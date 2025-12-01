@@ -1,0 +1,17 @@
+{
+  "config": {
+    "mode": "I",
+    "rotor_set": "B III IV I",
+    "ring_settings": "01 01 01",
+    "ring_position": "20 06 10",
+    "pegboard": "FV PQ"
+  },
+  "function_mode": "Museum EN (Coded)",
+  "museum_delay": 90,
+  "always_send_config": true,
+  "word_group_size": 5,
+  "character_delay_ms": 2000,
+  "web_server_enabled": true,
+  "web_server_port": 8080,
+  "device": "/dev/ttyACM0"
+}
