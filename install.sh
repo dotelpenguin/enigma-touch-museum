@@ -336,14 +336,15 @@ show_installation_checklist() {
     echo "  [✓] Set executable permissions on enigma-museum.py"
     echo "  [✓] Create startup script (start-enigma-museum.sh)"
     echo ""
-    echo -e "${YELLOW}Optional Steps (you will be prompted):${NC}"
+    echo -e "${YELLOW}Configuration Steps (you will be prompted):${NC}"
+    echo "  [ ] Select default museum mode (EN/DE, coded or on-the-fly)"
     echo "  [ ] Enable console auto-login (recommended for kiosk mode)"
     echo "  [ ] Add startup script to ~/.bashrc (for auto-start on login)"
     echo ""
     echo -e "${YELLOW}What the startup script does:${NC}"
     echo "  - Waits 5 seconds for user input on each start"
     echo "  - If key pressed: offers Config mode, Shell, or Museum mode"
-    echo "  - If no input: automatically starts Museum mode"
+    echo "  - If no input: automatically starts Museum mode (using selected default)"
     echo "  - Auto-restarts if application exits (kiosk mode)"
     echo ""
     echo -e "${YELLOW}System Requirements:${NC}"
@@ -372,11 +373,11 @@ show_installation_checklist() {
 show_installation_checklist
 
 # Update package list
-echo -e "${YELLOW}[1/7] Updating package list...${NC}"
+echo -e "${YELLOW}[1/8] Updating package list...${NC}"
 sudo apt-get update
 
 # Install Python 3 and pip if not already installed
-echo -e "${YELLOW}[2/7] Installing Python 3 and pip...${NC}"
+echo -e "${YELLOW}[2/8] Installing Python 3 and pip...${NC}"
 if ! command -v python3 &> /dev/null; then
     sudo apt-get install -y python3
 else
@@ -390,11 +391,11 @@ else
 fi
 
 # Install pyserial
-echo -e "${YELLOW}[3/7] Installing pyserial...${NC}"
+echo -e "${YELLOW}[3/8] Installing pyserial...${NC}"
 pip3 install --user pyserial
 
 # Add user to dialout group for serial device access
-echo -e "${YELLOW}[4/7] Adding user to dialout group...${NC}"
+echo -e "${YELLOW}[4/8] Adding user to dialout group...${NC}"
 if groups | grep -q "\bdialout\b"; then
     echo "User already in dialout group"
 else
@@ -404,13 +405,52 @@ else
 fi
 
 # Make the main script executable
-echo -e "${YELLOW}[5/7] Setting permissions...${NC}"
+echo -e "${YELLOW}[5/8] Setting permissions...${NC}"
 chmod +x "$SCRIPT_DIR/enigma-museum.py"
 
+# Prompt for default museum mode
+echo -e "${YELLOW}[6/8] Configuring default museum mode...${NC}"
+echo ""
+echo "Select the default museum mode message set:"
+echo "  [1] Museum EN - English messages (encoded on-the-fly)"
+echo "  [2] Museum DE - German messages (encoded on-the-fly)"
+echo "  [3] Museum EN (Coded) - English pre-coded messages"
+echo "  [4] Museum DE (Coded) - German pre-coded messages"
+echo ""
+read -p "Enter choice (1-4) [default: 1]: " museum_mode_choice
+
+# Set default museum mode based on choice
+case "${museum_mode_choice:-1}" in
+    1)
+        DEFAULT_MUSEUM_MODE="--museum-en"
+        MUSEUM_MODE_NAME="Museum EN"
+        ;;
+    2)
+        DEFAULT_MUSEUM_MODE="--museum-de"
+        MUSEUM_MODE_NAME="Museum DE"
+        ;;
+    3)
+        DEFAULT_MUSEUM_MODE="--museum-en-coded"
+        MUSEUM_MODE_NAME="Museum EN (Coded)"
+        ;;
+    4)
+        DEFAULT_MUSEUM_MODE="--museum-de-coded"
+        MUSEUM_MODE_NAME="Museum DE (Coded)"
+        ;;
+    *)
+        echo -e "${YELLOW}Invalid choice, using default: Museum EN${NC}"
+        DEFAULT_MUSEUM_MODE="--museum-en"
+        MUSEUM_MODE_NAME="Museum EN"
+        ;;
+esac
+
+echo -e "${GREEN}Default museum mode set to: $MUSEUM_MODE_NAME${NC}"
+echo ""
+
 # Create startup script
-echo -e "${YELLOW}[6/7] Creating startup script...${NC}"
+echo -e "${YELLOW}[7/8] Creating startup script...${NC}"
 STARTUP_SCRIPT="$SCRIPT_DIR/start-enigma-museum.sh"
-cat > "$STARTUP_SCRIPT" << 'EOF'
+cat > "$STARTUP_SCRIPT" << EOF
 #!/bin/bash
 #
 # Startup script for Enigma Museum Controller
@@ -418,8 +458,9 @@ cat > "$STARTUP_SCRIPT" << 'EOF'
 #
 
 # Get the directory where this script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-APP_SCRIPT="$SCRIPT_DIR/enigma-museum.py"
+SCRIPT_DIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
+APP_SCRIPT="\$SCRIPT_DIR/enigma-museum.py"
+DEFAULT_MODE="$DEFAULT_MUSEUM_MODE"
 
 # Function to wait for input with timeout
 # Returns: 0 = continue loop, 1 = exit to shell
@@ -431,15 +472,15 @@ wait_for_input() {
     echo "=========================================="
     echo "Enigma Museum Controller"
     echo "=========================================="
-    echo "Press any key within ${timeout} seconds to enter config mode or quit to shell"
+    echo "Press any key within \${timeout} seconds to enter config mode or quit to shell"
     echo "Otherwise, museum mode will start automatically..."
     echo ""
     
     # Use read with timeout (non-blocking)
     # -t timeout, -n 1 means read 1 character, -s silent (don't echo)
-    read -t $timeout -n 1 -s input 2>/dev/null || true
+    read -t \$timeout -n 1 -s input 2>/dev/null || true
     
-    if [ -n "$input" ]; then
+    if [ -n "\$input" ]; then
         # User pressed a key - clear the input buffer
         while read -t 0.1 -n 1 -s dummy 2>/dev/null; do :; done
         
@@ -451,10 +492,10 @@ wait_for_input() {
         echo ""
         read -p "Enter choice (C/S/M): " choice
         
-        case "${choice,,}" in
+        case "\${choice,,}" in
             c)
                 echo "Starting config mode..."
-                python3 "$APP_SCRIPT" --config
+                python3 "\$APP_SCRIPT" --config
                 return 0  # Continue loop (restart)
                 ;;
             s)
@@ -463,12 +504,12 @@ wait_for_input() {
                 ;;
             m)
                 echo "Starting museum mode..."
-                python3 "$APP_SCRIPT" --museum-en
+                python3 "\$APP_SCRIPT" \$DEFAULT_MODE
                 return 0  # Continue loop (restart)
                 ;;
             *)
                 echo "Invalid choice, starting museum mode..."
-                python3 "$APP_SCRIPT" --museum-en
+                python3 "\$APP_SCRIPT" \$DEFAULT_MODE
                 return 0  # Continue loop (restart)
                 ;;
         esac
@@ -476,7 +517,7 @@ wait_for_input() {
         # Timeout - start museum mode automatically
         echo ""
         echo "Starting museum mode..."
-        python3 "$APP_SCRIPT" --museum-en
+        python3 "\$APP_SCRIPT" \$DEFAULT_MODE
         return 0  # Continue loop (restart)
     fi
 }
@@ -499,7 +540,7 @@ chmod +x "$STARTUP_SCRIPT"
 echo -e "${GREEN}Startup script created: $STARTUP_SCRIPT${NC}"
 
 # Configure console auto-login
-echo -e "${YELLOW}[7/7] Configuring console auto-login...${NC}"
+echo -e "${YELLOW}[8/8] Configuring console auto-login...${NC}"
 enable_console_autologin
 
 # Ask if user wants to add to bash profile
