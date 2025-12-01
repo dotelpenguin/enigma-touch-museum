@@ -448,6 +448,97 @@ else
     echo -e "${YELLOW}Note: You may need to log out and back in for this to take effect${NC}"
 fi
 
+# Function to verify and fix serial device permissions
+verify_serial_permissions() {
+    echo ""
+    echo -e "${YELLOW}Verifying serial device permissions...${NC}"
+    
+    # Check if user is actually in dialout group in current session
+    if id -nG | grep -q "\bdialout\b"; then
+        echo -e "${GREEN}✓ User is in dialout group (current session)${NC}"
+    else
+        echo -e "${RED}✗ User is NOT in dialout group in current session${NC}"
+        echo -e "${YELLOW}You need to log out and back in, or run: newgrp dialout${NC}"
+        echo ""
+        read -p "Try to activate dialout group in current session? (y/n): " activate_group
+        if [[ "${activate_group,,}" == "y" ]]; then
+            echo "Running: newgrp dialout"
+            echo -e "${YELLOW}Note: This will start a new shell. Type 'exit' to return.${NC}"
+            newgrp dialout
+        fi
+    fi
+    
+    # Check for common serial devices
+    SERIAL_DEVICES=$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null)
+    if [ -z "$SERIAL_DEVICES" ]; then
+        echo -e "${YELLOW}No serial devices found (ttyACM* or ttyUSB*)${NC}"
+        echo "Make sure your device is connected"
+    else
+        echo ""
+        echo "Found serial devices:"
+        for device in $SERIAL_DEVICES; do
+            if [ -e "$device" ]; then
+                perms=$(stat -c "%a %U:%G" "$device" 2>/dev/null)
+                echo "  $device - $perms"
+                
+                # Check if user can read/write
+                if [ -r "$device" ] && [ -w "$device" ]; then
+                    echo -e "    ${GREEN}✓ Readable and writable${NC}"
+                else
+                    echo -e "    ${RED}✗ Permission denied${NC}"
+                    echo -e "    ${YELLOW}Attempting to fix permissions...${NC}"
+                    sudo chmod 666 "$device" 2>/dev/null
+                    if [ $? -eq 0 ]; then
+                        echo -e "    ${GREEN}✓ Permissions fixed (temporary)${NC}"
+                        echo -e "    ${YELLOW}Note: Permissions may reset after device reconnect${NC}"
+                    else
+                        echo -e "    ${RED}✗ Could not fix permissions${NC}"
+                    fi
+                fi
+            fi
+        done
+    fi
+    
+    # Create udev rule for persistent permissions
+    echo ""
+    echo -e "${YELLOW}Creating udev rule for persistent serial device permissions...${NC}"
+    UDEV_RULE="/etc/udev/rules.d/99-enigma-serial.rules"
+    
+    if [ -f "$UDEV_RULE" ]; then
+        echo "Udev rule already exists: $UDEV_RULE"
+        read -p "Replace existing udev rule? (y/n): " replace_udev
+        if [[ "${replace_udev,,}" != "y" ]]; then
+            echo "Keeping existing udev rule"
+            return
+        fi
+    fi
+    
+    read -p "Create udev rule to set serial device permissions? (y/n): " create_udev
+    if [[ "${create_udev,,}" == "y" ]]; then
+        sudo tee "$UDEV_RULE" > /dev/null << 'UDEV_EOF'
+# Enigma Museum Controller - Serial device permissions
+# Allow dialout group to access USB serial devices
+SUBSYSTEM=="tty", ATTRS{idVendor}=="*", ATTRS{idProduct}=="*", MODE="0666", GROUP="dialout"
+UDEV_EOF
+        
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Udev rule created${NC}"
+            echo "Reloading udev rules..."
+            sudo udevadm control --reload-rules
+            sudo udevadm trigger
+            echo -e "${GREEN}Udev rules reloaded${NC}"
+            echo -e "${YELLOW}Note: You may need to reconnect the device for changes to take effect${NC}"
+        else
+            echo -e "${RED}Error: Could not create udev rule${NC}"
+        fi
+    else
+        echo "Skipping udev rule creation"
+    fi
+}
+
+# Verify serial permissions
+verify_serial_permissions
+
 # Make the main script executable
 echo -e "${YELLOW}[5/8] Setting permissions...${NC}"
 chmod +x "$SCRIPT_DIR/enigma-museum.py"
@@ -628,7 +719,8 @@ echo "Installation complete!"
 echo "==========================================${NC}"
 echo ""
 echo "Next steps:"
-echo "  1. If you were added to dialout group, log out and back in"
+echo "  1. If you were added to dialout group, you MUST log out and back in"
+echo "     (or run: newgrp dialout) for group membership to take effect"
 if command -v raspi-config &> /dev/null || [ -f "/etc/systemd/system/getty@tty1.service.d/autologin.conf" ]; then
     echo "  2. If auto-login was enabled, reboot for it to take effect: sudo reboot"
     echo "  3. Test the application: python3 $SCRIPT_DIR/enigma-museum.py --config"
@@ -637,6 +729,14 @@ else
     echo "  2. Test the application: python3 $SCRIPT_DIR/enigma-museum.py --config"
     echo "  3. Or run the startup script: $STARTUP_SCRIPT"
 fi
+echo ""
+echo -e "${YELLOW}Troubleshooting Serial Device Permissions:${NC}"
+echo "  If you get 'Permission denied' accessing /dev/ttyACM0:"
+echo "  1. Verify group membership: groups (should show 'dialout')"
+echo "  2. If not showing, log out and back in, or run: newgrp dialout"
+echo "  3. Check device permissions: ls -l /dev/ttyACM*"
+echo "  4. Verify udev rule: cat /etc/udev/rules.d/99-enigma-serial.rules"
+echo "  5. If device exists but no permissions: sudo chmod 666 /dev/ttyACM0"
 echo ""
 echo -e "${YELLOW}Important Notes:${NC}"
 echo "  - This application is designed for Raspberry Pi OS Lite (console-only)"
