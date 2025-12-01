@@ -134,12 +134,31 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
     
     # Function to handle pyserial removal
     handle_pyserial() {
-        if pip3 show pyserial &>/dev/null; then
-            echo -e "${YELLOW}pyserial is installed${NC}"
+        # Check if installed via apt
+        if dpkg -l | grep -q "^ii.*python3-serial"; then
+            echo -e "${YELLOW}python3-serial is installed via apt${NC}"
+            echo -e "${RED}Warning: Removing pyserial may affect other Python applications${NC}"
+            echo "that use serial communication"
+            read -p "Uninstall python3-serial? (y/n): " remove_pyserial
+            if [[ "${remove_pyserial,,}" == "y" ]]; then
+                sudo apt-get remove -y python3-serial 2>/dev/null
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}Uninstalled python3-serial${NC}"
+                else
+                    echo -e "${YELLOW}Warning: Could not uninstall python3-serial${NC}"
+                fi
+            else
+                echo "Keeping python3-serial installed"
+            fi
+        # Check if installed via pip
+        elif pip3 show pyserial &>/dev/null; then
+            echo -e "${YELLOW}pyserial is installed via pip${NC}"
             echo -e "${RED}Warning: Removing pyserial may affect other Python applications${NC}"
             echo "that use serial communication"
             read -p "Uninstall pyserial? (y/n): " remove_pyserial
             if [[ "${remove_pyserial,,}" == "y" ]]; then
+                # Try with --break-system-packages first (if it was installed that way)
+                pip3 uninstall -y --break-system-packages pyserial 2>/dev/null || \
                 pip3 uninstall -y pyserial 2>/dev/null
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}Uninstalled pyserial${NC}"
@@ -151,7 +170,7 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
                 echo "Keeping pyserial installed"
             fi
         else
-            echo "pyserial is not installed (or not found via pip3)"
+            echo "pyserial/python3-serial is not installed (or not found)"
         fi
     }
     
@@ -331,7 +350,7 @@ show_installation_checklist() {
     echo -e "${YELLOW}Required Steps:${NC}"
     echo "  [✓] Update package list (apt-get update)"
     echo "  [✓] Install Python 3 and pip3 (if not already installed)"
-    echo "  [✓] Install pyserial library (pip3 install --user pyserial)"
+    echo "  [✓] Install pyserial library (via apt python3-serial or pip3)"
     echo "  [✓] Add user to dialout group (for serial device access)"
     echo "  [✓] Set executable permissions on enigma-museum.py"
     echo "  [✓] Create startup script (start-enigma-museum.sh)"
@@ -392,7 +411,32 @@ fi
 
 # Install pyserial
 echo -e "${YELLOW}[3/8] Installing pyserial...${NC}"
-pip3 install --user pyserial
+# Try installing via apt first (preferred method for system-wide installation)
+if apt-cache show python3-serial &>/dev/null; then
+    echo "Installing pyserial via apt (python3-serial)..."
+    sudo apt-get install -y python3-serial
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}pyserial installed via apt${NC}"
+    else
+        echo -e "${YELLOW}apt installation failed, trying pip...${NC}"
+        # Fall back to pip with --break-system-packages (acceptable for kiosk systems)
+        pip3 install --break-system-packages pyserial
+    fi
+else
+    echo "python3-serial not available in apt, installing via pip..."
+    # Use --break-system-packages flag for externally managed environments
+    # This is acceptable for kiosk systems where system-wide installation is desired
+    pip3 install --break-system-packages pyserial
+    if [ $? -ne 0 ]; then
+        echo -e "${YELLOW}Trying with --user flag as fallback...${NC}"
+        pip3 install --user pyserial || {
+            echo -e "${RED}Error: Could not install pyserial${NC}"
+            echo "Please install manually: sudo apt-get install python3-serial"
+            echo "or: pip3 install --break-system-packages pyserial"
+            exit 1
+        }
+    fi
+fi
 
 # Add user to dialout group for serial device access
 echo -e "${YELLOW}[4/8] Adding user to dialout group...${NC}"
