@@ -320,6 +320,57 @@ enable_console_autologin() {
 # Check desktop environment
 check_desktop_environment
 
+# Show installation checklist and get confirmation
+show_installation_checklist() {
+    echo -e "${GREEN}=========================================="
+    echo "Installation Checklist"
+    echo "==========================================${NC}"
+    echo ""
+    echo "The following will be performed:"
+    echo ""
+    echo -e "${YELLOW}Required Steps:${NC}"
+    echo "  [✓] Update package list (apt-get update)"
+    echo "  [✓] Install Python 3 and pip3 (if not already installed)"
+    echo "  [✓] Install pyserial library (pip3 install --user pyserial)"
+    echo "  [✓] Add user to dialout group (for serial device access)"
+    echo "  [✓] Set executable permissions on enigma-museum.py"
+    echo "  [✓] Create startup script (start-enigma-museum.sh)"
+    echo ""
+    echo -e "${YELLOW}Optional Steps (you will be prompted):${NC}"
+    echo "  [ ] Enable console auto-login (recommended for kiosk mode)"
+    echo "  [ ] Add startup script to ~/.bashrc (for auto-start on login)"
+    echo ""
+    echo -e "${YELLOW}What the startup script does:${NC}"
+    echo "  - Waits 5 seconds for user input on each start"
+    echo "  - If key pressed: offers Config mode, Shell, or Museum mode"
+    echo "  - If no input: automatically starts Museum mode"
+    echo "  - Auto-restarts if application exits (kiosk mode)"
+    echo ""
+    echo -e "${YELLOW}System Requirements:${NC}"
+    echo "  - Raspberry Pi OS Lite (console-only) recommended"
+    echo "  - Python 3.x"
+    echo "  - Serial device access (USB serial adapter)"
+    echo ""
+    echo -e "${YELLOW}Note:${NC}"
+    echo "  - Some steps require sudo privileges (you will be prompted)"
+    echo "  - You may need to log out/in after dialout group addition"
+    echo "  - Auto-login changes require a reboot to take effect"
+    echo ""
+    echo -e "${GREEN}==========================================${NC}"
+    echo ""
+    read -p "Continue with installation? (y/n): " confirm_install
+    
+    if [[ "${confirm_install,,}" != "y" ]]; then
+        echo ""
+        echo "Installation cancelled by user."
+        exit 0
+    fi
+    echo ""
+}
+
+# Show checklist and get confirmation
+show_installation_checklist
+
 # Update package list
 echo -e "${YELLOW}[1/7] Updating package list...${NC}"
 sudo apt-get update
