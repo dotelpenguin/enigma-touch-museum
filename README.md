@@ -409,6 +409,7 @@ Future enhancements and improvements for the Enigma Museum Controller:
 - [ ] Bi-directional communication from Enigma to Kiosk Controller
 - [ ] New message format allowing display of properly decoded messages with original spacing (also for simulation mode)
 - [ ] Advanced web interface with JavaScript/WebSockets (better than refresh)
+- [ ] Slideshow for messages. Image slides every X characters. Common folder, or numbered folder for each message.
 - [ ] Simulation Mode (when Enigma Touch is not connected)
 - [ ] Enhance web interface with additional display options
 - [ ] Add support for multiple simultaneous device connections (Interactive Encoding/Decoding)
