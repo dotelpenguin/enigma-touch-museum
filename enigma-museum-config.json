@@ -13,5 +13,5 @@
   "character_delay_ms": 2000,
   "web_server_enabled": true,
   "web_server_port": 8080,
-  "device": "/dev/ttyACM0"
+  "device": "/dev/tty.usbmodem207139584B471"
 }

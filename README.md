@@ -71,7 +71,19 @@ Detailed status view showing all device information and current settings:
 - Python 3.x
 - [pyserial](https://pypi.org/project/pyserial/) (for serial communication)
 - Enigma Touch device connected via USB serial interface
-- Enigma Touch firmware 1.12+ (limited testing on different firmware versions) 
+- Enigma Touch firmware 1.12+ (limited testing on different firmware versions)
+
+### Python Dependencies
+
+All Python dependencies are listed in `requirements.txt`. Install them with:
+```bash
+pip3 install -r requirements.txt
+```
+
+On macOS with Homebrew-managed Python, you may need:
+```bash
+pip3 install --break-system-packages -r requirements.txt
+``` 
 
 ## Tested Hardware/Systems
 
@@ -137,6 +149,49 @@ To remove auto-start and custom configurations:
 
 **Note:** The installation script is designed for Raspberry Pi OS Lite (console-only). If a desktop environment is detected, you'll be warned but can continue anyway.
 
+### macOS Installation (Homebrew)
+
+1. **Install Homebrew** (if not already installed):
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+2. **Install Python 3:**
+```bash
+brew install python3
+```
+
+3. **Clone the repository:**
+```bash
+git clone https://github.com/dotelpenguin/enigma-touch-museum.git
+cd enigma-touch-museum
+```
+
+4. **Install dependencies using requirements.txt:**
+```bash
+pip3 install --break-system-packages -r requirements.txt
+```
+
+   **Note:** macOS uses externally-managed Python environments. The `--break-system-packages` flag is required for Homebrew-managed Python installations. Alternatively, you can use a virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+5. **Find your serial device:**
+   On macOS, USB serial devices typically appear as `/dev/tty.usbserial-*` or `/dev/cu.usbserial-*`. To find your Enigma Touch device:
+```bash
+ls /dev/tty.usbserial* /dev/cu.usbserial* 2>/dev/null
+# Or list all serial devices:
+ls /dev/tty.* /dev/cu.* 2>/dev/null | grep -i usb
+```
+
+   The device path will be something like `/dev/tty.usbserial-1410` or `/dev/cu.usbserial-1410`. Use the `/dev/cu.*` path (not `/dev/tty.*`) for better compatibility.
+
+6. **macOS Permissions:**
+   macOS may prompt you to allow Terminal (or your terminal emulator) to access USB devices. If you encounter permission errors, check System Settings → Privacy & Security → USB Accessories.
+
 ### Generic Installation (Other Linux/Unix Systems)
 
 1. **Install Python 3:**
@@ -144,9 +199,6 @@ To remove auto-start and custom configurations:
 # On Debian/Ubuntu/Raspberry Pi OS
 sudo apt-get update
 sudo apt-get install python3 python3-pip
-
-# On macOS (using Homebrew)
-brew install python3
 ```
 
 2. **Clone the repository:**
@@ -157,8 +209,13 @@ cd enigma-touch-museum
 
 3. **Install dependencies:**
 ```bash
+# Using requirements.txt (recommended)
+pip3 install -r requirements.txt
+
+# Or install manually
 pip3 install pyserial
-# Or on Debian/Ubuntu/Raspberry Pi OS:
+
+# Or on Debian/Ubuntu/Raspberry Pi OS (system package):
 sudo apt-get install python3-serial
 ```
 
@@ -315,9 +372,16 @@ Ring position updates during encoding are not saved to the config file. Only exp
 
 ### Cannot Connect to Device
 
+**Linux/Raspberry Pi:**
 1. Check device path: `ls -l /dev/ttyACM*` or `ls -l /dev/ttyUSB*`
 2. Verify permissions: `groups` (should include `dialout`)
 3. Use `--config` to change device path without connecting
+
+**macOS:**
+1. Check device path: `ls /dev/tty.usbserial* /dev/cu.usbserial*` or `ls /dev/tty.* /dev/cu.* | grep -i usb`
+2. Use `/dev/cu.*` paths (not `/dev/tty.*`) for better compatibility
+3. Check System Settings → Privacy & Security → USB Accessories if permission errors occur
+4. Use `--config` to change device path without connecting
 
 ### Web Server Not Starting
 
