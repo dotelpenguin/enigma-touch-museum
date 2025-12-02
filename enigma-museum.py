@@ -4,6 +4,9 @@ Enigma Museum Controller - CLI tool for controlling Enigma device
 Duplicates ESP32 controller functionality with curses-based menu interface
 """
 
+# Application Version
+VERSION = "v1.01"
+
 import serial
 import time
 import sys
@@ -56,7 +59,7 @@ if not GERMAN_MESSAGES:
 class EnigmaController:
     """Handles serial communication with Enigma device"""
     
-    def __init__(self, device: str = DEFAULT_DEVICE):
+    def __init__(self, device: str = DEFAULT_DEVICE, preserve_device: bool = False):
         self.device = device
         self.ser: Optional[serial.Serial] = None
         self.config = {
@@ -75,7 +78,7 @@ class EnigmaController:
         self.web_server_port = 8080  # Default web server port
         self.config_file = CONFIG_FILE
         # Load saved config if it exists
-        self.load_config()
+        self.load_config(preserve_device=preserve_device)
     
     def save_config(self, preserve_ring_position=True):
         """Save current configuration to file
@@ -112,8 +115,12 @@ class EnigmaController:
         except Exception as e:
             return False
     
-    def load_config(self):
-        """Load configuration from file"""
+    def load_config(self, preserve_device: bool = False):
+        """Load configuration from file
+        
+        Args:
+            preserve_device: If True, don't overwrite self.device with device from config file
+        """
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r') as f:
@@ -135,7 +142,7 @@ class EnigmaController:
                         self.web_server_enabled = config_data['web_server_enabled']
                     if 'web_server_port' in config_data:
                         self.web_server_port = config_data['web_server_port']
-                    if 'device' in config_data:
+                    if 'device' in config_data and not preserve_device:
                         self.device = config_data['device']
                 return True
         except Exception:
@@ -419,7 +426,8 @@ class EnigmaController:
             if debug_callback:
                 debug_callback("Sending configuration before message...")
             # Reload config from file to ensure we use saved defaults, not current state
-            self.load_config()
+            # Preserve device to avoid changing it during operation
+            self.load_config(preserve_device=True)
             # Get saved config values (from file, not in-memory)
             saved = self.get_saved_config()
             self.set_mode(saved['config']['mode'], debug_callback=debug_callback)
@@ -1002,11 +1010,12 @@ class MuseumWebServer:
                 else:
                     html += '            <div class="log-entry">No activity yet...</div>\n'
                 
-                html += """        </div>
+                html += f"""        </div>
         
         <div style="text-align: center; margin-top: 20px; color: #888;">
             <p>Page auto-refreshes every 2 seconds</p>
             <p><a href="/message" style="color: #0ff;">View Kiosk Display</a></p>
+            <p>Museum Display {VERSION}</p>
         </div>
     </div>
 </body>
@@ -1337,10 +1346,10 @@ class MuseumWebServer:
                 if encoded_message:
                     html += f'            <div class="encoded-text">{html_module.escape(encoded_message)}</div>\n'
                 
-                html += """        </div>
+                html += f"""        </div>
         
         <div class="footer">
-            <p>Museum Display - Auto-refreshes every 2 seconds</p>
+            <p>Museum Display {VERSION} - Auto-refreshes every 2 seconds</p>
             <p>by Andrew Baker (DotelPenguin)</p>
         </div>
     </div>
@@ -1530,6 +1539,15 @@ class EnigmaMuseumUI:
             self.top_win.clear()
             max_y, max_x = self.top_win.getmaxyx()
             
+            # Title with version at the top
+            title = f"Enigma Museum Controller  {VERSION}"
+            title_x = (max_x - len(title)) // 2
+            if title_x >= 0:
+                try:
+                    self.top_win.addstr(0, max(0, title_x), title, curses.A_BOLD)
+                except:
+                    pass
+            
             # Get current settings
             config = self.controller.config
             
@@ -1543,8 +1561,8 @@ class EnigmaMuseumUI:
                 f"Char Delay: {char_delay:<15}  Web Server: {web_status:<20}",
             ]
             
-            # Center vertically and display
-            start_y = (max_y - len(settings_lines)) // 2
+            # Center vertically and display (starting from line 1 to leave room for title)
+            start_y = 1 + ((max_y - 1 - len(settings_lines)) // 2)
             for i, line in enumerate(settings_lines):
                 y = start_y + i
                 if y >= max_y:
@@ -2497,7 +2515,8 @@ class EnigmaMuseumUI:
         self.draw_settings_panel()
         
         # Reload config from file to ensure we use saved defaults, not current state
-        self.controller.load_config()
+        # Preserve device to avoid changing it during operation
+        self.controller.load_config(preserve_device=True)
         
         self.show_message(0, 0, "Setting all configurations from saved config...", curses.A_BOLD)
         self.draw_debug_panel()
@@ -2855,11 +2874,27 @@ class EnigmaMuseumUI:
         # Set debug enabled if requested via command line (before initializing curses)
         if debug_enabled:
             self.debug_enabled = True
-        self.stdscr = curses.initscr()
-        curses.noecho()
-        curses.cbreak()
-        curses.curs_set(0)
-        self.stdscr.keypad(True)
+        
+        # Initialize curses with error handling
+        try:
+            self.stdscr = curses.initscr()
+            curses.noecho()
+            curses.cbreak()
+            curses.curs_set(0)
+            self.stdscr.keypad(True)
+        except curses.error as e:
+            # Clean up if initialization fails
+            try:
+                curses.endwin()
+            except:
+                pass
+            print(f"ERROR: Failed to initialize curses interface: {e}")
+            print("This usually happens when:")
+            print("  - The terminal doesn't support curses")
+            print("  - Running in a non-interactive environment")
+            print("  - The terminal is too small or misconfigured")
+            print("\nTry running in a proper terminal emulator (not a non-interactive shell).")
+            sys.exit(1)
         
         # Initialize colors if supported
         if curses.has_colors():
@@ -2940,7 +2975,8 @@ Options:
 
 Arguments:
     DEVICE                     Serial device path (default: {DEFAULT_DEVICE})
-                              Examples: /dev/ttyACM0, /dev/ttyUSB0
+                              Examples: /dev/ttyACM0, /dev/ttyUSB0 (Linux)
+                                        /dev/cu.usbserial-1410 (macOS)
 
 Examples:
     {script_name}                        # Run with default device ({DEFAULT_DEVICE})
@@ -2966,7 +3002,7 @@ Description:
 
 def main():
     """Main entry point"""
-    device = DEFAULT_DEVICE
+    device = None  # None means use config file or default
     config_only = False
     museum_mode = None
     debug_enabled = False
@@ -3001,7 +3037,26 @@ def main():
             device = arg
         i += 1
     
-    controller = EnigmaController(device)
+    # If no device specified on command line, load from config file
+    if device is None:
+        # Load config to get device path
+        try:
+            if os.path.exists(CONFIG_FILE):
+                with open(CONFIG_FILE, 'r') as f:
+                    config_data = json.load(f)
+                    if 'device' in config_data:
+                        device = config_data['device']
+        except Exception:
+            pass
+        # Fall back to default if no device in config
+        if device is None:
+            device = DEFAULT_DEVICE
+        preserve_device = False
+    else:
+        # Device was explicitly specified on command line, preserve it
+        preserve_device = True
+    
+    controller = EnigmaController(device, preserve_device=preserve_device)
     
     # If config-only mode, skip connection and go straight to config menu
     if config_only:
@@ -3015,9 +3070,10 @@ def main():
         return
     
     # Normal mode - try to connect
-    print(f"Connecting to {device}...")
+    # Use controller.device to show the actual device being used
+    print(f"Connecting to {controller.device}...")
     if not controller.connect():
-        print(f"ERROR: Could not connect to {device}")
+        print(f"ERROR: Could not connect to {controller.device}")
         print("Make sure the device is connected and you have permission to access it.")
         print(f"\nTo change the device, run: {sys.argv[0]} --config")
         sys.exit(1)
