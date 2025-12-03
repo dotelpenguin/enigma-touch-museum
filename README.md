@@ -402,14 +402,16 @@ Ring position updates during encoding are not saved to the config file. Only exp
 Future enhancements and improvements for the Enigma Museum Controller:
 
 - [ ] Full German Translation (requires German speaker)
-- [ ] Break Python into modules, and cleanup code. 
+- [ ] Add Last Char returned to Top status screen, Used for enabling/stopping attact mode
+- [ ] Configure to Set and Lock Attact settings once firmware supports them
+- [ ] Break Python into modules, and cleanup code
 - [ ] Verify Enigma Touch is correctly configured and connected
 - [ ] Error checking and linting for config settings (no validation currently)
 - [ ] Pre-built Raspberry Pi image for easier kiosk deployment
 - [ ] Bi-directional communication from Enigma to Kiosk Controller
 - [ ] New message format allowing display of properly decoded messages with original spacing (also for simulation mode)
 - [ ] Advanced web interface with JavaScript/WebSockets (better than refresh)
-- [ ] Slideshow for messages. Image slides every X characters. Common folder, or numbered folder for each message.
+- [ ] Slideshow for messages. Image slides every X characters. Common folder, or numbered folder for each message
 - [ ] Simulation Mode (when Enigma Touch is not connected)
 - [ ] Enhance web interface with additional display options
 - [ ] Add support for multiple simultaneous device connections (Interactive Encoding/Decoding)
