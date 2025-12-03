@@ -78,14 +78,6 @@ class EnigmaController:
         self.web_server_port = 8080  # Default web server port
         self.web_server_ip: Optional[str] = None  # Web server IP address when running
         self.config_file = CONFIG_FILE
-        # Background monitoring for Enigma input
-        self.monitoring_thread: Optional[threading.Thread] = None
-        self.monitoring_active = False
-        self.monitoring_lock = threading.Lock()  # Lock to prevent interference with active operations
-        self.operation_in_progress = False  # Flag to indicate active operation
-        self.monitoring_debug_callback = None  # Callback for debug output from monitoring thread
-        self.monitoring_ui_refresh_callback = None  # Callback to refresh UI when keypress detected
-        self.monitoring_keypress_callback = None  # Callback for unexpected keypress during museum mode
         self.last_char_sent: Optional[str] = None  # Last character sent TO Enigma
         self.last_char_received: Optional[str] = None  # Last character received FROM Enigma (encoded)
         self.last_char_original: Optional[str] = None  # Original character that was encoded
@@ -211,8 +203,6 @@ class EnigmaController:
             time.sleep(2)  # Wait for device to be ready
             self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
-            # Start background monitoring
-            self.start_monitoring()
             return True
         except serial.SerialException as e:
             return False
@@ -360,64 +350,61 @@ class EnigmaController:
         if not self.ser or not self.ser.is_open:
             return None
         
-        # Acquire lock to prevent background monitoring from interfering
-        with self.monitoring_lock:
-            self.operation_in_progress = True
+        try:
+            # Clear input buffer before sending command to avoid mixing with previous data
+            self.ser.reset_input_buffer()
+            time.sleep(0.1)  # Small delay after clearing buffer
+            
+            # Decode command for logging - ensure we only show the actual command bytes
+            # Create a clean string representation directly from the command bytes
             try:
-                # Clear input buffer before sending command to avoid mixing with previous data
-                self.ser.reset_input_buffer()
-                time.sleep(0.1)  # Small delay after clearing buffer
-                
-                # Decode command for logging - ensure we only show the actual command bytes
-                # Create a clean string representation directly from the command bytes
-                try:
-                    cmd_str = command.decode('ascii', errors='replace')
-                    # Remove \r\n and any trailing whitespace for clean display
-                    cmd_str = cmd_str.replace('\r', '').replace('\n', '').strip()
-                    # Ensure we're not including any extra data
-                    if debug_callback:
-                        debug_callback(f">>> {cmd_str}")
-                except:
-                    if debug_callback:
-                        debug_callback(f">>> {command!r}")  # Show raw bytes if decode fails
-                
-                # Send the exact command bytes
-                self.ser.write(command)
-                self.ser.flush()
-                
-                time.sleep(0.5)  # Initial delay
-                response = b''
-                start_time = time.time()
-                
-                # Read response until we get a complete response or timeout
-                while time.time() - start_time < timeout:
-                    if self.ser.in_waiting > 0:
-                        response += self.ser.read(self.ser.in_waiting)
-                        time.sleep(0.1)
-                    else:
-                        if response:
-                            # Wait a bit more to ensure we got the complete response
-                            time.sleep(0.2)
-                            if self.ser.in_waiting > 0:
-                                response += self.ser.read(self.ser.in_waiting)
-                            break
-                    time.sleep(0.01)
-                
-                # Clear any remaining data in buffer after reading response
+                cmd_str = command.decode('ascii', errors='replace')
+                # Remove \r\n and any trailing whitespace for clean display
+                cmd_str = cmd_str.replace('\r', '').replace('\n', '').strip()
+                # Ensure we're not including any extra data
+                if debug_callback:
+                    debug_callback(f">>> {cmd_str}")
+            except:
+                if debug_callback:
+                    debug_callback(f">>> {command!r}")  # Show raw bytes if decode fails
+            
+            # Send the exact command bytes
+            self.ser.write(command)
+            self.ser.flush()
+            
+            time.sleep(0.5)  # Initial delay
+            response = b''
+            start_time = time.time()
+            
+            # Read response until we get a complete response or timeout
+            while time.time() - start_time < timeout:
                 if self.ser.in_waiting > 0:
-                    self.ser.reset_input_buffer()
-                
-                if response:
-                    try:
-                        decoded_response = response.decode('ascii', errors='replace')
-                        if debug_callback:
-                            debug_callback(f"<<< {decoded_response.strip()}")
-                        return decoded_response
-                    except:
-                        return None
-                return None
-            finally:
-                self.operation_in_progress = False
+                    response += self.ser.read(self.ser.in_waiting)
+                    time.sleep(0.1)
+                else:
+                    if response:
+                        # Wait a bit more to ensure we got the complete response
+                        time.sleep(0.2)
+                        if self.ser.in_waiting > 0:
+                            response += self.ser.read(self.ser.in_waiting)
+                        break
+                time.sleep(0.01)
+            
+            # Clear any remaining data in buffer after reading response
+            if self.ser.in_waiting > 0:
+                self.ser.reset_input_buffer()
+            
+            if response:
+                try:
+                    decoded_response = response.decode('ascii', errors='replace')
+                    if debug_callback:
+                        debug_callback(f"<<< {decoded_response.strip()}")
+                    return decoded_response
+                except:
+                    return None
+            return None
+        except Exception:
+            return None
     
     def query_mode(self, debug_callback=None) -> Optional[str]:
         """Query Enigma model/mode"""
@@ -621,41 +608,38 @@ class EnigmaController:
                 if position_update_callback:
                     position_update_callback()
         
-        # Acquire lock to prevent background monitoring from interfering during message encoding
-        with self.monitoring_lock:
-            self.operation_in_progress = True
-            try:
-                for i, char in enumerate(filtered_message):
-                    # All characters in filtered_message are already A-Z, so no need to check
+        try:
+            for i, char in enumerate(filtered_message):
+                # All characters in filtered_message are already A-Z, so no need to check
+                
+                char_count += 1  # Increment for each character we attempt to process
+                success = False
+                
+                # Retry loop for this character
+                retry_count = 0
+                max_retries = 3
+                while retry_count < max_retries and not success:
+                    # Clear input buffer before sending to ensure we get the right response
+                    self.ser.reset_input_buffer()
+                    time.sleep(0.1)  # Small delay after clearing
+                
+                    # Send character
+                    if debug_callback:
+                        debug_callback(f">>> '{char}'")
+                    # Update last character sent
+                    self.last_char_sent = char
+                    self.ser.write(char.encode('ascii'))
+                    self.ser.flush()
+                
+                    # Wait for complete response - read until we get the encoding response
+                    # We need to wait for a period of silence after detecting "Positions" to ensure complete response
+                    response = b''
+                    start_time = time.time()
+                    found_positions = False
+                    last_data_time = None
+                    silence_duration = 0.2  # Wait 200ms of silence after "Positions" to ensure complete response
                     
-                    char_count += 1  # Increment for each character we attempt to process
-                    success = False
-                    
-                    # Retry loop for this character
-                    retry_count = 0
-                    max_retries = 3
-                    while retry_count < max_retries and not success:
-                        # Clear input buffer before sending to ensure we get the right response
-                        self.ser.reset_input_buffer()
-                        time.sleep(0.1)  # Small delay after clearing
-                    
-                        # Send character
-                        if debug_callback:
-                            debug_callback(f">>> '{char}'")
-                        # Update last character sent
-                        self.last_char_sent = char
-                        self.ser.write(char.encode('ascii'))
-                        self.ser.flush()
-                    
-                        # Wait for complete response - read until we get the encoding response
-                        # We need to wait for a period of silence after detecting "Positions" to ensure complete response
-                        response = b''
-                        start_time = time.time()
-                        found_positions = False
-                        last_data_time = None
-                        silence_duration = 0.2  # Wait 200ms of silence after "Positions" to ensure complete response
-                        
-                        while time.time() - start_time < CHAR_TIMEOUT:
+                    while time.time() - start_time < CHAR_TIMEOUT:
                             if self.ser.in_waiting > 0:
                                 # Read all available data
                                 response += self.ser.read(self.ser.in_waiting)
@@ -690,190 +674,200 @@ class EnigmaController:
                                     # Have some response but no "Positions" yet, keep waiting
                                     time.sleep(0.01)
                             time.sleep(0.01)
-                    
-                        if response and found_positions:
-                            try:
-                                # Decode and normalize: remove all line returns, carriage returns, and normalize whitespace
-                                resp_text = response.decode('ascii', errors='replace')
-                                # Remove all line returns and carriage returns
-                                resp_text = resp_text.replace('\r', ' ').replace('\n', ' ')
-                                # Normalize multiple spaces to single space
-                                resp_text = ' '.join(resp_text.split())
-                                resp_text = resp_text.strip()
+                
+                    if response and found_positions:
+                        try:
+                            # Decode and normalize: remove all line returns, carriage returns, and normalize whitespace
+                            resp_text = response.decode('ascii', errors='replace')
+                            # Remove all line returns and carriage returns
+                            resp_text = resp_text.replace('\r', ' ').replace('\n', ' ')
+                            # Normalize multiple spaces to single space
+                            resp_text = ' '.join(resp_text.split())
+                            resp_text = resp_text.strip()
+                            
+                            if debug_callback:
+                                debug_callback(f"<<< {resp_text}")
+                            
+                            # Parse response format: "INPUT ENCODED Positions XX XX XX"
+                            # Example: "H O Positions 20 06 11"
+                            # The encoded character is the 2nd token (the letter after the input letter)
+                            parts = resp_text.split()
+                            encoded_char = None
+                            
+                            # Find pattern: two consecutive single uppercase letters followed by "Positions"
+                            # This identifies the encoding response: "INPUT ENCODED Positions"
+                            current_positions = None
+                            for j in range(len(parts) - 2):
+                                if (len(parts[j]) == 1 and parts[j].isalpha() and parts[j].isupper() and
+                                    len(parts[j+1]) == 1 and parts[j+1].isalpha() and parts[j+1].isupper() and
+                                    parts[j+2].lower() == 'positions'):
+                                    # Found: letter letter Positions - second letter is encoded
+                                    encoded_char = parts[j+1]
+                                    
+                                    # Extract rotor positions (should be 3 numbers after "Positions")
+                                    if j + 5 < len(parts):
+                                        try:
+                                            pos1 = int(parts[j+3])
+                                            pos2 = int(parts[j+4])
+                                            pos3 = int(parts[j+5])
+                                            current_positions = (pos1, pos2, pos3)
+                                        except (ValueError, IndexError):
+                                            if debug_callback:
+                                                debug_callback(f"Warning: Could not parse positions from response")
+                                    
+                                    if debug_callback:
+                                        debug_callback(f"Found: {parts[j]} -> {encoded_char}")
+                                        if current_positions:
+                                            debug_callback(f"Positions: {current_positions[0]} {current_positions[1]} {current_positions[2]}")
+                                    break
+                            
+                            if encoded_char:
+                                # Update last character info
+                                self.last_char_original = char
+                                self.last_char_received = encoded_char
                                 
-                                if debug_callback:
-                                    debug_callback(f"<<< {resp_text}")
-                                
-                                # Parse response format: "INPUT ENCODED Positions XX XX XX"
-                                # Example: "H O Positions 20 06 11"
-                                # The encoded character is the 2nd token (the letter after the input letter)
-                                parts = resp_text.split()
-                                encoded_char = None
-                                
-                                # Find pattern: two consecutive single uppercase letters followed by "Positions"
-                                # This identifies the encoding response: "INPUT ENCODED Positions"
-                                current_positions = None
-                                for j in range(len(parts) - 2):
-                                    if (len(parts[j]) == 1 and parts[j].isalpha() and parts[j].isupper() and
-                                        len(parts[j+1]) == 1 and parts[j+1].isalpha() and parts[j+1].isupper() and
-                                        parts[j+2].lower() == 'positions'):
-                                        # Found: letter letter Positions - second letter is encoded
-                                        encoded_char = parts[j+1]
-                                        
-                                        # Extract rotor positions (should be 3 numbers after "Positions")
-                                        if j + 5 < len(parts):
-                                            try:
-                                                pos1 = int(parts[j+3])
-                                                pos2 = int(parts[j+4])
-                                                pos3 = int(parts[j+5])
-                                                current_positions = (pos1, pos2, pos3)
-                                            except (ValueError, IndexError):
-                                                if debug_callback:
-                                                    debug_callback(f"Warning: Could not parse positions from response")
-                                        
+                                # Verify that positions have updated (for characters after the first)
+                                if previous_positions is not None and current_positions is not None:
+                                    if current_positions == previous_positions:
+                                        # Positions haven't changed - this might be a duplicate/old response
+                                        # Continue reading to get the updated response
                                         if debug_callback:
-                                            debug_callback(f"Found: {parts[j]} -> {encoded_char}")
-                                            if current_positions:
-                                                debug_callback(f"Positions: {current_positions[0]} {current_positions[1]} {current_positions[2]}")
-                                        break
-                                
-                                if encoded_char:
-                                    # Verify that positions have updated (for characters after the first)
-                                    if previous_positions is not None and current_positions is not None:
-                                        if current_positions == previous_positions:
-                                            # Positions haven't changed - this might be a duplicate/old response
-                                            # Continue reading to get the updated response
-                                            if debug_callback:
-                                                debug_callback(f"Positions unchanged ({current_positions}), continuing to read for update...")
-                                            # Continue the reading loop to get updated positions
-                                            # Reset found_positions so we keep reading
-                                            found_positions = False
-                                            # Read more data if available
-                                            additional_wait = 0.3  # Wait up to 300ms more for position update
-                                            additional_start = time.time()
-                                            while time.time() - additional_start < additional_wait:
-                                                if self.ser.in_waiting > 0:
-                                                    response += self.ser.read(self.ser.in_waiting)
-                                                    # Re-parse to check for updated positions
-                                                    resp_text = response.decode('ascii', errors='replace')
-                                                    resp_text = resp_text.replace('\r', ' ').replace('\n', ' ')
-                                                    resp_text = ' '.join(resp_text.split()).strip()
-                                                    parts = resp_text.split()
-                                                    # Look for updated positions
-                                                    for k in range(len(parts) - 2):
-                                                        if (len(parts[k]) == 1 and parts[k].isalpha() and parts[k].isupper() and
-                                                            len(parts[k+1]) == 1 and parts[k+1].isalpha() and parts[k+1].isupper() and
-                                                            parts[k+2].lower() == 'positions' and k + 5 < len(parts)):
-                                                            try:
-                                                                new_pos1 = int(parts[k+3])
-                                                                new_pos2 = int(parts[k+4])
-                                                                new_pos3 = int(parts[k+5])
-                                                                new_positions = (new_pos1, new_pos2, new_pos3)
-                                                                if new_positions != previous_positions:
-                                                                    # Found updated positions!
-                                                                    current_positions = new_positions
-                                                                    encoded_char = parts[k+1]  # Update encoded char in case it's different
-                                                                    if debug_callback:
-                                                                        debug_callback(f"Found updated positions: {previous_positions} -> {current_positions}")
-                                                                    break
-                                                            except (ValueError, IndexError):
-                                                                pass
-                                                    if current_positions != previous_positions:
-                                                        break
-                                                time.sleep(0.05)
-                                            
-                                            # Check if we got updated positions
-                                            if current_positions != previous_positions:
-                                                # Positions updated!
-                                                encoded_chars.append(encoded_char)
-                                                previous_positions = current_positions
-                                                update_ring_position(current_positions)
-                                                success = True
-                                                if callback:
-                                                    callback(char_count, len(filtered_message), char, encoded_char, resp_text)
-                                            else:
-                                                # Still no position update - will retry
-                                                if debug_callback:
-                                                    debug_callback(f"Still no position update after waiting")
-                                                success = False
-                                        else:
-                                            # Positions have changed - good!
-                                            if debug_callback:
-                                                debug_callback(f"Positions updated: {previous_positions} -> {current_positions}")
+                                            debug_callback(f"Positions unchanged ({current_positions}), continuing to read for update...")
+                                        # Continue the reading loop to get updated positions
+                                        # Reset found_positions so we keep reading
+                                        found_positions = False
+                                        # Read more data if available
+                                        additional_wait = 0.3  # Wait up to 300ms more for position update
+                                        additional_start = time.time()
+                                        while time.time() - additional_start < additional_wait:
+                                            if self.ser.in_waiting > 0:
+                                                response += self.ser.read(self.ser.in_waiting)
+                                                # Re-parse to check for updated positions
+                                                resp_text = response.decode('ascii', errors='replace')
+                                                resp_text = resp_text.replace('\r', ' ').replace('\n', ' ')
+                                                resp_text = ' '.join(resp_text.split()).strip()
+                                                parts = resp_text.split()
+                                                # Look for updated positions
+                                                for k in range(len(parts) - 2):
+                                                    if (len(parts[k]) == 1 and parts[k].isalpha() and parts[k].isupper() and
+                                                        len(parts[k+1]) == 1 and parts[k+1].isalpha() and parts[k+1].isupper() and
+                                                        parts[k+2].lower() == 'positions' and k + 5 < len(parts)):
+                                                        try:
+                                                            new_pos1 = int(parts[k+3])
+                                                            new_pos2 = int(parts[k+4])
+                                                            new_pos3 = int(parts[k+5])
+                                                            new_positions = (new_pos1, new_pos2, new_pos3)
+                                                            if new_positions != previous_positions:
+                                                                # Found updated positions!
+                                                                current_positions = new_positions
+                                                                encoded_char = parts[k+1]  # Update encoded char in case it's different
+                                                                if debug_callback:
+                                                                    debug_callback(f"Found updated positions: {previous_positions} -> {current_positions}")
+                                                                break
+                                                        except (ValueError, IndexError):
+                                                            pass
+                                                if current_positions != previous_positions:
+                                                    break
+                                            time.sleep(0.05)
+                                        
+                                        # Check if we got updated positions
+                                        if current_positions != previous_positions:
+                                            # Positions updated!
                                             encoded_chars.append(encoded_char)
                                             previous_positions = current_positions
                                             update_ring_position(current_positions)
                                             success = True
                                             if callback:
-                                                # Use char_count which tracks the actual character being processed
                                                 callback(char_count, len(filtered_message), char, encoded_char, resp_text)
-                                    elif current_positions is not None:
-                                        # First character - just record positions
+                                        else:
+                                            # Still no position update - will retry
+                                            if debug_callback:
+                                                debug_callback(f"Still no position update after waiting")
+                                            success = False
+                                    else:
+                                        # Positions have changed - good!
+                                        if debug_callback:
+                                            debug_callback(f"Positions updated: {previous_positions} -> {current_positions}")
                                         encoded_chars.append(encoded_char)
                                         previous_positions = current_positions
                                         update_ring_position(current_positions)
                                         success = True
                                         if callback:
                                             # Use char_count which tracks the actual character being processed
-                                            callback(char_count, len(message), char, encoded_char, resp_text)
-                                    else:
-                                        # Could not extract positions
-                                        if debug_callback:
-                                            debug_callback(f"Warning: Could not extract positions from response")
-                                        # Still accept the encoded character but warn
-                                        encoded_chars.append(encoded_char)
-                                        success = True
-                                        if callback:
                                             callback(char_count, len(filtered_message), char, encoded_char, resp_text)
+                                elif current_positions is not None:
+                                    # First character - just record positions
+                                    encoded_chars.append(encoded_char)
+                                    previous_positions = current_positions
+                                    update_ring_position(current_positions)
+                                    success = True
+                                    if callback:
+                                        # Use char_count which tracks the actual character being processed
+                                        callback(char_count, len(message), char, encoded_char, resp_text)
                                 else:
-                                    # Could not find encoded character
+                                    # Could not extract positions
                                     if debug_callback:
-                                        debug_callback(f"Warning: Could not parse encoded character")
-                                        debug_callback(f"Response: {resp_text}")
-                                        debug_callback(f"Parts: {parts}")
-                            except Exception as e:
+                                        debug_callback(f"Warning: Could not extract positions from response")
+                                    # Still accept the encoded character but warn
+                                    encoded_chars.append(encoded_char)
+                                    success = True
+                                    if callback:
+                                        callback(char_count, len(filtered_message), char, encoded_char, resp_text)
+                            else:
+                                # Could not find encoded character
                                 if debug_callback:
-                                    debug_callback(f"Error parsing response: {e}")
-                        elif response and not found_positions:
-                            # Got response but it doesn't contain "Positions" - might be incomplete
+                                    debug_callback(f"Warning: Could not parse encoded character")
+                                    debug_callback(f"Response: {resp_text}")
+                                    debug_callback(f"Parts: {parts}")
+                        except Exception as e:
                             if debug_callback:
-                                resp_text = response.decode('ascii', errors='replace')
-                                debug_callback(f"Warning: Incomplete response (no Positions found): {resp_text[:50]}")
-                    
-                    if not success:
-                        retry_count += 1
-                        if retry_count < max_retries:
-                            if debug_callback:
-                                debug_callback(f"Retrying character '{char}' (attempt {retry_count + 1}/{max_retries})")
-                            # Reset and retry
-                            self.send_command(b'\r?MO\r\n\r\n', debug_callback=debug_callback)
-                            time.sleep(0.5)
-                            self.return_to_encode_mode(debug_callback=debug_callback)
-                            time.sleep(0.5)
-                        else:
-                            if debug_callback:
-                                debug_callback(f"Failed to encode '{char}' after {max_retries} attempts")
-                            # Decrement char_count since we didn't successfully process this character
-                            char_count -= 1
-                    
-                    # Apply delay between characters AFTER successful encoding (outside retry loop)
-                    # Only delay if character was successfully encoded and there are more characters to process
-                    if success and i < len(filtered_message) - 1:
-                        if self.character_delay_ms > 0:
-                            time.sleep(self.character_delay_ms / 1000.0)
-                        else:
-                            # Small delay after successful encoding to ensure device is ready for next character
-                            time.sleep(0.1)
+                                debug_callback(f"Error parsing response: {e}")
+                    elif response and not found_positions:
+                        # Got response but it doesn't contain "Positions" - might be incomplete
+                        if debug_callback:
+                            resp_text = response.decode('ascii', errors='replace')
+                            debug_callback(f"Warning: Incomplete response (no Positions found): {resp_text[:50]}")
                 
-                if debug_callback and encoded_chars:
-                    encoded_result = ''.join(encoded_chars)
-                    debug_callback(f"Encoded result (ungrouped): {encoded_result}")
-                    # Group the encoded result
-                    grouped_result = self._group_encoded_text(encoded_result)
-                    debug_callback(f"Encoded result (grouped): {grouped_result}")
-                return True
-            finally:
-                self.operation_in_progress = False
+                if not success:
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        if debug_callback:
+                            debug_callback(f"Retrying character '{char}' (attempt {retry_count + 1}/{max_retries})")
+                        # Reset and retry
+                        self.send_command(b'\r?MO\r\n\r\n', debug_callback=debug_callback)
+                        time.sleep(0.5)
+                        self.return_to_encode_mode(debug_callback=debug_callback)
+                        time.sleep(0.5)
+                    else:
+                        if debug_callback:
+                            debug_callback(f"Failed to encode '{char}' after {max_retries} attempts")
+                        # Decrement char_count since we didn't successfully process this character
+                        char_count -= 1
+                
+                # Apply delay between characters AFTER successful encoding (outside retry loop)
+                # Only delay if character was successfully encoded and there are more characters to process
+                if success and i < len(filtered_message) - 1:
+                    if self.character_delay_ms > 0:
+                        if debug_callback:
+                            debug_callback(f"Character delay: {self.character_delay_ms}ms")
+                        time.sleep(self.character_delay_ms / 1000.0)
+                    else:
+                        # Small delay after successful encoding to ensure device is ready for next character
+                        if debug_callback:
+                            debug_callback(f"Character delay: 100ms (default)")
+                        time.sleep(0.1)
+        
+            if debug_callback and encoded_chars:
+                encoded_result = ''.join(encoded_chars)
+                debug_callback(f"Encoded result (ungrouped): {encoded_result}")
+                # Group the encoded result
+                grouped_result = self._group_encoded_text(encoded_result)
+                debug_callback(f"Encoded result (grouped): {grouped_result}")
+            return True
+        except Exception as e:
+            if debug_callback:
+                debug_callback(f"Error in send_message: {e}")
+            return False
     
     def _group_encoded_text(self, text: str) -> str:
         """Group encoded text into groups of configured size with spaces"""
@@ -1921,29 +1915,6 @@ class EnigmaMuseumUI:
         if len(self.debug_output) > self.max_debug_lines:
             self.debug_output = self.debug_output[-self.max_debug_lines:]
     
-    def update_monitoring_debug_callback(self):
-        """Update the monitoring debug callback based on debug enabled state"""
-        if self.debug_enabled:
-            # Create a callback that adds to debug output and refreshes
-            def monitoring_debug_callback(msg):
-                self.add_debug_output(msg)
-                self.draw_debug_panel()
-                self.refresh_all_panels()
-            self.controller.monitoring_debug_callback = monitoring_debug_callback
-        else:
-            # Disable monitoring debug callback
-            self.controller.monitoring_debug_callback = None
-    
-    def setup_monitoring_callbacks(self):
-        """Set up all monitoring callbacks for UI refresh"""
-        # Set up UI refresh callback to update settings panel when keypress detected
-        def monitoring_ui_refresh_callback():
-            self.draw_settings_panel()
-            self.refresh_all_panels()
-        self.controller.monitoring_ui_refresh_callback = monitoring_ui_refresh_callback
-        
-        # Also set up debug callback if enabled
-        self.update_monitoring_debug_callback()
     
     def draw_debug_panel(self):
         """Draw debug output or logo in the right panel"""
@@ -2135,7 +2106,6 @@ class EnigmaMuseumUI:
                 if not self.debug_enabled:
                     self.debug_output = []  # Clear debug output when disabled
                 self.create_subwindows()  # Recreate subwindows
-                self.setup_monitoring_callbacks()  # Update monitoring callbacks
                 self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
                 continue
             elif key == curses.KEY_UP:
@@ -2151,7 +2121,6 @@ class EnigmaMuseumUI:
                     if not self.debug_enabled:
                         self.debug_output = []  # Clear debug output when disabled
                     self.create_subwindows()  # Recreate subwindows
-                    self.setup_monitoring_callbacks()  # Update monitoring callbacks
                     self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
                     continue
                 return options[selected][0]
@@ -3086,9 +3055,6 @@ class EnigmaMuseumUI:
             self.draw_debug_panel()
             self.refresh_all_panels()
         
-        # Ensure monitoring callbacks are set for museum mode
-        self.setup_monitoring_callbacks()
-        
         last_message_time = 0
         
         while True:
@@ -3123,7 +3089,7 @@ class EnigmaMuseumUI:
                     return False
                 
                 def position_update_callback():
-                    """Update settings panel when ring positions change"""
+                    """Update settings panel when ring positions change or characters are sent/received"""
                     self.draw_settings_panel()
                     self.refresh_all_panels()
                 
@@ -3170,9 +3136,6 @@ class EnigmaMuseumUI:
         # Set debug enabled if requested via command line (before initializing curses)
         if debug_enabled:
             self.debug_enabled = True
-        
-        # Set up monitoring callbacks (UI refresh and debug)
-        self.setup_monitoring_callbacks()
         
         # Initialize curses with error handling
         try:
