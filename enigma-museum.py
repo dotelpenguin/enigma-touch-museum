@@ -302,7 +302,7 @@ class EnigmaController:
                                                 pos_info = f" Positions {pos1:02d} {pos2:02d} {pos3:02d}"
                                             except (ValueError, IndexError):
                                                 pass
-                                        self.monitoring_debug_callback(f">>> '{original_char}' (keypress)")
+                                        self.monitoring_debug_callback(f">>> '{original_char}'")
                                         self.monitoring_debug_callback(f"<<< {original_char} {encoded_char}{pos_info}")
                                     
                                     # Update last character info
@@ -3089,19 +3089,6 @@ class EnigmaMuseumUI:
         # Ensure monitoring callbacks are set for museum mode
         self.setup_monitoring_callbacks()
         
-        # Track pause state for unexpected keypresses
-        last_unexpected_input_time = [0]  # Use list to allow modification in callback
-        museum_paused = [False]  # Use list to allow modification in callback
-        
-        def keypress_callback():
-            """Called when unexpected keypress is detected"""
-            last_unexpected_input_time[0] = time.time()
-            museum_paused[0] = True
-            add_log_message("Keypress detected - pausing museum mode")
-        
-        # Set up keypress callback
-        self.controller.monitoring_keypress_callback = keypress_callback
-        
         last_message_time = 0
         
         while True:
@@ -3111,20 +3098,6 @@ class EnigmaMuseumUI:
                 break
             
             current_time = time.time()
-            
-            # Check if we're paused due to unexpected input
-            if museum_paused[0]:
-                # Check if enough time has passed since last unexpected input
-                time_since_last_input = current_time - last_unexpected_input_time[0]
-                if time_since_last_input >= self.controller.museum_delay:
-                    # Resume museum mode
-                    museum_paused[0] = False
-                    add_log_message("Museum mode resumed")
-                    last_message_time = current_time  # Reset timer to send message soon
-                else:
-                    # Still paused, skip sending messages
-                    time.sleep(0.1)
-                    continue
             
             if current_time - last_message_time >= self.controller.museum_delay:
                 # Use the same function for both coded and uncoded messages
@@ -3170,9 +3143,6 @@ class EnigmaMuseumUI:
                 last_message_time = current_time
             
             time.sleep(0.1)
-        
-        # Clear keypress callback when exiting museum mode
-        self.controller.monitoring_keypress_callback = None
         
         # Stop web server if running
         if web_server:
