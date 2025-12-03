@@ -74,6 +74,7 @@ class EnigmaController:
         self.always_send_config = False  # Send config before each message
         self.word_group_size = 5  # Default to 5-character groups
         self.character_delay_ms = 0  # Delay in milliseconds between characters when encoding
+        self.generating_messages = False  # Flag to skip delays during message generation
         self.web_server_enabled = False  # Web server enabled/disabled flag
         self.web_server_port = 8080  # Default web server port
         self.web_server_ip: Optional[str] = None  # Web server IP address when running
@@ -847,15 +848,24 @@ class EnigmaController:
                 # Apply delay between characters AFTER successful encoding (outside retry loop)
                 # Only delay if character was successfully encoded and there are more characters to process
                 if success and i < len(filtered_message) - 1:
-                    if self.character_delay_ms > 0:
+                    # Skip delay if generating messages
+                    if self.generating_messages:
                         if debug_callback:
-                            debug_callback(f"Character delay: {self.character_delay_ms}ms")
-                        time.sleep(self.character_delay_ms / 1000.0)
-                    else:
+                            debug_callback(f"Skipping delay (generating messages)")
                         # Small delay after successful encoding to ensure device is ready for next character
-                        if debug_callback:
-                            debug_callback(f"Character delay: 100ms (default)")
                         time.sleep(0.1)
+                    else:
+                        # Normal delay handling
+                        current_delay = self.character_delay_ms
+                        if current_delay > 0:
+                            if debug_callback:
+                                debug_callback(f"Character delay: {current_delay}ms")
+                            time.sleep(current_delay / 1000.0)
+                        else:
+                            # Small delay after successful encoding to ensure device is ready for next character
+                            if debug_callback:
+                                debug_callback(f"Character delay: 0ms")
+                            time.sleep(0.1)
         
             if debug_callback and encoded_chars:
                 encoded_result = ''.join(encoded_chars)
@@ -1561,6 +1571,7 @@ class EnigmaMuseumUI:
         self.COLOR_SENT = 1      # Dark green for data sent to Enigma
         self.COLOR_RECEIVED = 2  # Bright green for data received from Enigma
         self.COLOR_INFO = 3      # Yellow for other info
+        self.COLOR_DELAY = 5     # Light purple for character delay messages
         self.COLOR_WEB_RUNNING = 2  # Green for enabled and running web server
         self.COLOR_WEB_ENABLED_NOT_RUNNING = 3  # Yellow for enabled but not running web server
         self.COLOR_WEB_DISABLED = 4  # Grey for disabled web server
@@ -1906,6 +1917,9 @@ class EnigmaMuseumUI:
                 elif line.startswith('<<<'):
                     # Data received from Enigma - bright green
                     color_type = self.COLOR_RECEIVED
+                elif 'Character delay' in line:
+                    # Character delay messages - light purple
+                    color_type = self.COLOR_DELAY
                 else:
                     # Other info - yellow
                     color_type = self.COLOR_INFO
@@ -2450,10 +2464,10 @@ class EnigmaMuseumUI:
         # Determine file paths
         if language == 'EN':
             input_file = ENGLISH_MSG_FILE
-            output_file = os.path.join(SCRIPT_DIR, 'english-coded.msg')
+            output_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
         else:
             input_file = GERMAN_MSG_FILE
-            output_file = os.path.join(SCRIPT_DIR, 'german-coded.msg')
+            output_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
         
         # Load messages from file
         messages = load_messages_from_file(input_file)
@@ -2487,17 +2501,109 @@ class EnigmaMuseumUI:
         file_exists = os.path.exists(output_file)
         coded_messages = []
         start_index = 0
+        existing_settings = None
         
         if file_exists:
-            # Load existing coded messages
-            coded_messages = load_messages_from_file(output_file)
-            if coded_messages is None:
+            # Load existing JSON file
+            try:
+                with open(output_file, 'r', encoding='utf-8') as f:
+                    coded_messages = json.load(f)
+                if not isinstance(coded_messages, list):
+                    coded_messages = []
+                
+                # Extract settings from first message if exists
+                if coded_messages and isinstance(coded_messages[0], dict):
+                    existing_settings = {
+                        'MODEL': coded_messages[0].get('MODEL'),
+                        'ROTOR': coded_messages[0].get('ROTOR'),
+                        'RINGSET': coded_messages[0].get('RINGSET'),
+                        'RINGPOS': coded_messages[0].get('RINGPOS'),
+                        'PLUG': coded_messages[0].get('PLUG'),
+                        'GROUP': coded_messages[0].get('GROUP')
+                    }
+                
+                start_index = len(coded_messages)
+            except (json.JSONDecodeError, IOError) as e:
+                # File exists but is invalid - treat as empty
                 coded_messages = []
-            # Filter out any non-string entries to ensure data integrity
-            coded_messages = [msg for msg in coded_messages if isinstance(msg, str)]
-            start_index = len(coded_messages)
-        else:
-            # Create empty file on first loop only (if file doesn't exist)
+                start_index = 0
+        
+        # Get saved config values for comparison
+        saved = self.controller.get_saved_config()
+        saved_config_values = saved['config']
+        current_settings = {
+            'MODEL': saved_config_values['mode'],
+            'ROTOR': saved_config_values['rotor_set'],
+            'RINGSET': saved_config_values['ring_settings'],
+            'RINGPOS': saved_config_values['ring_position'],
+            'PLUG': saved_config_values['pegboard'],
+            'GROUP': saved['word_group_size']
+        }
+        
+        # Compare settings if existing file found
+        settings_changed = False
+        if file_exists and existing_settings:
+            settings_changed = (
+                existing_settings.get('MODEL') != current_settings['MODEL'] or
+                existing_settings.get('ROTOR') != current_settings['ROTOR'] or
+                existing_settings.get('RINGSET') != current_settings['RINGSET'] or
+                existing_settings.get('RINGPOS') != current_settings['RINGPOS'] or
+                existing_settings.get('PLUG') != current_settings['PLUG'] or
+                existing_settings.get('GROUP') != current_settings['GROUP']
+            )
+        
+        # Show resume/restart prompt if file exists
+        if file_exists and coded_messages:
+            self.setup_screen()
+            self.draw_settings_panel()
+            self.left_win.clear()
+            max_y, max_x = self.left_win.getmaxyx()
+            
+            self.left_win.addstr(0, 0, f"Existing file found: {os.path.basename(output_file)}", curses.A_BOLD)
+            self.left_win.addstr(1, 0, f"Found {len(coded_messages)} encoded messages")
+            
+            if settings_changed:
+                self.left_win.addstr(2, 0, "", curses.A_BOLD)
+                self.left_win.addstr(3, 0, "WARNING: Enigma settings have changed!", curses.A_BOLD | curses.A_BLINK)
+                self.left_win.addstr(4, 0, "You should start over to ensure consistency.")
+                self.left_win.addstr(5, 0, "")
+                self.left_win.addstr(6, 0, "Current settings:")
+                self.left_win.addstr(7, 0, f"  MODEL: {current_settings['MODEL']} (was: {existing_settings.get('MODEL', 'N/A')})")
+                self.left_win.addstr(8, 0, f"  ROTOR: {current_settings['ROTOR']} (was: {existing_settings.get('ROTOR', 'N/A')})")
+                self.left_win.addstr(9, 0, f"  RINGSET: {current_settings['RINGSET']} (was: {existing_settings.get('RINGSET', 'N/A')})")
+                self.left_win.addstr(10, 0, f"  RINGPOS: {current_settings['RINGPOS']} (was: {existing_settings.get('RINGPOS', 'N/A')})")
+                self.left_win.addstr(11, 0, f"  PLUG: {current_settings['PLUG']} (was: {existing_settings.get('PLUG', 'N/A')})")
+                self.left_win.addstr(12, 0, f"  GROUP: {current_settings['GROUP']} (was: {existing_settings.get('GROUP', 'N/A')})")
+            else:
+                self.left_win.addstr(2, 0, "Settings match existing file.")
+            
+            self.left_win.addstr(13, 0, "")
+            self.left_win.addstr(14, 0, "Resume from existing file? (Y/N)")
+            self.left_win.addstr(15, 0, "If Enigma settings have changed, you should start over.")
+            self.left_win.refresh()
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            
+            # Get user choice
+            key = self.stdscr.getch()
+            if key == ord('y') or key == ord('Y'):
+                # Resume - keep existing coded_messages and start_index
+                pass
+            else:
+                # Start over - clear existing file
+                coded_messages = []
+                start_index = 0
+                try:
+                    with open(output_file, 'w', encoding='utf-8') as f:
+                        json.dump([], f, indent=2, ensure_ascii=False)
+                except Exception as e:
+                    self.show_message(0, 0, f"Error clearing output file: {str(e)}", curses.A_BOLD)
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)
+                    return
+        elif not file_exists:
+            # Create empty file on first run
             try:
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump([], f, indent=2, ensure_ascii=False)
@@ -2522,9 +2628,10 @@ class EnigmaMuseumUI:
             self.draw_settings_panel()
             self.refresh_all_panels()
         
-        # Get saved config values
-        saved = self.controller.get_saved_config()
-        saved_config_values = saved['config']
+        # Set flag to skip delays during message generation
+        self.controller.generating_messages = True
+        if debug_callback:
+            debug_callback(f"Message generation mode: delays will be skipped")
         
         # Process each message
         
@@ -2544,18 +2651,22 @@ class EnigmaMuseumUI:
                 self.left_win.addstr(4, 0, "Encoded so far:")
                 display_y = 5
                 for idx, coded in enumerate(coded_messages[-5:], start=max(0, len(coded_messages)-5)):
-                    # Ensure coded is a string
-                    if isinstance(coded, str):
+                    # Handle both old string format and new object format
+                    if isinstance(coded, dict):
+                        # New format: extract MSG field for display
+                        display_text = coded.get('MSG', '[No MSG field]')
+                        display_msg = f"{idx+1}: {display_text[:max_x-10]}"
+                    elif isinstance(coded, str):
+                        # Old format: backward compatibility
                         display_msg = f"{idx+1}: {coded[:max_x-10]}"
-                        if len(display_msg) > max_x:
-                            display_msg = display_msg[:max_x-3] + "..."
-                        self.left_win.addstr(display_y, 0, display_msg)
-                        display_y += 1
                     else:
-                        # Skip non-string entries
+                        # Invalid entry
                         display_msg = f"{idx+1}: [Invalid entry]"
-                        self.left_win.addstr(display_y, 0, display_msg)
-                        display_y += 1
+                    
+                    if len(display_msg) > max_x:
+                        display_msg = display_msg[:max_x-3] + "..."
+                    self.left_win.addstr(display_y, 0, display_msg)
+                    display_y += 1
             
             self.left_win.refresh()
             self.draw_debug_panel()
@@ -2588,22 +2699,32 @@ class EnigmaMuseumUI:
                 encoded_chars.append(encoded)
                 return False  # Don't cancel
             
+            # generating_messages flag is already set, so delays will be skipped
             success = self.controller.send_message(message, progress_callback, debug_callback, position_update_callback)
             
             if success and encoded_chars:
                 encoded_result = ''.join(encoded_chars)
-                # Ensure we have a valid string before appending
+                # Ensure we have a valid string before creating message object
                 if encoded_result and isinstance(encoded_result, str):
-                    coded_messages.append(encoded_result)
+                    # Create message object with all metadata
+                    message_obj = {
+                        'MSG': message,
+                        'MODEL': current_settings['MODEL'],
+                        'ROTOR': current_settings['ROTOR'],
+                        'RINGSET': current_settings['RINGSET'],
+                        'RINGPOS': current_settings['RINGPOS'],
+                        'PLUG': current_settings['PLUG'],
+                        'GROUP': current_settings['GROUP'],
+                        'CODED': encoded_result
+                    }
+                    coded_messages.append(message_obj)
                     
                     # Save progress after each message
                     try:
-                        # Ensure all entries are strings before saving
-                        valid_messages = [msg for msg in coded_messages if isinstance(msg, str)]
                         with open(output_file, 'w', encoding='utf-8') as f:
-                            json.dump(valid_messages, f, indent=2, ensure_ascii=False)
+                            json.dump(coded_messages, f, indent=2, ensure_ascii=False)
                         if debug_callback:
-                            debug_callback(f"Saved {len(valid_messages)}/{message_count} encoded messages")
+                            debug_callback(f"Saved {len(coded_messages)}/{message_count} encoded messages")
                     except Exception as e:
                         if debug_callback:
                             debug_callback(f"Error saving file: {str(e)}")
@@ -2613,6 +2734,11 @@ class EnigmaMuseumUI:
             else:
                 if debug_callback:
                     debug_callback(f"Warning: Failed to encode message {i+1}")
+        
+        # Clear generation flag
+        self.controller.generating_messages = False
+        if debug_callback:
+            debug_callback(f"Message generation complete: delays restored")
         
         # Final summary
         self.setup_screen()
@@ -2876,11 +3002,11 @@ class EnigmaMuseumUI:
         elif mode == '4':
             mode_name = 'Museum EN (Coded)'
             message_file = ENGLISH_MSG_FILE
-            coded_file = os.path.join(SCRIPT_DIR, 'english-coded.msg')
+            coded_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
         elif mode == '5':
             mode_name = 'Museum DE (Coded)'
             message_file = GERMAN_MSG_FILE
-            coded_file = os.path.join(SCRIPT_DIR, 'german-coded.msg')
+            coded_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
         else:
             return
         
@@ -2903,9 +3029,19 @@ class EnigmaMuseumUI:
                 time.sleep(3)
                 return
             
-            # Filter out non-string entries
-            coded_messages = [msg for msg in coded_messages if isinstance(msg, str)]
-            if not coded_messages:
+            # Extract CODED field from message objects (new format) or use strings directly (old format)
+            messages = []
+            for msg in coded_messages:
+                if isinstance(msg, dict):
+                    # New format: extract CODED field
+                    coded_text = msg.get('CODED', '')
+                    if coded_text:
+                        messages.append(coded_text)
+                elif isinstance(msg, str):
+                    # Old format: backward compatibility
+                    messages.append(msg)
+            
+            if not messages:
                 self.setup_screen()
                 self.draw_settings_panel()
                 self.show_message(0, 0, f"Error: No valid coded messages found in {os.path.basename(coded_file)}", curses.A_BOLD)
@@ -2914,9 +3050,6 @@ class EnigmaMuseumUI:
                 self.refresh_all_panels()
                 time.sleep(3)
                 return
-            
-            # Use coded messages as the input messages (treat them the same as uncoded)
-            messages = coded_messages
             coded_messages = None  # Not needed anymore, we'll use messages
             original_messages = None  # Don't show original messages
         else:
@@ -3167,6 +3300,8 @@ class EnigmaMuseumUI:
             curses.init_pair(self.COLOR_RECEIVED, curses.COLOR_GREEN, curses.COLOR_BLACK)
             # Yellow for other info
             curses.init_pair(self.COLOR_INFO, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+            # Light purple for character delay messages
+            curses.init_pair(self.COLOR_DELAY, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
             # Grey for disabled web server
             curses.init_pair(self.COLOR_WEB_DISABLED, curses.COLOR_WHITE, curses.COLOR_BLACK)  # Using white as grey (dim)
         
