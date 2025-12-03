@@ -6,7 +6,7 @@
     "ring_position": "20 06 10",
     "pegboard": "FV PQ"
   },
-  "function_mode": "Museum EN",
+  "function_mode": "Decode - EN",
   "museum_delay": 90,
   "always_send_config": true,
   "word_group_size": 5,

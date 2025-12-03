@@ -216,20 +216,14 @@ class EnigmaController:
             self.ser.close()
     
     def start_monitoring(self):
-        """Start background thread to monitor Enigma input"""
-        if self.monitoring_active or not self.ser or not self.ser.is_open:
-            return
-        
-        self.monitoring_active = True
-        self.monitoring_thread = threading.Thread(target=self._monitor_input, daemon=True)
-        self.monitoring_thread.start()
+        """Start background thread to monitor Enigma input (no-op, monitoring was removed)"""
+        # Monitoring thread was removed - this method is kept for compatibility
+        pass
     
     def stop_monitoring(self):
-        """Stop background monitoring thread"""
-        self.monitoring_active = False
-        if self.monitoring_thread:
-            self.monitoring_thread.join(timeout=1.0)
-            self.monitoring_thread = None
+        """Stop background monitoring thread (no-op, monitoring was removed)"""
+        # Monitoring thread was removed - this method is kept for compatibility
+        pass
     
     def _monitor_input(self):
         """Background thread to continuously monitor serial input from Enigma"""
@@ -779,7 +773,12 @@ class EnigmaController:
                                             update_ring_position(current_positions)
                                             success = True
                                             if callback:
-                                                callback(char_count, len(filtered_message), char, encoded_char, resp_text)
+                                                # Check if callback wants to stop (returns True)
+                                                if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
+                                                    # Stop sending message
+                                                    if debug_callback:
+                                                        debug_callback("Message sending stopped by callback")
+                                                    return False
                                         else:
                                             # Still no position update - will retry
                                             if debug_callback:
@@ -795,7 +794,12 @@ class EnigmaController:
                                         success = True
                                         if callback:
                                             # Use char_count which tracks the actual character being processed
-                                            callback(char_count, len(filtered_message), char, encoded_char, resp_text)
+                                            # Check if callback wants to stop (returns True)
+                                            if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
+                                                # Stop sending message
+                                                if debug_callback:
+                                                    debug_callback("Message sending stopped by callback")
+                                                return False
                                 elif current_positions is not None:
                                     # First character - just record positions
                                     encoded_chars.append(encoded_char)
@@ -804,7 +808,12 @@ class EnigmaController:
                                     success = True
                                     if callback:
                                         # Use char_count which tracks the actual character being processed
-                                        callback(char_count, len(message), char, encoded_char, resp_text)
+                                        # Check if callback wants to stop (returns True)
+                                        if callback(char_count, len(message), char, encoded_char, resp_text):
+                                            # Stop sending message
+                                            if debug_callback:
+                                                debug_callback("Message sending stopped by callback")
+                                            return False
                                 else:
                                     # Could not extract positions
                                     if debug_callback:
@@ -813,7 +822,12 @@ class EnigmaController:
                                     encoded_chars.append(encoded_char)
                                     success = True
                                     if callback:
-                                        callback(char_count, len(filtered_message), char, encoded_char, resp_text)
+                                        # Check if callback wants to stop (returns True)
+                                        if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
+                                            # Stop sending message
+                                            if debug_callback:
+                                                debug_callback("Message sending stopped by callback")
+                                            return False
                             else:
                                 # Could not find encoded character
                                 if debug_callback:
@@ -1189,61 +1203,83 @@ class MuseumWebServer:
             
             def generate_message_html(self, data):
                 """Generate HTML page for museum kiosk display"""
-                # Use initial_config for most settings (shows original settings)
-                initial_config = data.get('initial_config', data.get('config', {}))
-                # Use current config for ring position (updates in real-time)
-                current_config = data.get('config', {})
-                config = initial_config.copy()
-                # Override ring position with current value for real-time updates
-                config['ring_position'] = current_config.get('ring_position', initial_config.get('ring_position', 'N/A'))
+                # Use current config (updates in real-time)
+                config = data.get('config', {})
                 log_messages = data.get('log_messages', [])
+                
+                # Get mode type (encode or decode)
+                is_encode_mode = data.get('is_encode_mode', True)
                 
                 # Get character delay and current character index for highlighting
                 character_delay_ms = data.get('character_delay_ms', 0)
                 current_char_index = data.get('current_char_index', 0)
                 
-                # Get real-time encoded text if available
+                # Get real-time encoded/decoded text if available
                 current_encoded_text = data.get('current_encoded_text', '')
                 
-                # Extract current message from log (look for most recent "Sending:" and "Encoded:" pair)
-                # Messages are already formatted when added to log, so we just extract them
+                # Extract current message from log based on mode
                 current_message = None
-                encoded_message = None
+                result_message = None
                 
-                # If we have real-time encoded text, use it; otherwise look in log
-                if current_encoded_text:
-                    encoded_message = current_encoded_text
-                    # Find the corresponding sending message
-                    for msg in reversed(log_messages):
-                        msg_str = str(msg)
-                        if msg_str.startswith('Sending:'):
-                            current_message = msg_str.replace('Sending:', '').strip()
-                            break
+                if is_encode_mode:
+                    # Encode mode: look for "Encoding:" and "Encoded:" pair
+                    if current_encoded_text:
+                        result_message = current_encoded_text
+                        # Find the corresponding encoding message
+                        for msg in reversed(log_messages):
+                            msg_str = str(msg)
+                            if msg_str.startswith('Encoding:'):
+                                current_message = msg_str.replace('Encoding:', '').strip()
+                                break
+                    else:
+                        # Look for the most recent encoded message first
+                        for msg in reversed(log_messages):
+                            msg_str = str(msg)
+                            if msg_str.startswith('Encoded:'):
+                                result_message = msg_str.replace('Encoded:', '').strip()
+                                break
+                        # Then find the corresponding encoding message
+                        found_encoded = False
+                        for msg in reversed(log_messages):
+                            msg_str = str(msg)
+                            if msg_str.startswith('Encoded:'):
+                                found_encoded = True
+                            elif found_encoded and msg_str.startswith('Encoding:'):
+                                current_message = msg_str.replace('Encoding:', '').strip()
+                                break
                 else:
-                    # Look for the most recent encoded message first
-                    for msg in reversed(log_messages):
-                        msg_str = str(msg)
-                        if msg_str.startswith('Encoded:'):
-                            # Extract encoded message after "Encoded: " (already formatted)
-                            encoded_message = msg_str.replace('Encoded:', '').strip()
-                            break
-                    # Then find the corresponding sending message (should be just before encoded)
-                    found_encoded = False
-                    for msg in reversed(log_messages):
-                        msg_str = str(msg)
-                        if msg_str.startswith('Encoded:'):
-                            found_encoded = True
-                        elif found_encoded and msg_str.startswith('Sending:'):
-                            # Extract message after "Sending: " (already formatted)
-                            current_message = msg_str.replace('Sending:', '').strip()
-                            break
-                    # If no encoded message found yet, just get the most recent sending message
+                    # Decode mode: look for "Decoding:" and "Decoded:" pair
+                    if current_encoded_text:
+                        result_message = current_encoded_text
+                        # Find the corresponding decoding message
+                        for msg in reversed(log_messages):
+                            msg_str = str(msg)
+                            if msg_str.startswith('Decoding:'):
+                                current_message = msg_str.replace('Decoding:', '').strip()
+                                break
+                    else:
+                        # Look for the most recent decoded message first
+                        for msg in reversed(log_messages):
+                            msg_str = str(msg)
+                            if msg_str.startswith('Decoded:'):
+                                result_message = msg_str.replace('Decoded:', '').strip()
+                                break
+                        # Then find the corresponding decoding message
+                        found_decoded = False
+                        for msg in reversed(log_messages):
+                            msg_str = str(msg)
+                            if msg_str.startswith('Decoded:'):
+                                found_decoded = True
+                            elif found_decoded and msg_str.startswith('Decoding:'):
+                                current_message = msg_str.replace('Decoding:', '').strip()
+                                break
+                    # If no decoded message found yet, just get the most recent decoding message
                     if not current_message:
                         for msg in reversed(log_messages):
                             msg_str = str(msg)
-                            if msg_str.startswith('Sending:'):
-                                # Extract message after "Sending: " (already formatted)
-                                current_message = msg_str.replace('Sending:', '').strip()
+                            if msg_str.startswith('Decoding:'):
+                                # Extract message after "Decoding: " (already formatted)
+                                current_message = msg_str.replace('Decoding:', '').strip()
                                 break
                 
                 # Format config info
@@ -1508,8 +1544,11 @@ class MuseumWebServer:
                 
                 html += """</div>
 """
-                if encoded_message:
-                    html += f'            <div class="encoded-text">{html_module.escape(encoded_message)}</div>\n'
+                # Display result message (encoded or decoded) with appropriate label
+                result_label = "Encoded" if is_encode_mode else "Decoded"
+                if result_message:
+                    html += f'            <div class="message-label">{result_label} Message</div>\n'
+                    html += f'            <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
                 
                 html += f"""        </div>
         
@@ -1572,6 +1611,8 @@ class EnigmaMuseumUI:
         self.COLOR_RECEIVED = 2  # Bright green for data received from Enigma
         self.COLOR_INFO = 3      # Yellow for other info
         self.COLOR_DELAY = 5     # Light purple for character delay messages
+        self.COLOR_MATCH = 6     # Bright green for matching characters
+        self.COLOR_MISMATCH = 7  # Red for mismatching characters
         self.COLOR_WEB_RUNNING = 2  # Green for enabled and running web server
         self.COLOR_WEB_ENABLED_NOT_RUNNING = 3  # Yellow for enabled but not running web server
         self.COLOR_WEB_DISABLED = 4  # Grey for disabled web server
@@ -1900,8 +1941,13 @@ class EnigmaMuseumUI:
         except:
             pass
     
-    def add_debug_output(self, message: str):
-        """Add a message to debug output with color coding"""
+    def add_debug_output(self, message: str, color_type: Optional[int] = None):
+        """Add a message to debug output with color coding
+        
+        Args:
+            message: The debug message to add
+            color_type: Optional color type to use. If None, will be determined from message content.
+        """
         if not self.debug_enabled:
             return
         # Split multi-line messages into separate lines
@@ -1910,19 +1956,26 @@ class EnigmaMuseumUI:
             # Remove carriage returns and strip whitespace
             line = line.replace('\r', '').strip()
             if line:  # Only add non-empty lines
-                # Determine color type based on message prefix
-                if line.startswith('>>>'):
-                    # Data sent to Enigma - dark green
-                    color_type = self.COLOR_SENT
-                elif line.startswith('<<<'):
-                    # Data received from Enigma - bright green
-                    color_type = self.COLOR_RECEIVED
-                elif 'Character delay' in line:
-                    # Character delay messages - light purple
-                    color_type = self.COLOR_DELAY
-                else:
-                    # Other info - yellow
-                    color_type = self.COLOR_INFO
+                # Use provided color_type, or determine from message content
+                if color_type is None:
+                    if line.startswith('>>>'):
+                        # Data sent to Enigma - dark green
+                        color_type = self.COLOR_SENT
+                    elif line.startswith('<<<'):
+                        # Data received from Enigma - bright green
+                        color_type = self.COLOR_RECEIVED
+                    elif 'Character delay' in line or 'Skipping delay' in line:
+                        # Character delay messages - light purple
+                        color_type = self.COLOR_DELAY
+                    elif 'MATCH' in line:
+                        # Matching characters - bright green
+                        color_type = self.COLOR_MATCH
+                    elif 'MISMATCH' in line:
+                        # Mismatching characters - red
+                        color_type = self.COLOR_MISMATCH
+                    else:
+                        # Other info - yellow
+                        color_type = self.COLOR_INFO
                 # Store as tuple: (message, color_type)
                 self.debug_output.append((line, color_type))
         # Keep only last max_debug_lines
@@ -1981,8 +2034,8 @@ class EnigmaMuseumUI:
                         # Apply color based on message type (if colors are supported)
                         if curses.has_colors():
                             color_attr = curses.color_pair(color_type)
-                            # Add bold for received messages (bright green)
-                            if color_type == self.COLOR_RECEIVED:
+                            # Add bold for received messages (bright green) and matching characters
+                            if color_type == self.COLOR_RECEIVED or color_type == self.COLOR_MATCH:
                                 color_attr |= curses.A_BOLD
                             self.right_win.addstr(y, 0, display_line, color_attr)
                         else:
@@ -2951,11 +3004,10 @@ class EnigmaMuseumUI:
     def museum_mode_screen(self):
         """Museum mode selection"""
         options = [
-            ("1", "Interactive (manual control)"),
-            ("2", "Museum EN (English messages)"),
-            ("3", "Museum DE (German messages)"),
-            ("4", "Museum EN (English Coded Messages)"),
-            ("5", "Museum DE (German Coded Messages)"),
+            ("2", "Encode - EN"),
+            ("3", "Decode - EN"),
+            ("4", "Encode - DE"),
+            ("5", "Decode - DE"),
             ("B", "Back")
         ]
         
@@ -2976,90 +3028,65 @@ class EnigmaMuseumUI:
                 if options[selected][0] == 'B':
                     return
                 self.run_museum_mode(options[selected][0])
-            elif key >= ord('1') and key <= ord('5'):
+            elif key >= ord('2') and key <= ord('5'):
                 self.run_museum_mode(chr(key))
-            elif key == ord('0'):
-                # Handle option 10 (0 key) - but we only have 5 options, so ignore
-                pass
     
     def run_museum_mode(self, mode: str):
         """Run museum mode"""
-        if mode == '1':
-            self.controller.function_mode = 'Interactive'
-            return
-        
-        # Determine message file and whether to use coded messages based on mode
-        use_coded = mode in ('4', '5')
+        # Determine operation mode (encode or decode)
+        is_encode = mode in ('2', '4')
         
         if mode == '2':
-            mode_name = 'Museum EN'
-            message_file = ENGLISH_MSG_FILE
-            coded_file = None
+            mode_name = 'Encode - EN'
+            json_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
         elif mode == '3':
-            mode_name = 'Museum DE'
-            message_file = GERMAN_MSG_FILE
-            coded_file = None
+            mode_name = 'Decode - EN'
+            json_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
         elif mode == '4':
-            mode_name = 'Museum EN (Coded)'
-            message_file = ENGLISH_MSG_FILE
-            coded_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
+            mode_name = 'Encode - DE'
+            json_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
         elif mode == '5':
-            mode_name = 'Museum DE (Coded)'
-            message_file = GERMAN_MSG_FILE
-            coded_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
+            mode_name = 'Decode - DE'
+            json_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
         else:
             return
         
-        # Single routine for all museum modes - only message sources change
         # Set function mode first so it's displayed in the top panel
         self.controller.function_mode = mode_name
         # Save function mode to config file
         self.controller.save_config()
         
-        if use_coded:
-            # Load coded messages
-            coded_messages = load_messages_from_file(coded_file)
-            if not coded_messages or not isinstance(coded_messages, list):
-                self.setup_screen()
-                self.draw_settings_panel()
-                self.show_message(0, 0, f"Error: Could not load coded messages from {os.path.basename(coded_file)}", curses.A_BOLD)
-                self.show_message(1, 0, "Please generate coded messages first using the Config menu.")
-                self.draw_debug_panel()
-                self.refresh_all_panels()
-                time.sleep(3)
-                return
-            
-            # Extract CODED field from message objects (new format) or use strings directly (old format)
-            messages = []
-            for msg in coded_messages:
-                if isinstance(msg, dict):
-                    # New format: extract CODED field
-                    coded_text = msg.get('CODED', '')
-                    if coded_text:
-                        messages.append(coded_text)
-                elif isinstance(msg, str):
-                    # Old format: backward compatibility
-                    messages.append(msg)
-            
-            if not messages:
-                self.setup_screen()
-                self.draw_settings_panel()
-                self.show_message(0, 0, f"Error: No valid coded messages found in {os.path.basename(coded_file)}", curses.A_BOLD)
-                self.show_message(1, 0, "Please generate coded messages first using the Config menu.")
-                self.draw_debug_panel()
-                self.refresh_all_panels()
-                time.sleep(3)
-                return
-            coded_messages = None  # Not needed anymore, we'll use messages
-            original_messages = None  # Don't show original messages
-        else:
-            # Load messages for encoding on the fly
-            messages = load_messages_from_file(message_file)
-            if not messages:
-                # Fallback to in-memory messages if file loading fails
-                messages = ENGLISH_MESSAGES if 'EN' in mode_name else GERMAN_MESSAGES
-            coded_messages = None
-            original_messages = None
+        # Load JSON file with message objects
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                message_objects = json.load(f)
+            if not isinstance(message_objects, list) or len(message_objects) == 0:
+                raise ValueError("Invalid or empty JSON file")
+        except (IOError, json.JSONDecodeError, ValueError) as e:
+            self.setup_screen()
+            self.draw_settings_panel()
+            self.show_message(0, 0, f"Error: Could not load messages from {os.path.basename(json_file)}", curses.A_BOLD)
+            self.show_message(1, 0, "Please generate encoded messages first using the Config menu.")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(3)
+            return
+        
+        # Validate message objects have required fields
+        valid_messages = []
+        for msg_obj in message_objects:
+            if isinstance(msg_obj, dict) and 'MSG' in msg_obj and 'CODED' in msg_obj:
+                valid_messages.append(msg_obj)
+        
+        if not valid_messages:
+            self.setup_screen()
+            self.draw_settings_panel()
+            self.show_message(0, 0, f"Error: No valid messages found in {os.path.basename(json_file)}", curses.A_BOLD)
+            self.show_message(1, 0, "Please generate encoded messages first using the Config menu.")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(3)
+            return
         
         # Setup screen and ensure function mode is displayed
         self.setup_screen()
@@ -3084,12 +3111,6 @@ class EnigmaMuseumUI:
             "Press Q to stop"
         ]
         
-        # Check if always_send_config is enabled (use saved config value)
-        saved = self.controller.get_saved_config()
-        always_send = saved.get('always_send_config', False)
-        if always_send:
-            header_lines.append("Note: Sending saved configuration before each message...")
-        
         # Calculate available lines for log messages
         header_height = len(header_lines)
         log_start_y = header_height
@@ -3101,8 +3122,12 @@ class EnigmaMuseumUI:
         # Track current character being encoded (for web display highlighting)
         current_char_index = [0]  # Use list to allow modification in nested functions
         
-        # Track encoded text as it's being built (for real-time web display)
+        # Track encoded/decoded text as it's being built (for real-time web display)
         current_encoded_text = [""]  # Use list to allow modification in nested functions
+        
+        # Track pause state for verification failures
+        museum_paused = [False]  # Use list to allow modification in nested functions
+        last_unexpected_input_time = [0]  # Use list to allow modification in nested functions
         
         def draw_screen():
             """Draw the entire screen with header and log messages"""
@@ -3115,8 +3140,6 @@ class EnigmaMuseumUI:
             for i, line in enumerate(header_lines):
                 if i < max_y:
                     attr = curses.A_BOLD if i == 0 else curses.A_NORMAL
-                    if i == len(header_lines) - 1 and always_send:
-                        attr |= curses.A_DIM
                     self.show_message(i, 0, line[:max_x], attr)
             
             # Draw log messages (scrollable)
@@ -3142,14 +3165,13 @@ class EnigmaMuseumUI:
                 log_messages.pop(0)
             draw_screen()
         
+        # Get saved config for reference
+        saved = self.controller.get_saved_config()
+        
         # Web server setup (after add_log_message is defined)
         web_server = None
         web_enabled = saved.get('web_server_enabled', False)
         web_port = saved.get('web_server_port', 8080)
-        
-        # Capture initial config (before any messages are sent) for /message page
-        # Use saved config to ensure we get the original settings, not live updates
-        initial_config = saved.get('config', self.controller.config.copy()).copy()
         
         # Data callback for web server
         def get_museum_data():
@@ -3158,13 +3180,12 @@ class EnigmaMuseumUI:
                 'function_mode': self.controller.function_mode,
                 'delay': self.controller.museum_delay,
                 'log_messages': log_messages.copy(),
-                'always_send': saved.get('always_send_config', False),
+                'is_encode_mode': is_encode,  # Track if encode or decode mode
                 'config': self.controller.config.copy(),  # Current config for /status
-                'initial_config': initial_config.copy(),  # Initial config for /message
                 'word_group_size': self.controller.word_group_size,  # For message formatting
                 'character_delay_ms': self.controller.character_delay_ms,  # Character delay setting
                 'current_char_index': current_char_index[0],  # Current character being encoded (1-based)
-                'current_encoded_text': current_encoded_text[0]  # Encoded text being built in real-time
+                'current_encoded_text': current_encoded_text[0]  # Encoded/decoded text being built in real-time
             }
         
         # Start web server if enabled
@@ -3183,10 +3204,26 @@ class EnigmaMuseumUI:
         
         draw_screen()
         
-        def debug_callback(msg):
-            self.add_debug_output(msg)
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
             self.draw_debug_panel()
             self.refresh_all_panels()
+        
+        # Helper function to restore spaces at exact positions from original message
+        def restore_spaces(decoded_text: str, original_msg: str) -> str:
+            """Restore spaces at exact positions from original message"""
+            result = list(decoded_text.replace(' ', ''))  # Remove any existing spaces
+            space_positions = [i for i, char in enumerate(original_msg) if char == ' ']
+            # Insert spaces at same positions (reverse order to maintain indices)
+            for pos in reversed(space_positions):
+                if pos <= len(result):
+                    result.insert(pos, ' ')
+            return ''.join(result)
+        
+        # Helper function to normalize text for comparison (remove spaces)
+        def normalize_for_comparison(text: str) -> str:
+            """Remove spaces for comparison"""
+            return text.replace(' ', '').upper()
         
         last_message_time = 0
         
@@ -3198,12 +3235,74 @@ class EnigmaMuseumUI:
             
             current_time = time.time()
             
+            # Check if paused due to verification failure or mismatch
+            if museum_paused[0]:
+                # Check for additional input from Enigma while paused
+                if self.controller.ser and self.controller.ser.is_open:
+                    try:
+                        if self.controller.ser.in_waiting > 0:
+                            # Additional input detected - read and clear it, then reset timer
+                            self.controller.ser.read(self.controller.ser.in_waiting)
+                            last_unexpected_input_time[0] = current_time
+                            if debug_callback:
+                                debug_callback("Additional input detected while paused - resetting timer")
+                    except Exception:
+                        pass  # Ignore read errors
+                
+                time_since_last_input = current_time - last_unexpected_input_time[0]
+                if time_since_last_input >= self.controller.museum_delay:
+                    # Resume museum mode - start over with a new random message immediately
+                    museum_paused[0] = False
+                    add_log_message("Museum mode resumed - starting new message")
+                    # Reset timer to trigger message sending immediately
+                    last_message_time = current_time - self.controller.museum_delay
+                    # Reset encoded text and character index
+                    current_char_index[0] = 0
+                    current_encoded_text[0] = ""
+                else:
+                    # Still paused, skip sending messages
+                    time.sleep(0.1)
+                    continue
+            
             if current_time - last_message_time >= self.controller.museum_delay:
-                # Use the same function for both coded and uncoded messages
-                message = random.choice(messages)
-                # Format message for display (group if no spaces)
-                formatted_message = self.controller.format_message_for_display(message)
-                add_log_message(f"Sending: {formatted_message}")
+                # Select random message object
+                msg_obj = random.choice(valid_messages)
+                
+                # Apply configuration from JSON message object
+                if debug_callback:
+                    debug_callback(f"Applying configuration from message...")
+                
+                self.controller.set_mode(msg_obj.get('MODEL', 'I'), debug_callback=debug_callback)
+                time.sleep(0.2)
+                self.controller.set_rotor_set(msg_obj.get('ROTOR', 'A III IV I'), debug_callback=debug_callback)
+                time.sleep(0.2)
+                self.controller.set_ring_settings(msg_obj.get('RINGSET', '01 01 01'), debug_callback=debug_callback)
+                time.sleep(0.2)
+                self.controller.set_ring_position(msg_obj.get('RINGPOS', '20 6 10'), debug_callback=debug_callback)
+                time.sleep(0.2)
+                self.controller.set_pegboard(msg_obj.get('PLUG', ''), debug_callback=debug_callback)
+                time.sleep(0.2)
+                # Set word group size from JSON
+                self.controller.word_group_size = msg_obj.get('GROUP', 5)
+                self.controller.return_to_encode_mode(debug_callback=debug_callback)
+                time.sleep(0.5)
+                
+                # Determine message to send and expected result
+                if is_encode:
+                    message_to_send = msg_obj['MSG']
+                    expected_result = msg_obj['CODED']
+                    operation = "Encoding"
+                else:
+                    message_to_send = msg_obj['CODED']
+                    expected_result = msg_obj['MSG']
+                    operation = "Decoding"
+                
+                # Format message for display
+                formatted_message = self.controller.format_message_for_display(message_to_send)
+                add_log_message(f"{operation}: {formatted_message}")
+                
+                # Normalize expected result for character-by-character comparison
+                expected_normalized = normalize_for_comparison(expected_result)
                 
                 encoded_result = []
                 current_char_index[0] = 0  # Reset current character index
@@ -3219,6 +3318,26 @@ class EnigmaMuseumUI:
                     if current_encoded_text[0]:
                         grouped = self.controller._group_encoded_text(current_encoded_text[0])
                         current_encoded_text[0] = grouped
+                    
+                    # Compare with expected character
+                    if index > 0 and index <= len(expected_normalized):
+                        expected_char = expected_normalized[index - 1]
+                        encoded_upper = encoded.upper() if encoded else ''
+                        matches = encoded_upper == expected_char
+                        
+                        if debug_callback:
+                            if matches:
+                                debug_callback(f"Expected: {expected_char}, Got: {encoded_upper} ✓ MATCH", color_type=self.COLOR_MATCH)
+                            else:
+                                debug_callback(f"Expected: {expected_char}, Got: {encoded_upper} ✗ MISMATCH", color_type=self.COLOR_MISMATCH)
+                                # Mismatch detected - stop sending message and pause museum mode
+                                if not museum_paused[0]:
+                                    museum_paused[0] = True
+                                    last_unexpected_input_time[0] = time.time()
+                                    add_log_message(f"Encoding interrupted by user input - character mismatch detected")
+                                    # Return True to stop sending the message
+                                    return True
+                    
                     return False
                 
                 def position_update_callback():
@@ -3226,18 +3345,51 @@ class EnigmaMuseumUI:
                     self.draw_settings_panel()
                     self.refresh_all_panels()
                 
-                self.controller.send_message(message, progress_callback, debug_callback, position_update_callback)
+                message_sent = self.controller.send_message(message_to_send, progress_callback, debug_callback, position_update_callback)
+                
+                # Check if message was interrupted (stopped early due to mismatch)
+                if museum_paused[0]:
+                    # Message was interrupted by mismatch - already logged and paused
+                    # Update web display to show interruption
+                    if current_encoded_text[0]:
+                        current_encoded_text[0] = current_encoded_text[0] + " [INTERRUPTED]"
+                    else:
+                        current_encoded_text[0] = "[INTERRUPTED]"
+                    # Force UI update
+                    self.draw_settings_panel()
+                    self.refresh_all_panels()
+                elif not message_sent:
+                    # Message sending failed
+                    add_log_message(f"{operation} failed or cancelled")
+                else:
+                    # Message completed - verify result
+                    if encoded_result:
+                        result = ''.join(encoded_result)
+                        # Normalize for comparison (remove spaces)
+                        result_normalized = normalize_for_comparison(result)
+                        expected_normalized = normalize_for_comparison(expected_result)
+                        
+                        # Verify result matches expected
+                        if result_normalized == expected_normalized:
+                            # Success - format and display result
+                            if is_encode:
+                                grouped_result = self.controller._group_encoded_text(result)
+                                add_log_message(f"Encoded: {grouped_result}")
+                            else:
+                                # Decode mode: restore spaces from MSG
+                                result_with_spaces = restore_spaces(result, msg_obj['MSG'])
+                                add_log_message(f"Decoded: {result_with_spaces}")
+                        else:
+                            # Verification failed - pause museum mode
+                            add_log_message(f"Verification failed - pausing museum mode (Enigma may have been touched)")
+                            museum_paused[0] = True
+                            last_unexpected_input_time[0] = current_time
+                    else:
+                        add_log_message(f"{operation} failed or cancelled")
+                
                 # Reset current character index and encoded text after encoding completes
                 current_char_index[0] = 0
                 current_encoded_text[0] = ""
-                
-                if encoded_result:
-                    result = ''.join(encoded_result)
-                    # Group the result for display
-                    grouped_result = self.controller._group_encoded_text(result)
-                    add_log_message(f"Encoded: {grouped_result}")
-                else:
-                    add_log_message("Encoding failed or cancelled")
                 
                 last_message_time = current_time
             
@@ -3302,6 +3454,10 @@ class EnigmaMuseumUI:
             curses.init_pair(self.COLOR_INFO, curses.COLOR_YELLOW, curses.COLOR_BLACK)
             # Light purple for character delay messages
             curses.init_pair(self.COLOR_DELAY, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+            # Bright green for matching characters (with bold)
+            curses.init_pair(self.COLOR_MATCH, curses.COLOR_GREEN, curses.COLOR_BLACK)
+            # Red for mismatching characters
+            curses.init_pair(self.COLOR_MISMATCH, curses.COLOR_RED, curses.COLOR_BLACK)
             # Grey for disabled web server
             curses.init_pair(self.COLOR_WEB_DISABLED, curses.COLOR_WHITE, curses.COLOR_BLACK)  # Using white as grey (dim)
         
@@ -3365,10 +3521,10 @@ Usage:
 Options:
     --config, -c              Open configuration menu without connecting to device
                               (useful for changing device settings when device is unavailable)
-    --museum-en               Start in Museum EN mode (English messages)
-    --museum-de               Start in Museum DE mode (German messages)
-    --museum-en-coded         Start in Museum EN mode with pre-coded messages
-    --museum-de-coded         Start in Museum DE mode with pre-coded messages
+    --museum-en-encode        Start in Encode - EN mode (English encode)
+    --museum-en-decode        Start in Decode - EN mode (English decode)
+    --museum-de-encode        Start in Encode - DE mode (German encode)
+    --museum-de-decode        Start in Decode - DE mode (German decode)
     --debug                   Enable debug output panel (shows serial communication)
     --help, -h                Show this help message and exit
 
@@ -3381,17 +3537,19 @@ Examples:
     {script_name}                        # Run with default device ({DEFAULT_DEVICE})
     {script_name} /dev/ttyUSB0          # Run with specific device
     {script_name} --config               # Open config menu to change settings
-    {script_name} --museum-en           # Start directly in Museum EN mode
-    {script_name} --museum-de /dev/ttyACM0  # Start Museum DE mode with specific device
-    {script_name} --museum-en-coded     # Start Museum EN with pre-coded messages
+    {script_name} --museum-en-encode    # Start directly in Encode - EN mode
+    {script_name} --museum-en-decode /dev/ttyACM0  # Start Decode - EN mode with specific device
+    {script_name} --museum-de-encode   # Start Encode - DE mode
+    {script_name} --museum-de-decode   # Start Decode - DE mode
 
 Description:
     This tool provides a curses-based menu interface for controlling an Enigma
     device via serial communication. You can send messages, configure settings,
     query device state, and run museum mode demonstrations.
 
-    Museum modes automatically send messages at configured intervals. Use coded
-    modes if you have pre-generated coded message files.
+    Museum modes automatically send messages at configured intervals. Encode modes
+    send original messages and verify encoded results. Decode modes send coded messages
+    and verify decoded results. All modes use JSON files with pre-generated messages.
 
     If connection fails, use --config to change the device path without
     requiring a connection.
@@ -3416,13 +3574,13 @@ def main():
             sys.exit(0)
         elif arg in ('--config', '-c'):
             config_only = True
-        elif arg == '--museum-en':
+        elif arg == '--museum-en-encode':
             museum_mode = '2'
-        elif arg == '--museum-de':
+        elif arg == '--museum-en-decode':
             museum_mode = '3'
-        elif arg == '--museum-en-coded':
+        elif arg == '--museum-de-encode':
             museum_mode = '4'
-        elif arg == '--museum-de-coded':
+        elif arg == '--museum-de-decode':
             museum_mode = '5'
         elif arg == '--debug':
             debug_enabled = True
