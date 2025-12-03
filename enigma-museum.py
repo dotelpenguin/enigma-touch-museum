@@ -78,6 +78,7 @@ class EnigmaController:
         self.web_server_enabled = False  # Web server enabled/disabled flag
         self.web_server_port = 8080  # Default web server port
         self.web_server_ip: Optional[str] = None  # Web server IP address when running
+        self.enable_slides = False  # Enable slides feature
         self.config_file = CONFIG_FILE
         self.last_char_sent: Optional[str] = None  # Last character sent TO Enigma
         self.last_char_received: Optional[str] = None  # Last character received FROM Enigma (encoded)
@@ -112,6 +113,7 @@ class EnigmaController:
                 'character_delay_ms': self.character_delay_ms,
                 'web_server_enabled': self.web_server_enabled,
                 'web_server_port': self.web_server_port,
+                'enable_slides': self.enable_slides,
                 'device': self.device
             }
             with open(self.config_file, 'w') as f:
@@ -147,6 +149,8 @@ class EnigmaController:
                         self.web_server_enabled = config_data['web_server_enabled']
                     if 'web_server_port' in config_data:
                         self.web_server_port = config_data['web_server_port']
+                    if 'enable_slides' in config_data:
+                        self.enable_slides = config_data['enable_slides']
                     if 'device' in config_data and not preserve_device:
                         self.device = config_data['device']
                 return True
@@ -173,6 +177,7 @@ class EnigmaController:
                     saved_config['character_delay_ms'] = config_data.get('character_delay_ms', self.character_delay_ms)
                     saved_config['web_server_enabled'] = config_data.get('web_server_enabled', self.web_server_enabled)
                     saved_config['web_server_port'] = config_data.get('web_server_port', self.web_server_port)
+                    saved_config['enable_slides'] = config_data.get('enable_slides', self.enable_slides)
                     saved_config['device'] = config_data.get('device', self.device)
                     return saved_config
         except Exception:
@@ -187,6 +192,7 @@ class EnigmaController:
             'character_delay_ms': self.character_delay_ms,
             'web_server_enabled': self.web_server_enabled,
             'web_server_port': self.web_server_port,
+            'enable_slides': self.enable_slides,
             'device': self.device
         }
         
@@ -1017,6 +1023,25 @@ class MuseumWebServer:
                         except Exception:
                             self.send_response(404)
                             self.end_headers()
+                    elif self.path.startswith('/slides/'):
+                        # Serve slide images
+                        try:
+                            slide_file_path = os.path.join(SCRIPT_DIR, self.path.lstrip('/'))
+                            if os.path.exists(slide_file_path) and os.path.isfile(slide_file_path):
+                                with open(slide_file_path, 'rb') as f:
+                                    image_data = f.read()
+                                self.send_response(200)
+                                self.send_header('Content-type', 'image/png')
+                                self.send_header('Cache-Control', 'no-cache')  # Don't cache slides as they change
+                                self.end_headers()
+                                self.wfile.write(image_data)
+                                self.wfile.flush()
+                            else:
+                                self.send_response(404)
+                                self.end_headers()
+                        except Exception:
+                            self.send_response(404)
+                            self.end_headers()
                     else:
                         self.send_response(404)
                         self.end_headers()
@@ -1209,6 +1234,12 @@ class MuseumWebServer:
                 
                 # Get mode type (encode or decode)
                 is_encode_mode = data.get('is_encode_mode', True)
+                
+                # Get enable_slides setting
+                enable_slides = data.get('enable_slides', False)
+                
+                # Get slide path
+                slide_path = data.get('slide_path', None)
                 
                 # Get character delay and current character index for highlighting
                 character_delay_ms = data.get('character_delay_ms', 0)
@@ -1430,6 +1461,15 @@ class MuseumWebServer:
             font-weight: bold;
             font-family: 'Courier New', monospace;
         }}
+        .message-container {{
+            display: flex;
+            flex-direction: row;
+            gap: min(1vw, 10px);
+            margin: min(1vh, 10px) 0;
+            flex-grow: 1;
+            min-height: 0;
+            max-height: 50vh;
+        }}
         .message-section {{
             margin: min(1vh, 10px) 0;
             padding: min(1.5vh, 15px);
@@ -1442,6 +1482,51 @@ class MuseumWebServer:
             justify-content: center;
             min-height: 0;
             max-height: 50vh;
+        }}
+        .message-container .message-section {{
+            margin: 0;
+            width: 50%;
+            max-height: none;
+        }}
+        .slide-section {{
+            margin: 0;
+            padding: min(1.5vh, 15px);
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            border: 2px solid #0ff;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 0;
+            width: 50%;
+        }}
+        .slide-placeholder {{
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px dashed rgba(255, 215, 0, 0.5);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 215, 0, 0.6);
+            font-size: min(2vw, 20px);
+            font-style: italic;
+            width: 100%;
+            height: 100%;
+            min-height: 200px;
+        }}
+        .slide-image {{
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            display: block;
+        }}
+        .slide-section {{
+            overflow: hidden;
         }}
         .message-label {{
             font-size: min(1.4vw, 14px);
@@ -1545,45 +1630,105 @@ class MuseumWebServer:
                 html += f"""                </div>
             </div>
         </div>
-        
-        <div class="message-section">
-            <div class="message-label">Current Message</div>
-            <div class="message-text">"""
-                
-                # Build message with character highlighting if delay >= 2000ms
-                if current_message and character_delay_ms >= 2000 and current_char_index > 0:
-                    # Remove spaces for character counting (to match how encoding works)
-                    message_no_spaces = current_message.replace(' ', '')
-                    if current_char_index <= len(message_no_spaces):
-                        # Find the character position in the formatted message (accounting for spaces)
-                        char_count = 0
-                        highlighted_message = ""
-                        for char in current_message:
-                            if char != ' ':
-                                char_count += 1
-                                if char_count == current_char_index:
-                                    # Highlight this character in yellow
-                                    highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
+"""
+                # Create layout based on whether slides are enabled
+                if enable_slides:
+                    # Two separate boxes side by side, each 50% width
+                    html += """        <div class="message-container">
+            <div class="message-section">
+                <div class="message-label">Current Message</div>
+                <div class="message-text">"""
+                    
+                    # Build message with character highlighting if delay >= 2000ms
+                    if current_message and character_delay_ms >= 2000 and current_char_index > 0:
+                        # Remove spaces for character counting (to match how encoding works)
+                        message_no_spaces = current_message.replace(' ', '')
+                        if current_char_index <= len(message_no_spaces):
+                            # Find the character position in the formatted message (accounting for spaces)
+                            char_count = 0
+                            highlighted_message = ""
+                            for char in current_message:
+                                if char != ' ':
+                                    char_count += 1
+                                    if char_count == current_char_index:
+                                        # Highlight this character in yellow
+                                        highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
+                                    else:
+                                        highlighted_message += html_module.escape(char)
                                 else:
                                     highlighted_message += html_module.escape(char)
-                            else:
-                                highlighted_message += html_module.escape(char)
-                        html += highlighted_message
+                            html += highlighted_message
+                        else:
+                            html += html_module.escape(current_message)
                     else:
-                        html += html_module.escape(current_message)
-                else:
-                    html += html_module.escape(current_message) if current_message else 'Waiting for message...'
-                
-                html += """</div>
+                        html += html_module.escape(current_message) if current_message else 'Waiting for message...'
+                    
+                    html += """</div>
 """
-                # Display result message (encoded or decoded) with appropriate label
-                result_label = "Encoded" if is_encode_mode else "Decoded"
-                if result_message:
-                    html += f'            <div class="message-label">{result_label} Message</div>\n'
-                    html += f'            <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
+                    # Display result message (encoded or decoded) with appropriate label
+                    result_label = "Encoded" if is_encode_mode else "Decoded"
+                    if result_message:
+                        html += f'                <div class="message-label">{result_label} Message</div>\n'
+                        html += f'                <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
+                    
+                    html += """            </div>
+            <div class="slide-section">"""
+                    
+                    if slide_path:
+                        html += f'                <img src="/{slide_path}" alt="Slide" class="slide-image" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">'
+                        html += """                <div class="slide-placeholder" style="display: none;">
+                    Slide Image Placeholder
+                </div>"""
+                    else:
+                        html += """                <div class="slide-placeholder">
+                    Slide Image Placeholder
+                </div>"""
+                    
+                    html += """            </div>
+        </div>
+"""
+                else:
+                    # Single box (original layout)
+                    html += """        <div class="message-section">
+            <div class="message-label">Current Message</div>
+            <div class="message-text">"""
+                    
+                    # Build message with character highlighting if delay >= 2000ms
+                    if current_message and character_delay_ms >= 2000 and current_char_index > 0:
+                        # Remove spaces for character counting (to match how encoding works)
+                        message_no_spaces = current_message.replace(' ', '')
+                        if current_char_index <= len(message_no_spaces):
+                            # Find the character position in the formatted message (accounting for spaces)
+                            char_count = 0
+                            highlighted_message = ""
+                            for char in current_message:
+                                if char != ' ':
+                                    char_count += 1
+                                    if char_count == current_char_index:
+                                        # Highlight this character in yellow
+                                        highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
+                                    else:
+                                        highlighted_message += html_module.escape(char)
+                                else:
+                                    highlighted_message += html_module.escape(char)
+                            html += highlighted_message
+                        else:
+                            html += html_module.escape(current_message)
+                    else:
+                        html += html_module.escape(current_message) if current_message else 'Waiting for message...'
+                    
+                    html += """</div>
+"""
+                    # Display result message (encoded or decoded) with appropriate label
+                    result_label = "Encoded" if is_encode_mode else "Decoded"
+                    if result_message:
+                        html += f'            <div class="message-label">{result_label} Message</div>\n'
+                        html += f'            <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
+                    
+                    html += """        </div>
+"""
                 
-                html += f"""        </div>
-        
+                html += f"""        
         <div class="footer">
             <p>Museum Display {VERSION} - Auto-refreshes every 2 seconds</p>
             <p>by Andrew Baker (DotelPenguin)</p>
@@ -2250,6 +2395,7 @@ class EnigmaMuseumUI:
                 ("12", f"Set Device (current: {saved['device']})"),
                 ("13", f"Set Web Server Port (current: {saved.get('web_server_port', 8080)})"),
                 ("14", f"Web Server: {'ENABLED' if saved.get('web_server_enabled', False) else 'DISABLED'}"),
+                ("15", f"Enable Slides: {'ON' if saved.get('enable_slides', False) else 'OFF'}"),
             ("B", "Back")
         ]
         
@@ -2537,6 +2683,18 @@ class EnigmaMuseumUI:
                 port = self.controller.web_server_port
                 self.show_message(0, 0, f"Web server ENABLED on port {port}", curses.A_BOLD)
                 self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '15':
+            # Toggle enable_slides
+            current_enabled = saved.get('enable_slides', False)
+            self.controller.enable_slides = not current_enabled
+            self.controller.save_config()  # Save config after change
+            status = "ON" if self.controller.enable_slides else "OFF"
+            self.show_message(0, 0, f"Enable Slides: {status}")
+            self.draw_settings_panel()  # Update settings display
             self.draw_debug_panel()
             self.refresh_all_panels()
             time.sleep(1)
@@ -3161,6 +3319,11 @@ class EnigmaMuseumUI:
         museum_paused = [False]  # Use list to allow modification in nested functions
         last_unexpected_input_time = [0]  # Use list to allow modification in nested functions
         
+        # Track slide information
+        current_message_index = [None]  # Index of current message in valid_messages
+        current_slide_number = [1]  # Current slide number (1.png, 2.png, etc.)
+        previous_slide_number = [0]  # Previous slide number to detect changes
+        
         def draw_screen():
             """Draw the entire screen with header and log messages"""
             # Ensure function mode is current before drawing
@@ -3205,9 +3368,47 @@ class EnigmaMuseumUI:
         web_enabled = saved.get('web_server_enabled', False)
         web_port = saved.get('web_server_port', 8080)
         
+        def get_slide_path():
+            """Determine slide directory and image path"""
+            if not self.controller.enable_slides or current_message_index[0] is None:
+                return None
+            
+            slides_dir = os.path.join(SCRIPT_DIR, 'slides')
+            message_index_dir = os.path.join(slides_dir, str(current_message_index[0]))
+            common_dir = os.path.join(slides_dir, 'common')
+            
+            # Check if message index directory exists, otherwise use common
+            if os.path.isdir(message_index_dir):
+                slide_dir = message_index_dir
+            elif os.path.isdir(common_dir):
+                slide_dir = common_dir
+            else:
+                return None
+            
+            # Find available slide images and cycle through them
+            slide_files = []
+            for i in range(1, 1000):  # Check up to 999.png
+                slide_file = os.path.join(slide_dir, f"{i}.png")
+                if os.path.exists(slide_file):
+                    slide_files.append(f"{i}.png")
+                else:
+                    break
+            
+            if not slide_files:
+                return None
+            
+            # Cycle through slides based on current_slide_number (1-based)
+            # Subtract 1 to convert to 0-based index, then modulo to cycle
+            slide_index = (current_slide_number[0] - 1) % len(slide_files)
+            slide_filename = slide_files[slide_index]
+            
+            # Return relative path from script directory for web server
+            return os.path.join('slides', os.path.basename(slide_dir), slide_filename)
+        
         # Data callback for web server
         def get_museum_data():
             """Get current museum mode data for web server"""
+            slide_path = get_slide_path() if self.controller.enable_slides else None
             return {
                 'function_mode': self.controller.function_mode,
                 'delay': self.controller.museum_delay,
@@ -3217,7 +3418,9 @@ class EnigmaMuseumUI:
                 'word_group_size': self.controller.word_group_size,  # For message formatting
                 'character_delay_ms': self.controller.character_delay_ms,  # Character delay setting
                 'current_char_index': current_char_index[0],  # Current character being encoded (1-based)
-                'current_encoded_text': current_encoded_text[0]  # Encoded/decoded text being built in real-time
+                'current_encoded_text': current_encoded_text[0],  # Encoded/decoded text being built in real-time
+                'enable_slides': self.controller.enable_slides,  # Enable slides feature
+                'slide_path': slide_path  # Path to current slide image
             }
         
         # Start web server if enabled
@@ -3319,6 +3522,18 @@ class EnigmaMuseumUI:
             if current_time - last_message_time >= self.controller.museum_delay:
                 # Select random message object
                 msg_obj = random.choice(valid_messages)
+                # Track message index for slide directory lookup
+                current_message_index[0] = valid_messages.index(msg_obj)
+                # Reset slide number when starting new message
+                current_slide_number[0] = 1
+                previous_slide_number[0] = 0
+                # Log initial slide if slides are enabled
+                if self.controller.enable_slides:
+                    slide_path = get_slide_path()
+                    if slide_path:
+                        add_log_message(f"Slide: {slide_path}")
+                    else:
+                        add_log_message("Slide: No slide image available")
                 
                 # Apply configuration from JSON message object
                 if debug_callback:
@@ -3384,6 +3599,24 @@ class EnigmaMuseumUI:
                             current_encoded_text[0] = restore_spaces(decoded_text, msg_obj['MSG'])
                         else:
                             current_encoded_text[0] = ""
+                    
+                    # Update slide number every 10 characters
+                    # Characters 1-10: slide 1, 11-20: slide 2, 21-30: slide 3, etc.
+                    if self.controller.enable_slides:
+                        # Calculate slide number: max(1, (index - 1) // 10 + 1)
+                        # This gives: 0 -> 1, 1-10 -> 1, 11-20 -> 2, 21-30 -> 3, etc.
+                        new_slide_number = max(1, ((index - 1) // 10) + 1)
+                        if new_slide_number != previous_slide_number[0]:
+                            current_slide_number[0] = new_slide_number
+                            previous_slide_number[0] = new_slide_number
+                            # Log slide change with path
+                            slide_path = get_slide_path()
+                            if slide_path:
+                                add_log_message(f"Slide: {slide_path}")
+                            else:
+                                add_log_message("Slide: No slide image available")
+                        else:
+                            current_slide_number[0] = new_slide_number
                     
                     # Compare with expected character
                     if index > 0 and index <= len(expected_normalized):
