@@ -402,6 +402,7 @@ Ring position updates during encoding are not saved to the config file. Only exp
 Future enhancements and improvements for the Enigma Museum Controller:
 
 - [ ] Full German Translation (requires German speaker)
+- [ ] Add option to generate random Model, Ring/Rotor settings when generating messages
 - [ ] Add Last Char returned to Top status screen, Used for enabling/stopping attact mode
 - [ ] Configure to Set and Lock Attact settings once firmware supports them
 - [ ] Break Python into modules, and cleanup code
