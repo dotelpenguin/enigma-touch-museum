@@ -1225,12 +1225,17 @@ class MuseumWebServer:
                     # Encode mode: look for "Encoding:" and "Encoded:" pair
                     if current_encoded_text:
                         result_message = current_encoded_text
-                        # Find the corresponding encoding message
+                        # Find the corresponding encoding message - look for MSG line after Encoding:
+                        # When iterating in reverse, we see MSG before Encoding, so capture MSG first
+                        msg_message = None
                         for msg in reversed(log_messages):
                             msg_str = str(msg)
-                            if msg_str.startswith('Encoding:'):
-                                current_message = msg_str.replace('Encoding:', '').strip()
-                                break
+                            if msg_str.startswith('  MSG:'):
+                                msg_message = msg_str.replace('  MSG:', '').strip()
+                            elif msg_str.startswith('Encoding:'):
+                                if msg_message:
+                                    current_message = msg_message
+                                    break
                     else:
                         # Look for the most recent encoded message first
                         for msg in reversed(log_messages):
@@ -1238,25 +1243,45 @@ class MuseumWebServer:
                             if msg_str.startswith('Encoded:'):
                                 result_message = msg_str.replace('Encoded:', '').strip()
                                 break
-                        # Then find the corresponding encoding message
+                        # Then find the corresponding encoding message - look for MSG line after Encoding:
                         found_encoded = False
+                        msg_message = None
                         for msg in reversed(log_messages):
                             msg_str = str(msg)
                             if msg_str.startswith('Encoded:'):
                                 found_encoded = True
+                            elif found_encoded and msg_str.startswith('  MSG:'):
+                                msg_message = msg_str.replace('  MSG:', '').strip()
                             elif found_encoded and msg_str.startswith('Encoding:'):
-                                current_message = msg_str.replace('Encoding:', '').strip()
-                                break
+                                if msg_message:
+                                    current_message = msg_message
+                                    break
+                        # If no encoded message found yet, just get the most recent encoding MSG message
+                        if not current_message:
+                            msg_message = None
+                            for msg in reversed(log_messages):
+                                msg_str = str(msg)
+                                if msg_str.startswith('  MSG:'):
+                                    msg_message = msg_str.replace('  MSG:', '').strip()
+                                elif msg_str.startswith('Encoding:'):
+                                    if msg_message:
+                                        current_message = msg_message
+                                        break
                 else:
                     # Decode mode: look for "Decoding:" and "Decoded:" pair
                     if current_encoded_text:
                         result_message = current_encoded_text
-                        # Find the corresponding decoding message
+                        # Find the corresponding decoding message - look for CODED line after Decoding:
+                        # When iterating in reverse, we see CODED before Decoding, so capture CODED first
+                        coded_message = None
                         for msg in reversed(log_messages):
                             msg_str = str(msg)
-                            if msg_str.startswith('Decoding:'):
-                                current_message = msg_str.replace('Decoding:', '').strip()
-                                break
+                            if msg_str.startswith('  CODED:'):
+                                coded_message = msg_str.replace('  CODED:', '').strip()
+                            elif msg_str.startswith('Decoding:'):
+                                if coded_message:
+                                    current_message = coded_message
+                                    break
                     else:
                         # Look for the most recent decoded message first
                         for msg in reversed(log_messages):
@@ -1264,23 +1289,30 @@ class MuseumWebServer:
                             if msg_str.startswith('Decoded:'):
                                 result_message = msg_str.replace('Decoded:', '').strip()
                                 break
-                        # Then find the corresponding decoding message
+                        # Then find the corresponding decoding message - look for CODED line after Decoding:
                         found_decoded = False
+                        coded_message = None
                         for msg in reversed(log_messages):
                             msg_str = str(msg)
                             if msg_str.startswith('Decoded:'):
                                 found_decoded = True
+                            elif found_decoded and msg_str.startswith('  CODED:'):
+                                coded_message = msg_str.replace('  CODED:', '').strip()
                             elif found_decoded and msg_str.startswith('Decoding:'):
-                                current_message = msg_str.replace('Decoding:', '').strip()
-                                break
-                    # If no decoded message found yet, just get the most recent decoding message
+                                if coded_message:
+                                    current_message = coded_message
+                                    break
+                    # If no decoded message found yet, just get the most recent decoding CODED message
                     if not current_message:
+                        coded_message = None
                         for msg in reversed(log_messages):
                             msg_str = str(msg)
-                            if msg_str.startswith('Decoding:'):
-                                # Extract message after "Decoding: " (already formatted)
-                                current_message = msg_str.replace('Decoding:', '').strip()
-                                break
+                            if msg_str.startswith('  CODED:'):
+                                coded_message = msg_str.replace('  CODED:', '').strip()
+                            elif msg_str.startswith('Decoding:'):
+                                if coded_message:
+                                    current_message = coded_message
+                                    break
                 
                 # Format config info
                 mode = config.get('mode', 'N/A')
@@ -3212,12 +3244,32 @@ class EnigmaMuseumUI:
         # Helper function to restore spaces at exact positions from original message
         def restore_spaces(decoded_text: str, original_msg: str) -> str:
             """Restore spaces at exact positions from original message"""
-            result = list(decoded_text.replace(' ', ''))  # Remove any existing spaces
-            space_positions = [i for i, char in enumerate(original_msg) if char == ' ']
-            # Insert spaces at same positions (reverse order to maintain indices)
+            # Remove any existing spaces from decoded text
+            decoded_no_spaces = decoded_text.replace(' ', '')
+            result = list(decoded_no_spaces)
+            
+            # Only restore spaces up to the current decoded length
+            current_length = len(decoded_no_spaces)
+            if current_length == 0:
+                return ''
+            
+            # Find space positions in original message (as character indices, not counting spaces)
+            # Map positions in the original MSG (with spaces) to positions in decoded text (without spaces)
+            space_positions = []
+            char_index = 0
+            for char in original_msg:
+                if char == ' ':
+                    # This space is at character position char_index in the non-spaced version
+                    if char_index < current_length:
+                        space_positions.append(char_index)
+                else:
+                    char_index += 1
+            
+            # Insert spaces at positions (reverse order to maintain indices)
             for pos in reversed(space_positions):
-                if pos <= len(result):
+                if pos < len(result):
                     result.insert(pos, ' ')
+            
             return ''.join(result)
         
         # Helper function to normalize text for comparison (remove spaces)
@@ -3299,7 +3351,12 @@ class EnigmaMuseumUI:
                 
                 # Format message for display
                 formatted_message = self.controller.format_message_for_display(message_to_send)
-                add_log_message(f"{operation}: {formatted_message}")
+                # Display both MSG and CODED in museum mode
+                formatted_msg = self.controller.format_message_for_display(msg_obj['MSG'])
+                formatted_coded = self.controller.format_message_for_display(msg_obj['CODED'])
+                add_log_message(f"{operation}:")
+                add_log_message(f"  MSG: {formatted_msg}")
+                add_log_message(f"  CODED: {formatted_coded}")
                 
                 # Normalize expected result for character-by-character comparison
                 expected_normalized = normalize_for_comparison(expected_result)
@@ -3313,11 +3370,20 @@ class EnigmaMuseumUI:
                     # Update current character index for web display
                     current_char_index[0] = index
                     # Update encoded text in real-time
-                    current_encoded_text[0] = ''.join(encoded_result)
-                    # Group the encoded text for display
-                    if current_encoded_text[0]:
-                        grouped = self.controller._group_encoded_text(current_encoded_text[0])
-                        current_encoded_text[0] = grouped
+                    decoded_text = ''.join(encoded_result)
+                    # Format for display based on mode
+                    if is_encode:
+                        # Encode mode: group the encoded text
+                        if decoded_text:
+                            current_encoded_text[0] = self.controller._group_encoded_text(decoded_text)
+                        else:
+                            current_encoded_text[0] = ""
+                    else:
+                        # Decode mode: restore spaces from MSG in real-time
+                        if decoded_text:
+                            current_encoded_text[0] = restore_spaces(decoded_text, msg_obj['MSG'])
+                        else:
+                            current_encoded_text[0] = ""
                     
                     # Compare with expected character
                     if index > 0 and index <= len(expected_normalized):
@@ -3376,9 +3442,9 @@ class EnigmaMuseumUI:
                                 grouped_result = self.controller._group_encoded_text(result)
                                 add_log_message(f"Encoded: {grouped_result}")
                             else:
-                                # Decode mode: restore spaces from MSG
-                                result_with_spaces = restore_spaces(result, msg_obj['MSG'])
-                                add_log_message(f"Decoded: {result_with_spaces}")
+                                # Decode mode: use MSG directly since decoded result matches it exactly
+                                formatted_decoded = self.controller.format_message_for_display(msg_obj['MSG'])
+                                add_log_message(f"Decoded: {formatted_decoded}")
                         else:
                             # Verification failed - pause museum mode
                             add_log_message(f"Verification failed - pausing museum mode (Enigma may have been touched)")

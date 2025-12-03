@@ -6,12 +6,12 @@
     "ring_position": "20 06 10",
     "pegboard": "FV PQ"
   },
-  "function_mode": "Decode - EN",
+  "function_mode": "Decode - DE",
   "museum_delay": 90,
   "always_send_config": true,
   "word_group_size": 5,
   "character_delay_ms": 2000,
   "web_server_enabled": true,
   "web_server_port": 8080,
-  "device": "/dev/tty.usbmodem207139584B471"
+  "device": "/dev/ttyACM0"
 }
