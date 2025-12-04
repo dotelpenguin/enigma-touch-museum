@@ -391,7 +391,15 @@ class EnigmaController:
                         break
                 time.sleep(0.01)
             
-            # Clear any remaining data in buffer after reading response
+            # Final check for any remaining data - read it instead of clearing
+            # This ensures we capture the last line that might still be in transit
+            if self.ser.in_waiting > 0:
+                time.sleep(0.1)  # Small delay to allow last data to arrive
+                if self.ser.in_waiting > 0:
+                    response += self.ser.read(self.ser.in_waiting)
+            
+            # Only clear buffer if there's still data after our final read attempt
+            # This handles any truly leftover data that shouldn't be there
             if self.ser.in_waiting > 0:
                 self.ser.reset_input_buffer()
             
@@ -675,6 +683,13 @@ class EnigmaController:
                                     # Have some response but no "Positions" yet, keep waiting
                                     time.sleep(0.01)
                             time.sleep(0.01)
+                    
+                    # Final check for any remaining data - read it to ensure we capture the last line
+                    # This ensures we capture any trailing data that might still be in transit
+                    if self.ser.in_waiting > 0:
+                        time.sleep(0.1)  # Small delay to allow last data to arrive
+                        if self.ser.in_waiting > 0:
+                            response += self.ser.read(self.ser.in_waiting)
                 
                     if response and found_positions:
                         try:
