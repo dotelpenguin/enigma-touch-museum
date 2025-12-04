@@ -3223,6 +3223,11 @@ class EnigmaMuseumUI:
     
     def run_museum_mode(self, mode: str):
         """Run museum mode"""
+        # Save original always_send_config value - we'll disable it during museum mode
+        # since we're setting config from JSON message objects, not from defaults
+        original_always_send_config = self.controller.always_send_config
+        self.controller.always_send_config = False
+        
         # Determine operation mode (encode or decode)
         is_encode = mode in ('2', '4')
         
@@ -3239,6 +3244,8 @@ class EnigmaMuseumUI:
             mode_name = 'Decode - DE'
             json_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
         else:
+            # Restore original value before returning
+            self.controller.always_send_config = original_always_send_config
             return
         
         # Set function mode first so it's displayed in the top panel
@@ -3260,6 +3267,8 @@ class EnigmaMuseumUI:
             self.draw_debug_panel()
             self.refresh_all_panels()
             time.sleep(3)
+            # Restore original always_send_config value before returning
+            self.controller.always_send_config = original_always_send_config
             return
         
         # Validate message objects have required fields
@@ -3276,6 +3285,8 @@ class EnigmaMuseumUI:
             self.draw_debug_panel()
             self.refresh_all_panels()
             time.sleep(3)
+            # Restore original always_send_config value before returning
+            self.controller.always_send_config = original_always_send_config
             return
         
         # Setup screen and ensure function mode is displayed
@@ -3703,6 +3714,8 @@ class EnigmaMuseumUI:
         # Restore screen state when exiting museum mode
         self.controller.function_mode = 'Interactive'
         self.stdscr.nodelay(False)  # Restore normal input mode
+        # Restore original always_send_config value
+        self.controller.always_send_config = original_always_send_config
         # Clear and redraw screen to prevent flickering
         self.setup_screen()
         self.draw_settings_panel()
