@@ -499,8 +499,16 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!MO {mode}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
+        # Check for invalid option error
+        if response and "*** Invalid option" in response:
+            if debug_callback:
+                # Use COLOR_MISMATCH for error display (red)
+                debug_callback(f"ERROR: Invalid option setting mode '{mode}'", color_type=7)
+            return False
+        if response is None:
+            return False
         self.config['mode'] = mode
-        return response is not None
+        return True
     
     def set_rotor_set(self, rotor_set: str, debug_callback=None) -> bool:
         """Set rotor configuration"""
@@ -512,8 +520,15 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!RO {rotor_set}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
+        # Check for invalid option error
+        if response and "*** Invalid option" in response:
+            if debug_callback:
+                debug_callback(f"ERROR: Invalid option setting rotor set '{rotor_set}'", color_type=7)  # COLOR_MISMATCH (red)
+            return False
+        if response is None:
+            return False
         self.config['rotor_set'] = rotor_set
-        return response is not None
+        return True
     
     def set_ring_settings(self, ring_settings: str, debug_callback=None) -> bool:
         """Set ring settings"""
@@ -525,8 +540,15 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!RI {ring_settings}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
+        # Check for invalid option error
+        if response and "*** Invalid option" in response:
+            if debug_callback:
+                debug_callback(f"ERROR: Invalid option setting ring settings '{ring_settings}'", color_type=7)  # COLOR_MISMATCH (red)
+            return False
+        if response is None:
+            return False
         self.config['ring_settings'] = ring_settings
-        return response is not None
+        return True
     
     def set_ring_position(self, ring_position: str, debug_callback=None) -> bool:
         """Set ring position"""
@@ -538,8 +560,15 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!RP {ring_position}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
+        # Check for invalid option error
+        if response and "*** Invalid option" in response:
+            if debug_callback:
+                debug_callback(f"ERROR: Invalid option setting ring position '{ring_position}'", color_type=7)  # COLOR_MISMATCH (red)
+            return False
+        if response is None:
+            return False
         self.config['ring_position'] = ring_position
-        return response is not None
+        return True
     
     def set_pegboard(self, pegboard: str, debug_callback=None) -> bool:
         """Set pegboard settings"""
@@ -553,8 +582,15 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!PB {pegboard}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
+        # Check for invalid option error
+        if response and "*** Invalid option" in response:
+            if debug_callback:
+                debug_callback(f"ERROR: Invalid option setting pegboard '{pegboard}'", color_type=7)  # COLOR_MISMATCH (red)
+            return False
+        if response is None:
+            return False
         self.config['pegboard'] = pegboard if pegboard != 'clear' else ''
-        return response is not None
+        return True
     
     def return_to_encode_mode(self, debug_callback=None) -> bool:
         """Return to encode mode"""
@@ -2459,91 +2495,126 @@ class EnigmaMuseumUI:
         # Get saved config values from file (not in-memory values)
         saved = self.controller.get_saved_config()
         
-        def debug_callback(msg):
-            self.add_debug_output(msg)
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
             self.draw_debug_panel()
             self.refresh_all_panels()
         
         if option == '1':
-            self.show_message(0, 0, "Set Mode (e.g., I, M3, M4):")
-            self.draw_debug_panel()
-            self.refresh_all_panels()
-            value = self.get_input(1, 0, "Mode: ", saved['config']['mode'])
-            if value:
+            while True:
+                self.show_message(0, 0, "Set Mode (e.g., I, M3, M4):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Mode: ", saved['config']['mode'])
+                if not value:
+                    break  # User cancelled
                 if self.controller.set_mode(value, debug_callback=debug_callback):
                     self.controller.save_config()  # Save config after change
                     self.show_message(2, 0, "Mode set successfully!")
                     self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
                 else:
-                    self.show_message(2, 0, "Failed to set mode!")
-                self.draw_debug_panel()
-                self.refresh_all_panels()
-                time.sleep(1)
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Invalid option! Please re-enter mode.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
         
         elif option == '2':
-            self.show_message(0, 0, "Set Rotor Set (e.g., A III IV I):")
-            self.draw_debug_panel()
-            self.refresh_all_panels()
-            value = self.get_input(1, 0, "Rotor Set: ", saved['config']['rotor_set'])
-            if value:
+            while True:
+                self.show_message(0, 0, "Set Rotor Set (e.g., A III IV I):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Rotor Set: ", saved['config']['rotor_set'])
+                if not value:
+                    break  # User cancelled
                 if self.controller.set_rotor_set(value, debug_callback=debug_callback):
                     self.controller.save_config()  # Save config after change
                     self.show_message(2, 0, "Rotor set configured successfully!")
                     self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
                 else:
-                    self.show_message(2, 0, "Failed to configure rotor set!")
-                self.draw_debug_panel()
-                self.refresh_all_panels()
-                time.sleep(1)
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Invalid option! Please re-enter rotor set.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
         
         elif option == '3':
-            self.show_message(0, 0, "Set Ring Settings (e.g., 01 01 01):")
-            self.draw_debug_panel()
-            self.refresh_all_panels()
-            value = self.get_input(1, 0, "Ring Settings: ", saved['config']['ring_settings'])
-            if value:
+            while True:
+                self.show_message(0, 0, "Set Ring Settings (e.g., 01 01 01):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Ring Settings: ", saved['config']['ring_settings'])
+                if not value:
+                    break  # User cancelled
                 if self.controller.set_ring_settings(value, debug_callback=debug_callback):
                     self.controller.save_config()  # Save config after change
                     self.show_message(2, 0, "Ring settings configured successfully!")
                     self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
                 else:
-                    self.show_message(2, 0, "Failed to configure ring settings!")
-                self.draw_debug_panel()
-                self.refresh_all_panels()
-                time.sleep(1)
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Invalid option! Please re-enter ring settings.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
         
         elif option == '4':
-            self.show_message(0, 0, "Set Ring Position (e.g., 20 6 10 or A B C):")
-            self.draw_debug_panel()
-            self.refresh_all_panels()
-            value = self.get_input(1, 0, "Ring Position: ", saved['config']['ring_position'])
-            if value:
+            while True:
+                self.show_message(0, 0, "Set Ring Position (e.g., 20 6 10 or A B C):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Ring Position: ", saved['config']['ring_position'])
+                if not value:
+                    break  # User cancelled
                 if self.controller.set_ring_position(value, debug_callback=debug_callback):
                     # Save config with new ring position (don't preserve old value)
                     self.controller.save_config(preserve_ring_position=False)
                     self.show_message(2, 0, "Ring position set successfully!")
                     self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
                 else:
-                    self.show_message(2, 0, "Failed to set ring position!")
-                self.draw_debug_panel()
-                self.refresh_all_panels()
-                time.sleep(1)
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Invalid option! Please re-enter ring position.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
         
         elif option == '5':
-            self.show_message(0, 0, "Set Pegboard (e.g., VF PQ or leave empty for clear):")
-            self.draw_debug_panel()
-            self.refresh_all_panels()
-            value = self.get_input(1, 0, "Pegboard: ", saved['config']['pegboard'])
-            if value:
-                if self.controller.set_pegboard(value, debug_callback=debug_callback):
+            while True:
+                self.show_message(0, 0, "Set Pegboard (e.g., VF PQ or leave empty for clear):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Pegboard: ", saved['config']['pegboard'])
+                # Empty value is allowed for pegboard (means 'clear')
+                if self.controller.set_pegboard(value if value else '', debug_callback=debug_callback):
                     self.controller.save_config()  # Save config after change
                     self.show_message(2, 0, "Pegboard configured successfully!")
                     self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
                 else:
-                    self.show_message(2, 0, "Failed to configure pegboard!")
-                self.draw_debug_panel()
-                self.refresh_all_panels()
-                time.sleep(1)
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Invalid option! Please re-enter pegboard.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
+                    # Continue loop to retry
         
         elif option == '6':
             self.show_message(0, 0, f"Set Museum Delay (current: {saved['museum_delay']}s):")
