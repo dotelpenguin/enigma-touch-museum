@@ -611,8 +611,13 @@ wait_for_input() {
     echo "=========================================="
     echo "Enigma Museum Controller"
     echo "=========================================="
-    echo "Press any key within \${timeout} seconds to enter config mode or quit to shell"
-    echo "Otherwise, museum mode will start automatically..."
+    echo "Press a key within \${timeout} seconds to choose an option:"
+    echo "  [C] Config mode - Open configuration menu"
+    echo "  [S] Shell - Exit to shell"
+    echo "  [M] Museum mode - Start museum mode"
+    echo "  [D] Debug mode - Start museum mode with debug output"
+    echo ""
+    echo "If no key is pressed, museum mode will start automatically..."
     echo ""
     
     # Use read with timeout (non-blocking)
@@ -623,14 +628,25 @@ wait_for_input() {
         # User pressed a key - clear the input buffer
         while read -t 0.1 -n 1 -s dummy 2>/dev/null; do :; done
         
-        echo ""
-        echo "Options:"
-        echo "  [C]onfig mode - Open configuration menu"
-        echo "  [S]hell - Exit to shell"
-        echo "  [M]useum mode - Start museum mode"
-        echo "  [D]ebug mode - Start museum mode with debug output"
-        echo ""
-        read -p "Enter choice (C/S/M/D): " choice
+        # Convert input to lowercase for case-insensitive matching
+        choice="\${input,,}"
+        
+        # If user pressed C, S, M, or D directly, use it; otherwise show menu
+        if [[ "\$choice" == "c" ]] || [[ "\$choice" == "s" ]] || [[ "\$choice" == "m" ]] || [[ "\$choice" == "d" ]]; then
+            # User pressed a valid key directly, use it
+            :
+        else
+            # Show menu for other keys
+            echo ""
+            echo "Options:"
+            echo "  [C]onfig mode - Open configuration menu"
+            echo "  [S]hell - Exit to shell"
+            echo "  [M]useum mode - Start museum mode"
+            echo "  [D]ebug mode - Start museum mode with debug output"
+            echo ""
+            read -p "Enter choice (C/S/M/D): " choice
+            choice="\${choice,,}"
+        fi
         
         case "\${choice,,}" in
             c)
