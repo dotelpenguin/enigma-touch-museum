@@ -459,15 +459,12 @@ verify_serial_permissions() {
     if id -nG | grep -q "\bdialout\b"; then
         echo -e "${GREEN}✓ User is in dialout group (current session)${NC}"
     else
-        echo -e "${RED}✗ User is NOT in dialout group in current session${NC}"
-        echo -e "${YELLOW}You need to log out and back in, or run: newgrp dialout${NC}"
+        echo -e "${YELLOW}⚠ User is NOT in dialout group in current session${NC}"
+        echo -e "${YELLOW}Note: Group membership was added, but requires logout/login to take effect${NC}"
+        echo -e "${YELLOW}You can continue installation, but may need to log out/in later for device access${NC}"
         echo ""
-        read -p "Try to activate dialout group in current session? (y/n): " activate_group
-        if [[ "${activate_group,,}" == "y" ]]; then
-            echo "Running: newgrp dialout"
-            echo -e "${YELLOW}Note: This will start a new shell. Type 'exit' to return.${NC}"
-            newgrp dialout
-        fi
+        # Don't use newgrp as it starts a new shell and breaks script execution
+        # Instead, just inform the user
     fi
     
     # Check for common serial devices
@@ -508,15 +505,19 @@ verify_serial_permissions() {
     
     if [ -f "$UDEV_RULE" ]; then
         echo "Udev rule already exists: $UDEV_RULE"
-        read -p "Replace existing udev rule? (y/n): " replace_udev
+        read -p "Replace existing udev rule? (y/n) [default: n]: " replace_udev
         if [[ "${replace_udev,,}" != "y" ]]; then
             echo "Keeping existing udev rule"
-            return
+        else
+            # Remove old rule and create new one
+            sudo rm -f "$UDEV_RULE"
+            create_udev="y"
         fi
+    else
+        read -p "Create udev rule to set serial device permissions? (y/n) [default: y]: " create_udev
     fi
     
-    read -p "Create udev rule to set serial device permissions? (y/n): " create_udev
-    if [[ "${create_udev,,}" == "y" ]]; then
+    if [[ "${create_udev:-y}" == "y" ]]; then
         sudo tee "$UDEV_RULE" > /dev/null << 'UDEV_EOF'
 # Enigma Museum Controller - Serial device permissions
 # Allow dialout group to access USB serial devices
@@ -526,12 +527,13 @@ UDEV_EOF
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}Udev rule created${NC}"
             echo "Reloading udev rules..."
-            sudo udevadm control --reload-rules
-            sudo udevadm trigger
+            sudo udevadm control --reload-rules 2>/dev/null
+            sudo udevadm trigger 2>/dev/null
             echo -e "${GREEN}Udev rules reloaded${NC}"
             echo -e "${YELLOW}Note: You may need to reconnect the device for changes to take effect${NC}"
         else
-            echo -e "${RED}Error: Could not create udev rule${NC}"
+            echo -e "${YELLOW}Warning: Could not create udev rule (may need sudo)${NC}"
+            echo "You can create it manually later if needed"
         fi
     else
         echo "Skipping udev rule creation"

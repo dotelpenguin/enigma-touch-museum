@@ -3409,10 +3409,10 @@ class EnigmaMuseumUI:
     def museum_mode_screen(self):
         """Museum mode selection"""
         options = [
-            ("2", "Encode - EN"),
-            ("3", "Decode - EN"),
-            ("4", "Encode - DE"),
-            ("5", "Decode - DE"),
+            ("1", "Encode - EN"),
+            ("2", "Decode - EN"),
+            ("3", "Encode - DE"),
+            ("4", "Decode - DE"),
             ("B", "Back")
         ]
         
@@ -3433,7 +3433,7 @@ class EnigmaMuseumUI:
                 if options[selected][0] == 'B':
                     return
                 self.run_museum_mode(options[selected][0])
-            elif key >= ord('2') and key <= ord('5'):
+            elif key >= ord('1') and key <= ord('4'):
                 self.run_museum_mode(chr(key))
     
     def run_museum_mode(self, mode: str):
@@ -3444,18 +3444,18 @@ class EnigmaMuseumUI:
         self.controller.always_send_config = False
         
         # Determine operation mode (encode or decode)
-        is_encode = mode in ('2', '4')
+        is_encode = mode in ('1', '3')
         
-        if mode == '2':
+        if mode == '1':
             mode_name = 'Encode - EN'
             json_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
-        elif mode == '3':
+        elif mode == '2':
             mode_name = 'Decode - EN'
             json_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
-        elif mode == '4':
+        elif mode == '3':
             mode_name = 'Encode - DE'
             json_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
-        elif mode == '5':
+        elif mode == '4':
             mode_name = 'Decode - DE'
             json_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
         else:
@@ -3966,7 +3966,7 @@ class EnigmaMuseumUI:
         
         Args:
             config_only: If True, show only config menu and exit after
-            museum_mode: If set, start directly in specified museum mode ('2', '3', '4', or '5')
+            museum_mode: If set, start directly in specified museum mode ('1', '2', '3', or '4')
             debug_enabled: If True, enable debug output panel at startup
         """
         # Set debug enabled if requested via command line (before initializing curses)
@@ -4126,13 +4126,13 @@ def main():
         elif arg in ('--config', '-c'):
             config_only = True
         elif arg == '--museum-en-encode':
-            museum_mode = '2'
+            museum_mode = '1'
         elif arg == '--museum-en-decode':
-            museum_mode = '3'
+            museum_mode = '2'
         elif arg == '--museum-de-encode':
-            museum_mode = '4'
+            museum_mode = '3'
         elif arg == '--museum-de-decode':
-            museum_mode = '5'
+            museum_mode = '4'
         elif arg == '--debug':
             debug_enabled = True
         elif arg.startswith('-'):
