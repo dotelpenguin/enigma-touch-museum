@@ -41,6 +41,7 @@ if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
     echo "  - Install pyserial library"
     echo "  - Add user to dialout group for serial device access"
     echo "  - Create startup script (start-enigma-museum.sh)"
+    echo "  - Configure default museum mode (Encode/Decode - EN/DE)"
     echo "  - Optionally enable console auto-login (recommended for kiosk)"
     echo "  - Optionally add auto-start to ~/.bashrc"
     echo ""
@@ -356,7 +357,7 @@ show_installation_checklist() {
     echo "  [✓] Create startup script (start-enigma-museum.sh)"
     echo ""
     echo -e "${YELLOW}Configuration Steps (you will be prompted):${NC}"
-    echo "  [ ] Select default museum mode (EN/DE, coded or on-the-fly)"
+    echo "  [ ] Select default museum mode (Encode/Decode - EN/DE)"
     echo "  [ ] Enable console auto-login (recommended for kiosk mode)"
     echo "  [ ] Add startup script to ~/.bashrc (for auto-start on login)"
     echo ""
@@ -365,6 +366,7 @@ show_installation_checklist() {
     echo "  - If key pressed: offers Config mode, Shell, or Museum mode"
     echo "  - If no input: automatically starts Museum mode (using selected default)"
     echo "  - Auto-restarts if application exits (kiosk mode)"
+    echo "  - Supports --debug flag for serial communication debugging"
     echo ""
     echo -e "${YELLOW}System Requirements:${NC}"
     echo "  - Raspberry Pi OS Lite (console-only) recommended"
@@ -546,36 +548,36 @@ chmod +x "$SCRIPT_DIR/enigma-museum.py"
 # Prompt for default museum mode
 echo -e "${YELLOW}[6/8] Configuring default museum mode...${NC}"
 echo ""
-echo "Select the default museum mode message set:"
-echo "  [1] Museum EN - English messages (encoded on-the-fly)"
-echo "  [2] Museum DE - German messages (encoded on-the-fly)"
-echo "  [3] Museum EN (Coded) - English pre-coded messages"
-echo "  [4] Museum DE (Coded) - German pre-coded messages"
+echo "Select the default museum mode:"
+echo "  [1] Encode - EN (English encode mode)"
+echo "  [2] Decode - EN (English decode mode)"
+echo "  [3] Encode - DE (German encode mode)"
+echo "  [4] Decode - DE (German decode mode)"
 echo ""
 read -p "Enter choice (1-4) [default: 1]: " museum_mode_choice
 
 # Set default museum mode based on choice
 case "${museum_mode_choice:-1}" in
     1)
-        DEFAULT_MUSEUM_MODE="--museum-en"
-        MUSEUM_MODE_NAME="Museum EN"
+        DEFAULT_MUSEUM_MODE="--museum-en-encode"
+        MUSEUM_MODE_NAME="Encode - EN"
         ;;
     2)
-        DEFAULT_MUSEUM_MODE="--museum-de"
-        MUSEUM_MODE_NAME="Museum DE"
+        DEFAULT_MUSEUM_MODE="--museum-en-decode"
+        MUSEUM_MODE_NAME="Decode - EN"
         ;;
     3)
-        DEFAULT_MUSEUM_MODE="--museum-en-coded"
-        MUSEUM_MODE_NAME="Museum EN (Coded)"
+        DEFAULT_MUSEUM_MODE="--museum-de-encode"
+        MUSEUM_MODE_NAME="Encode - DE"
         ;;
     4)
-        DEFAULT_MUSEUM_MODE="--museum-de-coded"
-        MUSEUM_MODE_NAME="Museum DE (Coded)"
+        DEFAULT_MUSEUM_MODE="--museum-de-decode"
+        MUSEUM_MODE_NAME="Decode - DE"
         ;;
     *)
-        echo -e "${YELLOW}Invalid choice, using default: Museum EN${NC}"
-        DEFAULT_MUSEUM_MODE="--museum-en"
-        MUSEUM_MODE_NAME="Museum EN"
+        echo -e "${YELLOW}Invalid choice, using default: Encode - EN${NC}"
+        DEFAULT_MUSEUM_MODE="--museum-en-encode"
+        MUSEUM_MODE_NAME="Encode - EN"
         ;;
 esac
 
@@ -623,9 +625,10 @@ wait_for_input() {
         echo "Options:"
         echo "  [C]onfig mode - Open configuration menu"
         echo "  [S]hell - Exit to shell"
-        echo "  [M]useum mode - Start museum mode anyway"
+        echo "  [M]useum mode - Start museum mode"
+        echo "  [D]ebug mode - Start museum mode with debug output"
         echo ""
-        read -p "Enter choice (C/S/M): " choice
+        read -p "Enter choice (C/S/M/D): " choice
         
         case "\${choice,,}" in
             c)
@@ -640,6 +643,11 @@ wait_for_input() {
             m)
                 echo "Starting museum mode..."
                 python3 "\$APP_SCRIPT" \$DEFAULT_MODE
+                return 0  # Continue loop (restart)
+                ;;
+            d)
+                echo "Starting museum mode with debug..."
+                python3 "\$APP_SCRIPT" \$DEFAULT_MODE --debug
                 return 0  # Continue loop (restart)
                 ;;
             *)
@@ -742,6 +750,21 @@ echo -e "${YELLOW}Important Notes:${NC}"
 echo "  - This application is designed for Raspberry Pi OS Lite (console-only)"
 echo "  - For kiosk mode, enable console auto-login and add startup to ~/.bashrc"
 echo "  - The application will auto-restart if it exits (kiosk mode)"
+echo ""
+echo -e "${YELLOW}Command-Line Options:${NC}"
+echo "  --config, -c              Open configuration menu without connecting"
+echo "  --museum-en-encode        Start in Encode - EN mode (English encode)"
+echo "  --museum-en-decode        Start in Decode - EN mode (English decode)"
+echo "  --museum-de-encode        Start in Encode - DE mode (German encode)"
+echo "  --museum-de-decode        Start in Decode - DE mode (German decode)"
+echo "  --debug                   Enable debug output panel"
+echo "  DEVICE                    Serial device path (e.g., /dev/ttyACM0)"
+echo ""
+echo "Examples:"
+echo "  python3 enigma-museum.py --config"
+echo "  python3 enigma-museum.py --museum-en-encode"
+echo "  python3 enigma-museum.py --museum-de-decode /dev/ttyUSB0"
+echo "  python3 enigma-museum.py --debug /dev/ttyACM0"
 echo ""
 echo "To remove auto-start, run: ./install.sh --uninstall"
 echo ""
