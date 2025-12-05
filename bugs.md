@@ -1,7 +1,5 @@
-- [X] Museum is not setting the Enigma config from Message Array, it's using the defaults
+- [X] Museum is not setting the Enigma config from Message Array, it's using the defaults - **FIXED**
 - [ ] WebHost Display flickers due to refresh
 - [ ] Logic not handling 4 Rotor configs
-- [ ] Clear config line, if invalid. 
+- [X] Clear config line, if invalid - **FIXED** (input line now clears before re-entry on error)
 - [ ] Logic issues with Lettered Rotors
-
-

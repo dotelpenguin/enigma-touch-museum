@@ -14,5 +14,5 @@
   "web_server_enabled": true,
   "web_server_port": 8080,
   "enable_slides": true,
-  "device": "/dev/tty.usbmodem207139584B471"
+  "device": "/dev/ttyACM0"
 }

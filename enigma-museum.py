@@ -1887,7 +1887,7 @@ class EnigmaMuseumUI:
         self.top_win = None  # Top window for settings display
         self.left_win = None  # Bottom left panel window (menus)
         self.right_win = None  # Bottom right panel window (debug/logo)
-        self.debug_enabled = False
+        self.debug_enabled = True
         self.debug_output = []  # Store debug messages as tuples: (message, color_type)
         self.max_debug_lines = 100  # Limit debug history
         self.top_height = 6  # Height of top settings window
@@ -3961,7 +3961,7 @@ class EnigmaMuseumUI:
         self.draw_debug_panel()
         self.refresh_all_panels()
     
-    def run(self, config_only: bool = False, museum_mode: Optional[str] = None, debug_enabled: bool = False):
+    def run(self, config_only: bool = False, museum_mode: Optional[str] = None, debug_enabled: bool = True):
         """Main UI loop
         
         Args:
@@ -4113,7 +4113,7 @@ def main():
     device = None  # None means use config file or default
     config_only = False
     museum_mode = None
-    debug_enabled = False
+    debug_enabled = True
     
     # Parse command line arguments
     i = 1

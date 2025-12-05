@@ -126,7 +126,7 @@ The installation script will:
 - Optionally add auto-start to `~/.bashrc`
 
 **During installation, you will be prompted to:**
-- Select a default museum mode (EN/DE, coded or on-the-fly)
+- Select a default museum mode (Encode/Decode - EN/DE)
 - Enable console auto-login (recommended for kiosk mode)
 - Add startup script to `~/.bashrc` (for auto-start on login)
 
@@ -231,7 +231,7 @@ sudo usermod -a -G dialout $USER
 
 The application uses `enigma-museum-config.json` for persistent configuration. See [ENIGMA_PROTOCOL_DOCUMENTATION.md](ENIGMA_PROTOCOL_DOCUMENTATION.md) for detailed protocol information. 
 
-**Note**: Currently there is no sanity checking on config settings, future TODO idem. 
+**Note**: Configuration settings are validated when sent to the Enigma device. Invalid settings (e.g., duplicate mappings, invalid options, rotor used twice) will be detected and the user will be prompted to fix them. The application will automatically switch to the configuration menu if errors are detected when sending config to the device. 
 
 You can configure:
 
@@ -261,10 +261,10 @@ python3 enigma-museum.py [OPTIONS] [DEVICE]
 ### Command-Line Options
 
 - `--config`, `-c`: Open configuration menu without connecting to device
-- `--museum-en`: Start directly in Museum EN mode (English messages)
-- `--museum-de`: Start directly in Museum DE mode (German messages)
-- `--museum-en-coded`: Start in Museum EN mode with pre-coded messages
-- `--museum-de-coded`: Start in Museum DE mode with pre-coded messages
+- `--museum-en-encode`: Start directly in Encode - EN mode (English encode)
+- `--museum-en-decode`: Start directly in Decode - EN mode (English decode)
+- `--museum-de-encode`: Start directly in Encode - DE mode (German encode)
+- `--museum-de-decode`: Start directly in Decode - DE mode (German decode)
 - `--debug`: Enable debug output panel (shows serial communication)
 - `--help`, `-h`: Show help message and exit
 
@@ -277,14 +277,17 @@ python3 enigma-museum.py
 # Configure settings without connecting
 python3 enigma-museum.py --config
 
-# Start directly in Museum EN mode
-python3 enigma-museum.py --museum-en
+# Start directly in Encode - EN mode
+python3 enigma-museum.py --museum-en-encode
 
 # Start with specific device and debug enabled
 python3 enigma-museum.py --debug /dev/ttyACM0
 
-# Start Museum DE mode with pre-coded messages
-python3 enigma-museum.py --museum-de-coded
+# Start Decode - DE mode
+python3 enigma-museum.py --museum-de-decode
+
+# Start Encode - DE mode with specific device
+python3 enigma-museum.py --museum-de-encode /dev/ttyUSB0
 ```
 
 ## Main Menu Options
@@ -298,10 +301,14 @@ python3 enigma-museum.py --museum-de-coded
 
 ## Museum Modes
 
-- **Museum EN**: English messages, encoded on-the-fly
-- **Museum DE**: German messages, encoded on-the-fly
-- **Museum EN (Coded)**: English messages, using pre-coded messages
-- **Museum DE (Coded)**: German messages, using pre-coded messages
+The museum mode menu offers four options (numbered 1-4):
+
+1. **Encode - EN**: English messages, encode mode (sends original messages, verifies encoded results)
+2. **Decode - EN**: English messages, decode mode (sends coded messages, verifies decoded results)
+3. **Encode - DE**: German messages, encode mode (sends original messages, verifies encoded results)
+4. **Decode - DE**: German messages, decode mode (sends coded messages, verifies decoded results)
+
+All modes use JSON files with pre-generated messages (`english-encoded.json` or `german-encoded.json`). These files must be generated first using the Configuration menu (options 10 or 11).
 
 **Important:** German messages and translations were generated using AI and may contain inaccuracies or errors. Review and contributions from native German speakers are needed.
 
@@ -345,10 +352,12 @@ Access via Main Menu → Configuration:
 
 ## Message Files
 
-- `english.msg`: English messages for museum mode
-- `german.msg`: German messages for museum mode
-- `english-coded.msg`: Pre-coded English messages (generated)
-- `german-coded.msg`: Pre-coded German messages (generated)
+- `english.msg`: Source English messages for museum mode
+- `german.msg`: Source German messages for museum mode
+- `english-encoded.json`: Generated English messages with encoding metadata (JSON format)
+- `german-encoded.json`: Generated German messages with encoding metadata (JSON format)
+
+**Note:** The JSON files (`*-encoded.json`) are generated from the source message files (`.msg`) using the Configuration menu options 10 (Generate Coded Messages - EN) or 11 (Generate Coded Messages - DE). These JSON files contain the original messages along with their encoded/decoded results and configuration settings.
 
 **Note on German Translations:** The German messages and translations in this project were generated using AI translation tools and are likely inaccurate or may contain errors. These translations need review and cleanup by native German speakers. Contributions to improve the German translations are welcome - please see the [Contributing](#contributing) section.
 
@@ -367,6 +376,16 @@ When character delay is 2000ms or greater, the current character being encoded i
 ### Ring Position Protection
 
 Ring position updates during encoding are not saved to the config file. Only explicit changes via the configuration menu are persisted.
+
+### Configuration Error Handling
+
+The application includes comprehensive error detection and handling:
+
+- **Automatic Error Detection**: All Enigma device error responses are automatically detected using pattern matching
+- **Error Types**: Detects all error types including invalid options, duplicate mappings, rotor conflicts, and more
+- **Automatic Recovery**: When configuration errors are detected, the application automatically switches to the configuration menu
+- **Input Validation**: Input lines are automatically cleared on error to allow clean re-entry
+- **User Notification**: Error messages are displayed in the debug output with color coding (red for errors)
 
 ## Troubleshooting
 
@@ -393,10 +412,26 @@ Ring position updates during encoding are not saved to the config file. Only exp
 ### Messages Not Encoding
 
 1. Verify Enigma touch is using the proper logging method. (Line returns enabled, either 4,5 mode)
-1. Enable debug mode (`--debug` or menu option 6)
-2. Check serial communication in debug panel
-3. Verify device is in encode mode
-4. Check message contains only A-Z characters (spaces and special characters are filtered)
+2. Enable debug mode (`--debug` or menu option 6)
+3. Check serial communication in debug panel
+4. Verify device is in encode mode
+5. Check message contains only A-Z characters (spaces and special characters are filtered)
+6. Check for configuration errors - if config errors are detected, the application will automatically switch to the config menu
+
+### Configuration Errors
+
+If you receive configuration errors when sending settings to the Enigma device:
+
+1. The application will automatically detect errors matching the pattern: `^` + line return + `*** ` + error message
+2. Common errors include:
+   - `*** Invalid option`: Invalid configuration value
+   - `*** Duplicate mapping`: Duplicate pegboard or rotor mappings
+   - `*** Rotor used twice`: Same rotor used multiple times in rotor set
+3. When an error is detected:
+   - Error message is displayed in debug output
+   - Application automatically switches to configuration menu
+   - Input line is cleared for clean re-entry
+   - You must fix the configuration before continuing
 
 ## TODO
 
@@ -408,7 +443,7 @@ Future enhancements and improvements for the Enigma Museum Controller:
 - [ ] Configure to Set and Lock Attact settings once firmware supports them
 - [ ] Break Python into modules, and cleanup code
 - [ ] Verify Enigma Touch is correctly configured and connected
-- [ ] Error checking and linting for config settings (no validation currently)
+- [X] Error checking for config settings (validates when sent to device, detects all error types)
 - [ ] Pre-built Raspberry Pi image for easier kiosk deployment
 - [ ] Bi-directional communication from Enigma to Kiosk Controller
 - [ ] New message format allowing display of properly decoded messages with original spacing (also for simulation mode)
