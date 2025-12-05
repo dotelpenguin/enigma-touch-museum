@@ -392,6 +392,7 @@ Ring position updates during encoding are not saved to the config file. Only exp
 
 ### Messages Not Encoding
 
+1. Verify Enigma touch is using the proper logging method. (Line returns enabled, either 4,5 mode)
 1. Enable debug mode (`--debug` or menu option 6)
 2. Check serial communication in debug panel
 3. Verify device is in encode mode

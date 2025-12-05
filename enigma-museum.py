@@ -346,6 +346,40 @@ class EnigmaController:
                 # On any error, sleep and continue
                 time.sleep(0.1)
     
+    def _has_error_response(self, response: Optional[str]) -> Tuple[bool, Optional[str]]:
+        """Check if response contains an error message matching pattern: ^ + line return + *** + error message
+        
+        Pattern: literal '^' character, followed by line return (\r\n or \n), followed by '*** ' and error message
+        
+        Args:
+            response: The response string to check
+            
+        Returns:
+            Tuple of (has_error, error_message) where error_message is the extracted error text or None
+        """
+        if not response:
+            return (False, None)
+        
+        import re
+        # Match pattern: ^ followed by line return(s) followed by *** and space, then error message
+        # Pattern: ^\r\n*** or ^\n*** or ^\r*** followed by error message
+        # The ^ is a literal caret character, not regex start-of-line
+        pattern = r'\^[\r]*\n\*\*\* (.+)'
+        match = re.search(pattern, response)
+        if match:
+            error_message = match.group(1).strip()
+            return (True, error_message)
+        
+        # Also check for pattern at start of line (in case ^ is missing but *** error is present)
+        # This is a fallback to catch any *** error messages
+        pattern2 = r'(?:^|\r?\n)\*\*\* (.+)'
+        match2 = re.search(pattern2, response)
+        if match2:
+            error_message = match2.group(1).strip()
+            return (True, error_message)
+        
+        return (False, None)
+    
     def send_command(self, command: bytes, timeout: float = CMD_TIMEOUT, debug_callback=None) -> Optional[str]:
         """Send a command and return response"""
         if not self.ser or not self.ser.is_open:
@@ -499,11 +533,12 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!MO {mode}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
-        # Check for invalid option error
-        if response and "*** Invalid option" in response:
+        # Check for any error response matching pattern: ^ + line return + *** + error message
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
             if debug_callback:
                 # Use COLOR_MISMATCH for error display (red)
-                debug_callback(f"ERROR: Invalid option setting mode '{mode}'", color_type=7)
+                debug_callback(f"ERROR: {error_message} (setting mode '{mode}')", color_type=7)
             return False
         if response is None:
             return False
@@ -520,10 +555,11 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!RO {rotor_set}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
-        # Check for invalid option error
-        if response and "*** Invalid option" in response:
+        # Check for any error response matching pattern: ^ + line return + *** + error message
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
             if debug_callback:
-                debug_callback(f"ERROR: Invalid option setting rotor set '{rotor_set}'", color_type=7)  # COLOR_MISMATCH (red)
+                debug_callback(f"ERROR: {error_message} (setting rotor set '{rotor_set}')", color_type=7)  # COLOR_MISMATCH (red)
             return False
         if response is None:
             return False
@@ -540,10 +576,11 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!RI {ring_settings}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
-        # Check for invalid option error
-        if response and "*** Invalid option" in response:
+        # Check for any error response matching pattern: ^ + line return + *** + error message
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
             if debug_callback:
-                debug_callback(f"ERROR: Invalid option setting ring settings '{ring_settings}'", color_type=7)  # COLOR_MISMATCH (red)
+                debug_callback(f"ERROR: {error_message} (setting ring settings '{ring_settings}')", color_type=7)  # COLOR_MISMATCH (red)
             return False
         if response is None:
             return False
@@ -560,10 +597,11 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!RP {ring_position}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
-        # Check for invalid option error
-        if response and "*** Invalid option" in response:
+        # Check for any error response matching pattern: ^ + line return + *** + error message
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
             if debug_callback:
-                debug_callback(f"ERROR: Invalid option setting ring position '{ring_position}'", color_type=7)  # COLOR_MISMATCH (red)
+                debug_callback(f"ERROR: {error_message} (setting ring position '{ring_position}')", color_type=7)  # COLOR_MISMATCH (red)
             return False
         if response is None:
             return False
@@ -582,10 +620,11 @@ class EnigmaController:
         time.sleep(0.05)
         cmd = f"!PB {pegboard}\r\n".encode('ascii')
         response = self.send_command(cmd, debug_callback=debug_callback)
-        # Check for invalid option error
-        if response and "*** Invalid option" in response:
+        # Check for any error response matching pattern: ^ + line return + *** + error message
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
             if debug_callback:
-                debug_callback(f"ERROR: Invalid option setting pegboard '{pegboard}'", color_type=7)  # COLOR_MISMATCH (red)
+                debug_callback(f"ERROR: {error_message} (setting pegboard '{pegboard}')", color_type=7)  # COLOR_MISMATCH (red)
             return False
         if response is None:
             return False
@@ -597,7 +636,7 @@ class EnigmaController:
         response = self.send_command(b'?MO\r\n', timeout=1.0, debug_callback=debug_callback)
         return response is not None
     
-    def send_message(self, message: str, callback=None, debug_callback=None, position_update_callback=None) -> bool:
+    def send_message(self, message: str, callback=None, debug_callback=None, position_update_callback=None, config_error_callback=None) -> bool:
         """Send message character by character"""
         if not self.ser or not self.ser.is_open:
             return False
@@ -615,16 +654,34 @@ class EnigmaController:
             self.load_config(preserve_device=True)
             # Get saved config values (from file, not in-memory)
             saved = self.get_saved_config()
-            self.set_mode(saved['config']['mode'], debug_callback=debug_callback)
+            
+            # Check each config setting for errors
+            config_errors = []
+            if not self.set_mode(saved['config']['mode'], debug_callback=debug_callback):
+                config_errors.append("mode")
             time.sleep(0.2)
-            self.set_rotor_set(saved['config']['rotor_set'], debug_callback=debug_callback)
+            if not self.set_rotor_set(saved['config']['rotor_set'], debug_callback=debug_callback):
+                config_errors.append("rotor_set")
             time.sleep(0.2)
-            self.set_ring_settings(saved['config']['ring_settings'], debug_callback=debug_callback)
+            if not self.set_ring_settings(saved['config']['ring_settings'], debug_callback=debug_callback):
+                config_errors.append("ring_settings")
             time.sleep(0.2)
-            self.set_ring_position(saved['config']['ring_position'], debug_callback=debug_callback)
+            if not self.set_ring_position(saved['config']['ring_position'], debug_callback=debug_callback):
+                config_errors.append("ring_position")
             time.sleep(0.2)
-            self.set_pegboard(saved['config']['pegboard'], debug_callback=debug_callback)
+            if not self.set_pegboard(saved['config']['pegboard'], debug_callback=debug_callback):
+                config_errors.append("pegboard")
             time.sleep(0.2)
+            
+            # If any config errors occurred, notify and return False
+            if config_errors:
+                error_msg = f"Configuration errors detected: {', '.join(config_errors)}"
+                if debug_callback:
+                    debug_callback(f"ERROR: {error_msg}", color_type=7)  # COLOR_MISMATCH (red)
+                if config_error_callback:
+                    config_error_callback(config_errors)
+                return False
+            
             self.return_to_encode_mode(debug_callback=debug_callback)
         time.sleep(0.5)
         
@@ -2305,8 +2362,19 @@ class EnigmaMuseumUI:
         curses.echo()
         curses.curs_set(1)
         try:
-            win.move(y, x + len(prompt))
-            value = win.getstr(y, x + len(prompt), 50).decode('utf-8')
+            # Clear the input line before getting input
+            input_x = x + len(prompt)
+            max_y, max_x = win.getmaxyx()
+            # Clear from input position to end of line
+            for clear_x in range(input_x, max_x):
+                try:
+                    win.addstr(y, clear_x, ' ')
+                except:
+                    pass
+            win.move(y, input_x)
+            win.refresh()
+            
+            value = win.getstr(y, input_x, 50).decode('utf-8')
             if not value and default:
                 return default
             return value
@@ -2518,7 +2586,7 @@ class EnigmaMuseumUI:
                     break  # Success, exit loop
                 else:
                     # Error occurred - show message and loop back for retry
-                    self.show_message(2, 0, "Invalid option! Please re-enter mode.")
+                    self.show_message(2, 0, "Error! Please re-enter mode.")
                     self.draw_debug_panel()
                     self.refresh_all_panels()
                     time.sleep(2)  # Show error message longer
@@ -2541,7 +2609,7 @@ class EnigmaMuseumUI:
                     break  # Success, exit loop
                 else:
                     # Error occurred - show message and loop back for retry
-                    self.show_message(2, 0, "Invalid option! Please re-enter rotor set.")
+                    self.show_message(2, 0, "Error! Please re-enter rotor set.")
                     self.draw_debug_panel()
                     self.refresh_all_panels()
                     time.sleep(2)  # Show error message longer
@@ -2564,7 +2632,7 @@ class EnigmaMuseumUI:
                     break  # Success, exit loop
                 else:
                     # Error occurred - show message and loop back for retry
-                    self.show_message(2, 0, "Invalid option! Please re-enter ring settings.")
+                    self.show_message(2, 0, "Error! Please re-enter ring settings.")
                     self.draw_debug_panel()
                     self.refresh_all_panels()
                     time.sleep(2)  # Show error message longer
@@ -2588,7 +2656,7 @@ class EnigmaMuseumUI:
                     break  # Success, exit loop
                 else:
                     # Error occurred - show message and loop back for retry
-                    self.show_message(2, 0, "Invalid option! Please re-enter ring position.")
+                    self.show_message(2, 0, "Error! Please re-enter ring position.")
                     self.draw_debug_panel()
                     self.refresh_all_panels()
                     time.sleep(2)  # Show error message longer
@@ -2610,7 +2678,7 @@ class EnigmaMuseumUI:
                     break  # Success, exit loop
                 else:
                     # Error occurred - show message and loop back for retry
-                    self.show_message(2, 0, "Invalid option! Please re-enter pegboard.")
+                    self.show_message(2, 0, "Error! Please re-enter pegboard.")
                     self.draw_debug_panel()
                     self.refresh_all_panels()
                     time.sleep(2)  # Show error message longer
@@ -2947,8 +3015,8 @@ class EnigmaMuseumUI:
         self.setup_screen()
         self.draw_settings_panel()
         
-        def debug_callback(msg):
-            self.add_debug_output(msg)
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
             self.draw_debug_panel()
             self.refresh_all_panels()
         
@@ -3005,16 +3073,45 @@ class EnigmaMuseumUI:
             if debug_callback:
                 debug_callback(f"Sending configuration before message {i+1}...")
             
-            self.controller.set_mode(saved_config_values['mode'], debug_callback=debug_callback)
+            # Check each config setting for errors
+            config_errors = []
+            if not self.controller.set_mode(saved_config_values['mode'], debug_callback=debug_callback):
+                config_errors.append("mode")
             time.sleep(0.2)
-            self.controller.set_rotor_set(saved_config_values['rotor_set'], debug_callback=debug_callback)
+            if not self.controller.set_rotor_set(saved_config_values['rotor_set'], debug_callback=debug_callback):
+                config_errors.append("rotor_set")
             time.sleep(0.2)
-            self.controller.set_ring_settings(saved_config_values['ring_settings'], debug_callback=debug_callback)
+            if not self.controller.set_ring_settings(saved_config_values['ring_settings'], debug_callback=debug_callback):
+                config_errors.append("ring_settings")
             time.sleep(0.2)
-            self.controller.set_ring_position(saved_config_values['ring_position'], debug_callback=debug_callback)
+            if not self.controller.set_ring_position(saved_config_values['ring_position'], debug_callback=debug_callback):
+                config_errors.append("ring_position")
             time.sleep(0.2)
-            self.controller.set_pegboard(saved_config_values['pegboard'], debug_callback=debug_callback)
+            if not self.controller.set_pegboard(saved_config_values['pegboard'], debug_callback=debug_callback):
+                config_errors.append("pegboard")
             time.sleep(0.2)
+            
+            # If any config errors occurred, notify user and switch to config menu
+            if config_errors:
+                error_msg = f"Configuration errors detected: {', '.join(config_errors)}"
+                if debug_callback:
+                    debug_callback(f"ERROR: {error_msg}", color_type=7)  # COLOR_MISMATCH (red)
+                self.setup_screen()
+                self.draw_settings_panel()
+                self.left_win.clear()
+                self.left_win.addstr(0, 0, "Configuration Error!", curses.A_BOLD | curses.A_REVERSE)
+                self.left_win.addstr(1, 0, error_msg)
+                self.left_win.addstr(2, 0, "")
+                self.left_win.addstr(3, 0, "Switching to configuration menu...")
+                self.left_win.addstr(4, 0, "Press any key to continue...")
+                self.left_win.refresh()
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                self.stdscr.getch()
+                self.config_menu()
+                # After returning from config menu, stop generation
+                break
+            
             self.controller.return_to_encode_mode(debug_callback=debug_callback)
             time.sleep(0.5)
             
@@ -3142,8 +3239,8 @@ class EnigmaMuseumUI:
             self.stdscr.nodelay(False)
             return False
         
-        def debug_callback(msg):
-            self.add_debug_output(msg)
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
             self.draw_debug_panel()
             self.refresh_all_panels()
         
@@ -3152,7 +3249,32 @@ class EnigmaMuseumUI:
             self.draw_settings_panel()
             self.refresh_all_panels()
         
-        self.controller.send_message(message, progress_callback, debug_callback, position_update_callback)
+        config_error_occurred = [False]
+        config_error_details = [None]
+        
+        def config_error_callback(errors):
+            """Handle config errors by notifying user and preparing to switch to config menu"""
+            config_error_occurred[0] = True
+            config_error_details[0] = errors
+            error_msg = f"Configuration error detected: {', '.join(errors)}. Please check your settings."
+            self.show_message(y + 1, 0, error_msg, curses.A_BOLD | curses.A_REVERSE)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        success = self.controller.send_message(message, progress_callback, debug_callback, position_update_callback, config_error_callback)
+        
+        # If config error occurred, switch to config menu
+        if config_error_occurred[0]:
+            self.show_message(y + 2, 0, "Switching to configuration menu...", curses.A_BOLD)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            self.config_menu()
+            return
+        
+        # Only show results if message was sent successfully
+        if not success:
+            return
         
         if encoded_result:
             result = ''.join(encoded_result)
@@ -3184,8 +3306,8 @@ class EnigmaMuseumUI:
         self.draw_debug_panel()
         self.refresh_all_panels()
         
-        def debug_callback(msg):
-            self.add_debug_output(msg)
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
             self.draw_debug_panel()
             self.refresh_all_panels()
         
@@ -3233,39 +3355,46 @@ class EnigmaMuseumUI:
         self.draw_debug_panel()
         self.refresh_all_panels()
         
-        def debug_callback(msg):
-            self.add_debug_output(msg)
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
             self.draw_debug_panel()
             self.refresh_all_panels()
         
         # Get saved config values (from file, not in-memory)
         saved = self.controller.get_saved_config()
         
-        success = True
+        config_errors = []
         if not self.controller.set_mode(saved['config']['mode'], debug_callback=debug_callback):
-            success = False
+            config_errors.append("mode")
         time.sleep(0.2)
         if not self.controller.set_rotor_set(saved['config']['rotor_set'], debug_callback=debug_callback):
-            success = False
+            config_errors.append("rotor_set")
         time.sleep(0.2)
         if not self.controller.set_ring_settings(saved['config']['ring_settings'], debug_callback=debug_callback):
-            success = False
+            config_errors.append("ring_settings")
         time.sleep(0.2)
         if not self.controller.set_ring_position(saved['config']['ring_position'], debug_callback=debug_callback):
-            success = False
+            config_errors.append("ring_position")
         time.sleep(0.2)
         if not self.controller.set_pegboard(saved['config']['pegboard'], debug_callback=debug_callback):
-            success = False
+            config_errors.append("pegboard")
         time.sleep(0.2)
         self.controller.return_to_encode_mode(debug_callback=debug_callback)
         
         self.setup_screen()
         self.draw_settings_panel()  # Update settings display
         
-        if success:
-            self.show_message(0, 0, "All settings configured successfully!", curses.A_BOLD)
+        if config_errors:
+            error_msg = f"Configuration errors detected: {', '.join(config_errors)}"
+            self.show_message(0, 0, error_msg, curses.A_BOLD | curses.A_REVERSE)
+            self.show_message(1, 0, "Switching to configuration menu...", curses.A_BOLD)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            self.config_menu()
+            return
         else:
-            self.show_message(0, 0, "Some settings may have failed to configure.", curses.A_BOLD)
+            self.show_message(0, 0, "All settings configured successfully!", curses.A_BOLD)
         
         self.draw_debug_panel()
         
@@ -3741,7 +3870,31 @@ class EnigmaMuseumUI:
                     self.draw_settings_panel()
                     self.refresh_all_panels()
                 
-                message_sent = self.controller.send_message(message_to_send, progress_callback, debug_callback, position_update_callback)
+                config_error_occurred = [False]
+                
+                def config_error_callback(errors):
+                    """Handle config errors by notifying user and preparing to switch to config menu"""
+                    config_error_occurred[0] = True
+                    error_msg = f"Configuration error: {', '.join(errors)}. Switching to config menu..."
+                    add_log_message(error_msg)
+                    if debug_callback:
+                        debug_callback(error_msg, color_type=self.COLOR_MISMATCH)
+                
+                message_sent = self.controller.send_message(message_to_send, progress_callback, debug_callback, position_update_callback, config_error_callback)
+                
+                # If config error occurred, switch to config menu
+                if config_error_occurred[0]:
+                    add_log_message("Pausing museum mode to fix configuration")
+                    museum_paused[0] = True
+                    self.show_message(0, 0, "Configuration error detected! Switching to config menu...", curses.A_BOLD | curses.A_REVERSE)
+                    self.draw_settings_panel()
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)
+                    self.config_menu()
+                    # After returning from config menu, resume museum mode
+                    museum_paused[0] = False
+                    continue  # Skip to next message
                 
                 # Check if message was interrupted (stopped early due to mismatch)
                 if museum_paused[0]:

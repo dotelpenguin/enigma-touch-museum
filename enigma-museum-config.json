@@ -1,18 +1,18 @@
 {
   "config": {
-    "mode": "I",
-    "rotor_set": "B III IV I",
-    "ring_settings": "01 01 01",
+    "mode": "M3",
+    "rotor_set": "B V II I",
+    "ring_settings": "A D A",
     "ring_position": "20 06 10",
-    "pegboard": "FV PQ"
+    "pegboard": "AZ UJ EI"
   },
   "function_mode": "Decode - EN",
   "museum_delay": 90,
-  "always_send_config": true,
+  "always_send_config": false,
   "word_group_size": 5,
   "character_delay_ms": 2000,
   "web_server_enabled": true,
   "web_server_port": 8080,
   "enable_slides": true,
-  "device": "/dev/ttyACM0"
+  "device": "/dev/tty.usbmodem207139584B471"
 }
