@@ -439,14 +439,10 @@ Future enhancements and improvements for the Enigma Museum Controller:
 
 - [ ] Full German Translation (requires German speaker)
 - [ ] Add option to generate random Model, Ring/Rotor settings when generating messages
-- [ ] Add Last Char returned to Top status screen, Used for enabling/stopping attact mode
 - [ ] Configure to Set and Lock Attact settings once firmware supports them
 - [ ] Break Python into modules, and cleanup code
 - [ ] Verify Enigma Touch is correctly configured and connected
-- [X] Error checking for config settings (validates when sent to device, detects all error types)
 - [ ] Pre-built Raspberry Pi image for easier kiosk deployment
-- [ ] Bi-directional communication from Enigma to Kiosk Controller
-- [ ] New message format allowing display of properly decoded messages with original spacing (also for simulation mode)
 - [ ] Advanced web interface with JavaScript/WebSockets (better than refresh)
 - [ ] Slideshow for messages. Image slides every X characters. Common folder, or numbered folder for each message
 - [ ] Simulation Mode (when Enigma Touch is not connected)
@@ -455,6 +451,9 @@ Future enhancements and improvements for the Enigma Museum Controller:
 - [ ] Add remote control API endpoints
 - [ ] Improve error handling and recovery mechanisms
 - [ ] Add unit tests and integration tests
+- [ ] WebHost Display flickers due to refresh
+- [ ] Logic not handling 4 Rotor configs
+- [ ] Logic issues with Lettered Rotors
 
 ## License
 
