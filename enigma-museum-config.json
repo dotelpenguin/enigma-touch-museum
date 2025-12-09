@@ -6,9 +6,9 @@
     "ring_position": "20 06 10",
     "pegboard": "FV PQ"
   },
-  "function_mode": "Interactive",
-  "museum_delay": 90,
-  "always_send_config": false,
+  "function_mode": "Encode - EN",
+  "museum_delay": 60,
+  "always_send_config": true,
   "word_group_size": 5,
   "character_delay_ms": 2000,
   "web_server_enabled": true,
@@ -21,5 +21,5 @@
   "brightness": 3,
   "volume": 0,
   "screen_saver": 0,
-  "device": "/dev/tty.usbmodem207A39584B471"
+  "device": "/dev/ttyACM0"
 }

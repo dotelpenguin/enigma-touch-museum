@@ -1,0 +1,2216 @@
+#!/usr/bin/env python3
+"""
+Main UI coordinator for Enigma Museum Controller
+"""
+
+import curses
+import time
+import sys
+import random
+import json
+import os
+import threading
+import socket
+import html as html_module
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from typing import Optional, Tuple, List
+
+from enigma.constants import VERSION, DEFAULT_DEVICE, BAUD_RATE, CHAR_TIMEOUT, CMD_TIMEOUT, SCRIPT_DIR, CONFIG_FILE, ENGLISH_MSG_FILE, GERMAN_MSG_FILE, MIN_COLS, MIN_LINES
+from enigma.messages import ENGLISH_MESSAGES, GERMAN_MESSAGES, load_messages_from_file
+from enigma.enigma_controller import EnigmaController
+from enigma.web_server import MuseumWebServer
+from enigma.base import UIBase
+
+
+class EnigmaMuseumUI(UIBase):
+    """Curses-based UI for Enigma Museum Controller"""
+    
+    def __init__(self, controller: EnigmaController):
+        # Initialize UIBase - stdscr will be set in run() method
+        UIBase.__init__(self, controller, None)
+        self.controller = controller
+        self.stdscr = None  # Will be initialized in run() method
+        # Note: Most base methods are inherited from UIBase
+
+
+
+
+
+    def setup_screen(self):
+        """Clear screen, draw border, dividers, and create subwindows"""
+        if not self.stdscr:
+            return
+        self.stdscr.clear()
+        self.stdscr.border()
+        self.create_subwindows()
+        
+        # Draw horizontal divider below top window
+        if self.top_win:
+            divider_y = 1 + self.top_height
+            for x in range(1, curses.COLS - 1):
+                try:
+                    self.stdscr.addch(divider_y, x, '═')  # ANSI double horizontal line
+                except:
+                    pass
+        
+        # Draw vertical divider between left and right bottom windows
+        if self.left_win and self.right_win:
+            divider_x = curses.COLS // 2
+            bottom_start = 1 + self.top_height + 1
+            for y in range(bottom_start, curses.LINES - 1):
+                try:
+                    self.stdscr.addch(y, divider_x, '║')  # ANSI double vertical line
+                except:
+                    pass
+        
+        # Clear all windows
+        if self.top_win:
+            self.top_win.clear()
+        if self.left_win:
+            self.left_win.clear()
+        if self.right_win:
+            self.right_win.clear()
+    
+
+
+
+    def add_debug_output(self, message: str, color_type: Optional[int] = None):
+        """Add a message to debug output with color coding
+        
+        Args:
+            message: The debug message to add
+            color_type: Optional color type to use. If None, will be determined from message content.
+        """
+        if not self.debug_enabled:
+            return
+        # Split multi-line messages into separate lines
+        lines = message.split('\n')
+        for line in lines:
+            # Remove carriage returns and strip whitespace
+            line = line.replace('\r', '').strip()
+            if line:  # Only add non-empty lines
+                # Use provided color_type, or determine from message content
+                if color_type is None:
+                    if line.startswith('>>>'):
+                        # Data sent to Enigma - dark green
+                        color_type = self.COLOR_SENT
+                    elif line.startswith('<<<'):
+                        # Data received from Enigma - bright green
+                        color_type = self.COLOR_RECEIVED
+                    elif 'Character delay' in line or 'Skipping delay' in line:
+                        # Character delay messages - light purple
+                        color_type = self.COLOR_DELAY
+                    elif 'MATCH' in line:
+                        # Matching characters - bright green
+                        color_type = self.COLOR_MATCH
+                    elif 'MISMATCH' in line:
+                        # Mismatching characters - red
+                        color_type = self.COLOR_MISMATCH
+                    else:
+                        # Other info - yellow
+                        color_type = self.COLOR_INFO
+                # Store as tuple: (message, color_type)
+                self.debug_output.append((line, color_type))
+        # Keep only last max_debug_lines
+        if len(self.debug_output) > self.max_debug_lines:
+            self.debug_output = self.debug_output[-self.max_debug_lines:]
+    
+    
+    def draw_debug_panel(self):
+        """Draw debug output or logo in the right panel"""
+        if not self.right_win:
+            return
+        
+        if self.debug_enabled:
+            # Show debug output
+            try:
+                self.right_win.clear()
+                max_y, max_x = self.right_win.getmaxyx()
+                
+                # Draw debug header
+                header = " DEBUG OUTPUT "
+                header_x = (max_x - len(header)) // 2
+                if header_x >= 0 and header_x + len(header) <= max_x:
+                    self.right_win.addstr(0, header_x, header, curses.A_BOLD | curses.A_REVERSE)
+                
+                # Draw debug messages (scrollable)
+                start_line = 1
+                available_lines = max_y - start_line
+                
+                # Show most recent messages
+                debug_lines_to_show = self.debug_output[-available_lines:] if len(self.debug_output) > available_lines else self.debug_output
+                
+                for i, debug_item in enumerate(debug_lines_to_show):
+                    y = start_line + i
+                    if y >= max_y:
+                        break
+                    try:
+                        # Extract message and color type from tuple
+                        if isinstance(debug_item, tuple):
+                            line, color_type = debug_item
+                        else:
+                            # Backward compatibility: if it's just a string, use default color
+                            line = debug_item
+                            color_type = self.COLOR_INFO
+                        
+                        # Remove any control characters and truncate to fit window width
+                        # Replace any remaining newlines/carriage returns with spaces
+                        display_line = line.replace('\r', '').replace('\n', ' ').strip()
+                        # Remove the >>> and <<< prefixes from display
+                        if display_line.startswith('>>> '):
+                            display_line = display_line[4:]  # Remove ">>> "
+                        elif display_line.startswith('<<< '):
+                            display_line = display_line[4:]  # Remove "<<< "
+                        display_line = display_line[:max_x]
+                        # Clear the line first to avoid overlap
+                        self.right_win.addstr(y, 0, ' ' * max_x)  # Clear line
+                        # Apply color based on message type (if colors are supported)
+                        if curses.has_colors():
+                            color_attr = curses.color_pair(color_type)
+                            # Add bold for received messages (bright green) and matching characters
+                            if color_type == self.COLOR_RECEIVED or color_type == self.COLOR_MATCH:
+                                color_attr |= curses.A_BOLD
+                            self.right_win.addstr(y, 0, display_line, color_attr)
+                        else:
+                            # No color support - just display normally
+                            self.right_win.addstr(y, 0, display_line)
+                    except:
+                        pass
+                
+                self.right_win.refresh()
+            except:
+                pass
+        else:
+            # Show logo when debug is disabled
+            self.draw_logo_panel()
+        
+
+
+    def show_menu(self, title: str, options: List[Tuple[str, str]], selected: int = 0) -> int:
+        """Display menu and return selected index"""
+        self.setup_screen()
+        
+        # Draw settings in top panel
+        self.draw_settings_panel()
+        
+        # Title in left window
+        win = self.get_active_window()
+        if win:
+            max_y, max_x = win.getmaxyx()
+            title_y = 0
+            title_x = (max_x - len(title)) // 2
+            try:
+                win.addstr(title_y, title_x, title, curses.A_BOLD | curses.A_UNDERLINE)
+            except:
+                pass
+        
+        # Options in left window
+        start_y = 2
+        for i, (key, desc) in enumerate(options):
+            y = start_y + i
+            attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
+            self.show_message(y, 0, f"{key}) {desc}", attr)
+        
+        # Instructions - dynamic based on available options
+        win = self.get_active_window()
+        if win:
+            max_y, max_x = win.getmaxyx()
+            try:
+                # Check if Q is in options
+                has_q = any(opt[0].upper() == 'Q' for opt in options)
+                has_b = any(opt[0].upper() == 'B' for opt in options)
+                
+                if has_q:
+                    instruction = "Use UP/DOWN arrows, ENTER to select, Q to quit"
+                elif has_b:
+                    instruction = "Use UP/DOWN arrows, ENTER to select, Q or B to go back"
+                else:
+                    instruction = "Use UP/DOWN arrows, ENTER to select"
+                
+                win.addstr(max_y - 1, 0, instruction)
+            except:
+                pass
+        
+        # Draw debug panel or logo in right window
+        self.draw_debug_panel()
+        
+        # Refresh all windows
+        if self.top_win:
+            self.top_win.refresh()
+        if self.left_win:
+            self.left_win.refresh()
+        if self.right_win:
+            self.right_win.refresh()
+        self.stdscr.refresh()
+        return selected
+    
+    def main_menu(self) -> str:
+        """Display main menu"""
+        options = [
+            ("1", "Send Message"),
+            ("2", "Configuration"),
+            ("3", "Query All Settings"),
+            ("4", "Museum Mode"),
+            ("5", "Set All Settings"),
+            ("6", f"Debug: {'true' if self.debug_enabled else 'false'}"),
+            ("Q", "Quit")
+        ]
+        
+        selected = 0
+        while True:
+            # Update debug status in options
+            options[5] = ("6", f"Debug: {'true' if self.debug_enabled else 'false'}")
+            self.show_menu("Enigma Museum Controller", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('q') or key == ord('Q'):
+                return 'quit'
+            elif key == ord('6'):
+                # Toggle debug
+                self.debug_enabled = not self.debug_enabled
+                if not self.debug_enabled:
+                    self.debug_output = []  # Clear debug output when disabled
+                self.create_subwindows()  # Recreate subwindows
+                self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
+                continue
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'Q':
+                    return 'quit'
+                elif options[selected][0] == '6':
+                    # Toggle debug
+                    self.debug_enabled = not self.debug_enabled
+                    if not self.debug_enabled:
+                        self.debug_output = []  # Clear debug output when disabled
+                    self.create_subwindows()  # Recreate subwindows
+                    self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
+                    continue
+                return options[selected][0]
+            elif key >= ord('1') and key <= ord('5'):
+                return chr(key)
+    
+    def config_menu(self, exit_after: bool = False):
+        """Configuration menu with sections
+        
+        Args:
+            exit_after: If True, exit the application after leaving the menu
+        """
+        options = [
+            ("1", "Enigma Options"),
+            ("2", "WebPage Options"),
+            ("3", "Kiosk Options"),
+            ("4", "Utilities"),
+            ("B", "Back")
+        ]
+        
+        selected = 0
+        while True:
+            self.show_menu("Configuration", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                if exit_after:
+                    return 'exit'
+                return
+            elif key == ord('q') or key == ord('Q'):
+                if exit_after:
+                    return 'exit'
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    if exit_after:
+                        return 'exit'
+                    return
+                elif options[selected][0] == '1':
+                    self.config_menu_enigma()
+                elif options[selected][0] == '2':
+                    self.config_menu_webpage()
+                elif options[selected][0] == '3':
+                    self.config_menu_kiosk()
+                elif options[selected][0] == '4':
+                    self.config_menu_utilities()
+            elif key >= ord('1') and key <= ord('4'):
+                section = chr(key)
+                if section == '1':
+                    self.config_menu_enigma()
+                elif section == '2':
+                    self.config_menu_webpage()
+                elif section == '3':
+                    self.config_menu_kiosk()
+                elif section == '4':
+                    self.config_menu_utilities()
+    
+    def config_menu_enigma(self):
+        """Enigma Options submenu"""
+        def get_options():
+            saved = self.controller.get_saved_config()
+            return [
+                ("1", f"Set Device (current: {saved['device']})"),
+                ("2", f"Set Mode (current: {saved['config']['mode']})"),
+                ("3", f"Set Rotor Set (current: {saved['config']['rotor_set']})"),
+                ("4", f"Set Rings (current: {saved['config']['ring_settings']})"),
+                ("5", f"Set Ring Position (current: {saved['config']['ring_position']})"),
+                ("6", f"Set Pegboard (current: {saved['config']['pegboard']})"),
+                ("7", f"Always Send Config Before Message: {str(saved['always_send_config']).lower()}"),
+                ("B", "Back")
+            ]
+        
+        options = get_options()
+        selected = 0
+        while True:
+            self.show_menu("Enigma Options", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                self.handle_config_option_enigma(options[selected][0])
+                options = get_options()
+            elif key >= ord('1') and key <= ord('7'):
+                self.handle_config_option_enigma(chr(key))
+                options = get_options()
+    
+    def config_menu_webpage(self):
+        """WebPage Options submenu"""
+        def get_options():
+            saved = self.controller.get_saved_config()
+            return [
+                ("1", f"Set Word Group (current: {saved['word_group_size']})"),
+                ("2", f"Set Character Delay (current: {saved.get('character_delay_ms', 0)}ms)"),
+                ("3", f"Web Server: {str(saved.get('web_server_enabled', False)).lower()}"),
+                ("4", f"Set Web Server Port (current: {saved.get('web_server_port', 8080)})"),
+                ("5", f"Enable Slides: {str(saved.get('enable_slides', False)).lower()}"),
+                ("B", "Back")
+            ]
+        
+        options = get_options()
+        selected = 0
+        while True:
+            self.show_menu("WebPage Options", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                self.handle_config_option_webpage(options[selected][0])
+                options = get_options()
+            elif key >= ord('1') and key <= ord('5'):
+                self.handle_config_option_webpage(chr(key))
+                options = get_options()
+    
+    def config_menu_kiosk(self):
+        """Kiosk Options submenu"""
+        def get_options():
+            saved = self.controller.get_saved_config()
+            return [
+                ("1", f"Set Museum Delay (current: {saved['museum_delay']}s)"),
+                ("2", f"Lock Model: {str(saved.get('lock_model', True)).lower()}"),
+                ("3", f"Lock Rotor/Wheel: {str(saved.get('lock_rotor', True)).lower()}"),
+                ("4", f"Lock Ring: {str(saved.get('lock_ring', True)).lower()}"),
+                ("5", f"Disable Auto-PowerOff: {str(saved.get('disable_power_off', True)).lower()}"),
+                ("6", f"Set Brightness (current: {saved.get('brightness', 3)}, range: 1-5)"),
+                ("7", f"Set Volume (current: {saved.get('volume', 0)}, range: 0-3)"),
+                ("8", f"Set Screen Saver (current: {saved.get('screen_saver', 0)}, range: 0-99)"),
+                ("B", "Back")
+            ]
+        
+        options = get_options()
+        selected = 0
+        while True:
+            self.show_menu("Kiosk Options", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                self.handle_config_option_kiosk(options[selected][0])
+                options = get_options()
+            elif key >= ord('1') and key <= ord('8'):
+                self.handle_config_option_kiosk(chr(key))
+                options = get_options()
+    
+    def config_menu_utilities(self):
+        """Utilities submenu"""
+        options = [
+            ("1", "Generate Coded Messages - EN"),
+            ("2", "Generate Coded Messages - DE"),
+            ("B", "Back")
+        ]
+        
+        selected = 0
+        while True:
+            self.show_menu("Utilities", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                elif options[selected][0] == '1':
+                    self.handle_config_option('10')  # Generate EN
+                elif options[selected][0] == '2':
+                    self.handle_config_option('11')  # Generate DE
+            elif key >= ord('1') and key <= ord('2'):
+                if chr(key) == '1':
+                    self.handle_config_option('10')  # Generate EN
+                elif chr(key) == '2':
+                    self.handle_config_option('11')  # Generate DE
+    
+    def handle_config_option_enigma(self, option: str):
+        """Handle Enigma Options section"""
+        # Map section options to original option numbers
+        option_map = {
+            '1': '12',  # Set Device
+            '2': '1',   # Set Mode
+            '3': '2',   # Set Rotor Set
+            '4': '3',   # Set Rings (Ring Settings)
+            '5': '4',   # Set Ring Position
+            '6': '5',   # Set Pegboard
+            '7': '7'    # Always Send Config Before Message
+        }
+        self.handle_config_option(option_map.get(option, option))
+    
+    def handle_config_option_webpage(self, option: str):
+        """Handle WebPage Options section"""
+        # Map section options to original option numbers
+        option_map = {
+            '1': '8',   # Set Word Group
+            '2': '9',   # Set Character Delay
+            '3': '14',  # Web Server
+            '4': '13',  # Set Web Server Port
+            '5': '15'   # Enable Slides
+        }
+        self.handle_config_option(option_map.get(option, option))
+    
+    def handle_config_option_kiosk(self, option: str):
+        """Handle Kiosk Options section"""
+        # Map section options to original option numbers
+        option_map = {
+            '1': '6',   # Set Museum Delay
+            '2': '16',  # Lock Model
+            '3': '17',  # Lock Rotor/Wheel
+            '4': '18',  # Lock Ring
+            '5': '19',  # Disable Auto-PowerOff
+            '6': '20',  # Set Brightness
+            '7': '21',  # Set Volume
+            '8': '22'   # Set Screen Saver
+        }
+        self.handle_config_option(option_map.get(option, option))
+    
+    def handle_config_option(self, option: str):
+        """Handle configuration option selection"""
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        # Get saved config values from file (not in-memory values)
+        saved = self.controller.get_saved_config()
+        
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        if option == '1':
+            while True:
+                self.show_message(0, 0, "Set Mode (e.g., I, M3, M4):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Mode: ", saved['config']['mode'])
+                if not value:
+                    break  # User cancelled
+                if self.controller.set_mode(value, debug_callback=debug_callback):
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, "Mode set successfully!")
+                    self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
+                else:
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Error! Please re-enter mode.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
+        
+        elif option == '2':
+            while True:
+                self.show_message(0, 0, "Set Rotor Set (e.g., A III IV I):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Rotor Set: ", saved['config']['rotor_set'])
+                if not value:
+                    break  # User cancelled
+                if self.controller.set_rotor_set(value, debug_callback=debug_callback):
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, "Rotor set configured successfully!")
+                    self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
+                else:
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Error! Please re-enter rotor set.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
+        
+        elif option == '3':
+            while True:
+                self.show_message(0, 0, "Set Ring Settings (e.g., 01 01 01):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Ring Settings: ", saved['config']['ring_settings'])
+                if not value:
+                    break  # User cancelled
+                if self.controller.set_ring_settings(value, debug_callback=debug_callback):
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, "Ring settings configured successfully!")
+                    self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
+                else:
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Error! Please re-enter ring settings.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
+        
+        elif option == '4':
+            while True:
+                self.show_message(0, 0, "Set Ring Position (e.g., 20 6 10 or A B C):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Ring Position: ", saved['config']['ring_position'])
+                if not value:
+                    break  # User cancelled
+                if self.controller.set_ring_position(value, debug_callback=debug_callback):
+                    # Save config with new ring position (don't preserve old value)
+                    self.controller.save_config(preserve_ring_position=False)
+                    self.show_message(2, 0, "Ring position set successfully!")
+                    self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
+                else:
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Error! Please re-enter ring position.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
+        
+        elif option == '5':
+            while True:
+                self.show_message(0, 0, "Set Pegboard (e.g., VF PQ or leave empty for clear):")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                value = self.get_input(1, 0, "Pegboard: ", saved['config']['pegboard'])
+                # Empty value is allowed for pegboard (means 'clear')
+                if self.controller.set_pegboard(value if value else '', debug_callback=debug_callback):
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, "Pegboard configured successfully!")
+                    self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                    break  # Success, exit loop
+                else:
+                    # Error occurred - show message and loop back for retry
+                    self.show_message(2, 0, "Error! Please re-enter pegboard.")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)  # Show error message longer
+                    # Continue loop to retry
+        
+        elif option == '6':
+            self.show_message(0, 0, f"Set Museum Delay (current: {saved['museum_delay']}s):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            value = self.get_input(1, 0, "Delay (seconds): ", str(saved['museum_delay']))
+            try:
+                self.controller.museum_delay = int(value)
+                self.controller.save_config()  # Save config after change
+                self.show_message(2, 0, f"Museum delay set to {self.controller.museum_delay}s")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid delay value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+        
+        elif option == '7':
+            # Toggle always_send_config - use saved value
+            self.controller.always_send_config = not saved['always_send_config']
+            # Save config with preserve_always_send_config=False to save the new value
+            self.controller.save_config(preserve_always_send_config=False)  # Save config after change
+            status = str(self.controller.always_send_config).lower()
+            self.show_message(0, 0, f"Always Send Config Before Message: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '8':
+            # Set word group size
+            self.show_message(0, 0, "Enter word group size (4 or 5):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            curses.echo()
+            curses.curs_set(1)
+            try:
+                group_size_str = self.get_input(1, 0, "Group size: ", str(saved['word_group_size']))
+                group_size = int(group_size_str.strip())
+                if group_size == 4 or group_size == 5:
+                    self.controller.word_group_size = group_size
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(0, 0, f"Word group size set to {group_size}")
+                    self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+                else:
+                    self.show_message(2, 0, "Invalid! Must be 4 or 5")
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid group size value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            finally:
+                curses.noecho()
+                curses.curs_set(0)
+        
+        elif option == '9':
+            # Set character delay
+            self.show_message(0, 0, f"Set Character Delay (current: {saved.get('character_delay_ms', 0)}ms):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            curses.echo()
+            curses.curs_set(1)
+            try:
+                delay_str = self.get_input(1, 0, "Delay (ms): ", str(saved.get('character_delay_ms', 0)))
+                delay_ms = int(delay_str.strip())
+                if delay_ms < 0:
+                    self.show_message(2, 0, "Invalid! Must be >= 0")
+                else:
+                    self.controller.character_delay_ms = delay_ms
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(0, 0, f"Character delay set to {delay_ms}ms")
+                    self.draw_settings_panel()  # Update settings display
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(1)
+            except ValueError:
+                self.show_message(2, 0, "Invalid delay value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            finally:
+                curses.noecho()
+                curses.curs_set(0)
+        
+        elif option == '10':
+            # Generate coded messages - English
+            self.generate_coded_messages('EN')
+        
+        elif option == '11':
+            # Generate coded messages - German
+            self.generate_coded_messages('DE')
+        
+        elif option == '12':
+            # Set device
+            self.show_message(0, 0, "Set Device (e.g., /dev/ttyACM0):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            saved = self.controller.get_saved_config()
+            value = self.get_input(1, 0, "Device: ", saved['device'])
+            if value:
+                self.controller.device = value
+                self.controller.save_config()  # Save config after change
+                self.show_message(2, 0, f"Device set to {value}")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+        
+        elif option == '13':
+            # Set web server port
+            self.show_message(0, 0, f"Set Web Server Port (current: {saved.get('web_server_port', 8080)}):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            value = self.get_input(1, 0, "Port: ", str(saved.get('web_server_port', 8080)))
+            try:
+                port = int(value)
+                if port < 1 or port > 65535:
+                    self.show_message(2, 0, "Invalid port! Must be 1-65535")
+                else:
+                    self.controller.web_server_port = port
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, f"Web server port set to {port}")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid port value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+        
+        elif option == '14':
+            # Toggle web server enable/disable
+            current_enabled = saved.get('web_server_enabled', False)
+            if current_enabled:
+                # Currently enabled - disable it
+                self.controller.web_server_enabled = False
+                self.controller.web_server_ip = None  # Clear IP
+                self.controller.save_config()
+                self.show_message(0, 0, "Web server: false", curses.A_BOLD)
+                self.draw_settings_panel()  # Update settings display
+            else:
+                # Currently disabled - enable it
+                self.controller.web_server_enabled = True
+                self.controller.save_config()
+                port = self.controller.web_server_port
+                self.show_message(0, 0, f"Web server: true (port {port})", curses.A_BOLD)
+                self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '15':
+            # Toggle enable_slides
+            current_enabled = saved.get('enable_slides', False)
+            self.controller.enable_slides = not current_enabled
+            self.controller.save_config()  # Save config after change
+            status = str(self.controller.enable_slides).lower()
+            self.show_message(0, 0, f"Enable Slides: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '16':
+            # Toggle lock_model
+            current_locked = saved.get('lock_model', True)
+            self.controller.lock_model = not current_locked
+            self.controller.save_config()  # Save config after change
+            status = str(self.controller.lock_model).lower()
+            self.show_message(0, 0, f"Lock Model: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '17':
+            # Toggle lock_rotor
+            current_locked = saved.get('lock_rotor', True)
+            self.controller.lock_rotor = not current_locked
+            self.controller.save_config()  # Save config after change
+            status = str(self.controller.lock_rotor).lower()
+            self.show_message(0, 0, f"Lock Rotor/Wheel: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '18':
+            # Toggle lock_ring
+            current_locked = saved.get('lock_ring', True)
+            self.controller.lock_ring = not current_locked
+            self.controller.save_config()  # Save config after change
+            status = str(self.controller.lock_ring).lower()
+            self.show_message(0, 0, f"Lock Ring: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '19':
+            # Toggle disable_power_off
+            current_disabled = saved.get('disable_power_off', True)
+            self.controller.disable_power_off = not current_disabled
+            self.controller.save_config()  # Save config after change
+            status = str(self.controller.disable_power_off).lower()
+            self.show_message(0, 0, f"Disable Power-Off: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '20':
+            # Set brightness (1-5)
+            self.show_message(0, 0, f"Set Brightness (current: {saved.get('brightness', 3)}, range: 1-5):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            value = self.get_input(1, 0, "Brightness (1-5): ", str(saved.get('brightness', 3)))
+            try:
+                brightness = int(value)
+                if brightness < 1 or brightness > 5:
+                    self.show_message(2, 0, "Invalid brightness! Must be 1-5")
+                else:
+                    self.controller.brightness = brightness
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, f"Brightness set to {brightness}")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid brightness value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+        
+        elif option == '21':
+            # Set volume (0-3)
+            self.show_message(0, 0, f"Set Volume (current: {saved.get('volume', 0)}, range: 0-3):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            value = self.get_input(1, 0, "Volume (0-3): ", str(saved.get('volume', 0)))
+            try:
+                volume = int(value)
+                if volume < 0 or volume > 3:
+                    self.show_message(2, 0, "Invalid volume! Must be 0-3")
+                else:
+                    self.controller.volume = volume
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, f"Volume set to {volume}")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid volume value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+        
+        elif option == '22':
+            # Set screen_saver (0-99)
+            self.show_message(0, 0, f"Set Screen Saver (current: {saved.get('screen_saver', 0)}, range: 0-99):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            value = self.get_input(1, 0, "Screen Saver (0-99): ", str(saved.get('screen_saver', 0)))
+            try:
+                screen_saver = int(value)
+                if screen_saver < 0 or screen_saver > 99:
+                    self.show_message(2, 0, "Invalid screen saver! Must be 0-99")
+                else:
+                    self.controller.screen_saver = screen_saver
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, f"Screen Saver set to {screen_saver}")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid screen saver value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+    
+    def generate_coded_messages(self, language: str):
+        """Generate coded messages from english.msg or german.msg"""
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        # Determine file paths
+        if language == 'EN':
+            input_file = ENGLISH_MSG_FILE
+            output_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
+        else:
+            input_file = GERMAN_MSG_FILE
+            output_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
+        
+        # Load messages from file
+        messages = load_messages_from_file(input_file)
+        
+        if not messages:
+            self.show_message(0, 0, f"Error: Could not load messages from {os.path.basename(input_file)}", curses.A_BOLD)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            return
+        
+        message_count = len(messages)
+        
+        # Show confirmation screen
+        self.show_message(0, 0, f"Generate Coded Messages - {language}", curses.A_BOLD)
+        self.show_message(1, 0, f"Found {message_count} messages in {os.path.basename(input_file)}")
+        self.show_message(2, 0, f"Output will be saved to {os.path.basename(output_file)}")
+        self.show_message(3, 0, "")
+        self.show_message(4, 0, "WARNING: This process can take a long time!", curses.A_BOLD | curses.A_BLINK)
+        self.show_message(5, 0, "")
+        self.show_message(6, 0, "Press Y to continue, any other key to cancel")
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        # Get confirmation
+        key = self.stdscr.getch()
+        if key != ord('y') and key != ord('Y'):
+            return
+        
+        # Check if output file exists
+        file_exists = os.path.exists(output_file)
+        coded_messages = []
+        start_index = 0
+        existing_settings = None
+        
+        if file_exists:
+            # Load existing JSON file
+            try:
+                with open(output_file, 'r', encoding='utf-8') as f:
+                    coded_messages = json.load(f)
+                if not isinstance(coded_messages, list):
+                    coded_messages = []
+                
+                # Extract settings from first message if exists
+                if coded_messages and isinstance(coded_messages[0], dict):
+                    existing_settings = {
+                        'MODEL': coded_messages[0].get('MODEL'),
+                        'ROTOR': coded_messages[0].get('ROTOR'),
+                        'RINGSET': coded_messages[0].get('RINGSET'),
+                        'RINGPOS': coded_messages[0].get('RINGPOS'),
+                        'PLUG': coded_messages[0].get('PLUG'),
+                        'GROUP': coded_messages[0].get('GROUP')
+                    }
+                
+                start_index = len(coded_messages)
+            except (json.JSONDecodeError, IOError) as e:
+                # File exists but is invalid - treat as empty
+                coded_messages = []
+                start_index = 0
+        
+        # Get saved config values for comparison
+        saved = self.controller.get_saved_config()
+        saved_config_values = saved['config']
+        current_settings = {
+            'MODEL': saved_config_values['mode'],
+            'ROTOR': saved_config_values['rotor_set'],
+            'RINGSET': saved_config_values['ring_settings'],
+            'RINGPOS': saved_config_values['ring_position'],
+            'PLUG': saved_config_values['pegboard'],
+            'GROUP': saved['word_group_size']
+        }
+        
+        # Compare settings if existing file found
+        settings_changed = False
+        if file_exists and existing_settings:
+            settings_changed = (
+                existing_settings.get('MODEL') != current_settings['MODEL'] or
+                existing_settings.get('ROTOR') != current_settings['ROTOR'] or
+                existing_settings.get('RINGSET') != current_settings['RINGSET'] or
+                existing_settings.get('RINGPOS') != current_settings['RINGPOS'] or
+                existing_settings.get('PLUG') != current_settings['PLUG'] or
+                existing_settings.get('GROUP') != current_settings['GROUP']
+            )
+        
+        # Show resume/restart prompt if file exists
+        if file_exists and coded_messages:
+            self.setup_screen()
+            self.draw_settings_panel()
+            self.left_win.clear()
+            max_y, max_x = self.left_win.getmaxyx()
+            
+            self.left_win.addstr(0, 0, f"Existing file found: {os.path.basename(output_file)}", curses.A_BOLD)
+            self.left_win.addstr(1, 0, f"Found {len(coded_messages)} encoded messages")
+            
+            if settings_changed:
+                self.left_win.addstr(2, 0, "", curses.A_BOLD)
+                self.left_win.addstr(3, 0, "WARNING: Enigma settings have changed!", curses.A_BOLD | curses.A_BLINK)
+                self.left_win.addstr(4, 0, "You should start over to ensure consistency.")
+                self.left_win.addstr(5, 0, "")
+                self.left_win.addstr(6, 0, "Current settings:")
+                self.left_win.addstr(7, 0, f"  MODEL: {current_settings['MODEL']} (was: {existing_settings.get('MODEL', 'N/A')})")
+                self.left_win.addstr(8, 0, f"  ROTOR: {current_settings['ROTOR']} (was: {existing_settings.get('ROTOR', 'N/A')})")
+                self.left_win.addstr(9, 0, f"  RINGSET: {current_settings['RINGSET']} (was: {existing_settings.get('RINGSET', 'N/A')})")
+                self.left_win.addstr(10, 0, f"  RINGPOS: {current_settings['RINGPOS']} (was: {existing_settings.get('RINGPOS', 'N/A')})")
+                self.left_win.addstr(11, 0, f"  PLUG: {current_settings['PLUG']} (was: {existing_settings.get('PLUG', 'N/A')})")
+                self.left_win.addstr(12, 0, f"  GROUP: {current_settings['GROUP']} (was: {existing_settings.get('GROUP', 'N/A')})")
+            else:
+                self.left_win.addstr(2, 0, "Settings match existing file.")
+            
+            self.left_win.addstr(13, 0, "")
+            self.left_win.addstr(14, 0, "Resume from existing file? (Y/N)")
+            self.left_win.addstr(15, 0, "If Enigma settings have changed, you should start over.")
+            self.left_win.refresh()
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            
+            # Get user choice
+            key = self.stdscr.getch()
+            if key == ord('y') or key == ord('Y'):
+                # Resume - keep existing coded_messages and start_index
+                pass
+            else:
+                # Start over - clear existing file
+                coded_messages = []
+                start_index = 0
+                try:
+                    with open(output_file, 'w', encoding='utf-8') as f:
+                        json.dump([], f, indent=2, ensure_ascii=False)
+                except Exception as e:
+                    self.show_message(0, 0, f"Error clearing output file: {str(e)}", curses.A_BOLD)
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)
+                    return
+        elif not file_exists:
+            # Create empty file on first run
+            try:
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    json.dump([], f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                self.show_message(0, 0, f"Error creating output file: {str(e)}", curses.A_BOLD)
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(2)
+                return
+        
+        # Setup screen for progress display
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        def position_update_callback():
+            """Update settings panel when ring positions change"""
+            self.draw_settings_panel()
+            self.refresh_all_panels()
+        
+        # Set flag to skip delays during message generation
+        self.controller.generating_messages = True
+        if debug_callback:
+            debug_callback(f"Message generation mode: delays will be skipped")
+        
+        # Process each message
+        
+        for i in range(start_index, message_count):
+            message = messages[i]
+            
+            # Update progress display
+            self.left_win.clear()
+            max_y, max_x = self.left_win.getmaxyx()
+            self.left_win.addstr(0, 0, f"Generating Coded Messages - {language}", curses.A_BOLD)
+            self.left_win.addstr(1, 0, f"Progress: {i+1}/{message_count}")
+            self.left_win.addstr(2, 0, f"Processing message {i+1}: {message[:max_x-20] if len(message) > max_x-20 else message}")
+            self.left_win.addstr(3, 0, "-" * max_x)
+            
+            # Show already encoded messages
+            if coded_messages:
+                self.left_win.addstr(4, 0, "Encoded so far:")
+                display_y = 5
+                for idx, coded in enumerate(coded_messages[-5:], start=max(0, len(coded_messages)-5)):
+                    # Handle both old string format and new object format
+                    if isinstance(coded, dict):
+                        # New format: extract MSG field for display
+                        display_text = coded.get('MSG', '[No MSG field]')
+                        display_msg = f"{idx+1}: {display_text[:max_x-10]}"
+                    elif isinstance(coded, str):
+                        # Old format: backward compatibility
+                        display_msg = f"{idx+1}: {coded[:max_x-10]}"
+                    else:
+                        # Invalid entry
+                        display_msg = f"{idx+1}: [Invalid entry]"
+                    
+                    if len(display_msg) > max_x:
+                        display_msg = display_msg[:max_x-3] + "..."
+                    self.left_win.addstr(display_y, 0, display_msg)
+                    display_y += 1
+            
+            self.left_win.refresh()
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            
+            # Send configuration before each message
+            if debug_callback:
+                debug_callback(f"Sending configuration before message {i+1}...")
+            
+            # Check each config setting for errors
+            config_errors = []
+            if not self.controller.set_mode(saved_config_values['mode'], debug_callback=debug_callback):
+                config_errors.append("mode")
+            time.sleep(0.2)
+            if not self.controller.set_rotor_set(saved_config_values['rotor_set'], debug_callback=debug_callback):
+                config_errors.append("rotor_set")
+            time.sleep(0.2)
+            if not self.controller.set_ring_settings(saved_config_values['ring_settings'], debug_callback=debug_callback):
+                config_errors.append("ring_settings")
+            time.sleep(0.2)
+            if not self.controller.set_ring_position(saved_config_values['ring_position'], debug_callback=debug_callback):
+                config_errors.append("ring_position")
+            time.sleep(0.2)
+            if not self.controller.set_pegboard(saved_config_values['pegboard'], debug_callback=debug_callback):
+                config_errors.append("pegboard")
+            time.sleep(0.2)
+            
+            # If any config errors occurred, notify user and switch to config menu
+            if config_errors:
+                error_msg = f"Configuration errors detected: {', '.join(config_errors)}"
+                if debug_callback:
+                    debug_callback(f"ERROR: {error_msg}", color_type=7)  # COLOR_MISMATCH (red)
+                self.setup_screen()
+                self.draw_settings_panel()
+                self.left_win.clear()
+                self.left_win.addstr(0, 0, "Configuration Error!", curses.A_BOLD | curses.A_REVERSE)
+                self.left_win.addstr(1, 0, error_msg)
+                self.left_win.addstr(2, 0, "")
+                self.left_win.addstr(3, 0, "Switching to configuration menu...")
+                self.left_win.addstr(4, 0, "Press any key to continue...")
+                self.left_win.refresh()
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                self.stdscr.getch()
+                self.config_menu()
+                # After returning from config menu, stop generation
+                break
+            
+            self.controller.return_to_encode_mode(debug_callback=debug_callback)
+            time.sleep(0.5)
+            
+            # Encode the message
+            if debug_callback:
+                debug_callback(f"Encoding message {i+1}: {message}")
+            
+            # Collect encoded characters using callback
+            encoded_chars = []
+            def progress_callback(index, total, original, encoded, response):
+                encoded_chars.append(encoded)
+                return False  # Don't cancel
+            
+            # generating_messages flag is already set, so delays will be skipped
+            success = self.controller.send_message(message, progress_callback, debug_callback, position_update_callback)
+            
+            if success and encoded_chars:
+                encoded_result = ''.join(encoded_chars)
+                # Ensure we have a valid string before creating message object
+                if encoded_result and isinstance(encoded_result, str):
+                    # Create message object with all metadata
+                    message_obj = {
+                        'MSG': message,
+                        'MODEL': current_settings['MODEL'],
+                        'ROTOR': current_settings['ROTOR'],
+                        'RINGSET': current_settings['RINGSET'],
+                        'RINGPOS': current_settings['RINGPOS'],
+                        'PLUG': current_settings['PLUG'],
+                        'GROUP': current_settings['GROUP'],
+                        'CODED': encoded_result
+                    }
+                    coded_messages.append(message_obj)
+                    
+                    # Save progress after each message
+                    try:
+                        with open(output_file, 'w', encoding='utf-8') as f:
+                            json.dump(coded_messages, f, indent=2, ensure_ascii=False)
+                        if debug_callback:
+                            debug_callback(f"Saved {len(coded_messages)}/{message_count} encoded messages")
+                    except Exception as e:
+                        if debug_callback:
+                            debug_callback(f"Error saving file: {str(e)}")
+                else:
+                    if debug_callback:
+                        debug_callback(f"Warning: Invalid encoded result for message {i+1}")
+            else:
+                if debug_callback:
+                    debug_callback(f"Warning: Failed to encode message {i+1}")
+        
+        # Clear generation flag
+        self.controller.generating_messages = False
+        if debug_callback:
+            debug_callback(f"Message generation complete: delays restored")
+        
+        # Final summary
+        self.setup_screen()
+        self.draw_settings_panel()
+        self.left_win.clear()
+        max_y, max_x = self.left_win.getmaxyx()
+        self.left_win.addstr(0, 0, "Generation Complete!", curses.A_BOLD)
+        self.left_win.addstr(1, 0, f"Processed {len(coded_messages)}/{message_count} messages")
+        self.left_win.addstr(2, 0, f"Output saved to: {os.path.basename(output_file)}")
+        self.left_win.addstr(3, 0, "")
+        self.left_win.addstr(4, 0, "Press any key to continue...")
+        self.left_win.refresh()
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        self.stdscr.getch()
+    
+    def send_message_screen(self):
+        """Screen for sending a message"""
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        self.show_message(0, 0, "Enter message to encode:")
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        curses.echo()
+        curses.curs_set(1)
+        win = self.get_active_window()
+        if win:
+            try:
+                message = win.getstr(1, 0, 200).decode('utf-8')
+            except:
+                message = ''
+        else:
+            message = ''
+        curses.noecho()
+        curses.curs_set(0)
+        
+        if not message:
+            return
+        
+        message = message.upper()
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        # Check if always_send_config is enabled (use saved config value)
+        saved = self.controller.get_saved_config()
+        always_send = saved.get('always_send_config', False)
+        
+        self.show_message(0, 0, f"Encoding: {message}")
+        if always_send:
+            self.show_message(1, 0, "Note: Sending saved configuration before encoding...", curses.A_BOLD | curses.A_DIM)
+            self.show_message(2, 0, "Press any key to cancel")
+            y = 3  # Start progress messages one line lower
+        else:
+            self.show_message(1, 0, "Press any key to cancel")
+            y = 2  # Normal position for progress messages
+        
+        encoded_result = []
+        
+        def progress_callback(index, total, original, encoded, response):
+            line = f"{index}/{total}: {original} -> {encoded}"
+            self.show_message(y + index, 0, line)
+            encoded_result.append(encoded)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            # Check for cancel
+            self.stdscr.nodelay(True)
+            if self.stdscr.getch() != -1:
+                return True  # Cancel
+            self.stdscr.nodelay(False)
+            return False
+        
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        def position_update_callback():
+            """Update settings panel when ring positions change"""
+            self.draw_settings_panel()
+            self.refresh_all_panels()
+        
+        def mode_update_callback():
+            """Update settings panel when function mode changes"""
+            self.draw_settings_panel()
+            self.refresh_all_panels()
+        
+        config_error_occurred = [False]
+        config_error_details = [None]
+        
+        def config_error_callback(errors):
+            """Handle config errors by notifying user and preparing to switch to config menu"""
+            config_error_occurred[0] = True
+            config_error_details[0] = errors
+            error_msg = f"Configuration error detected: {', '.join(errors)}. Please check your settings."
+            self.show_message(y + 1, 0, error_msg, curses.A_BOLD | curses.A_REVERSE)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        # Explicitly use Message Interactive mode (expects lowercase) for manual messages from UI
+        success = self.controller.send_message(message, progress_callback, debug_callback, position_update_callback, config_error_callback, expect_lowercase_response=True, mode_update_callback=mode_update_callback)
+        
+        # Update settings panel after message sending (mode may have changed)
+        self.draw_settings_panel()
+        self.refresh_all_panels()
+        
+        # If config error occurred, switch to config menu
+        if config_error_occurred[0]:
+            self.show_message(y + 2, 0, "Switching to configuration menu...", curses.A_BOLD)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            self.config_menu()
+            return
+        
+        # Only show results if message was sent successfully
+        if not success:
+            return
+        
+        if encoded_result:
+            result = ''.join(encoded_result)
+            # Group the result for display
+            grouped_result = self.controller._group_encoded_text(result)
+            win = self.get_active_window()
+            if win:
+                max_y, max_x = win.getmaxyx()
+                self.show_message(y + len(encoded_result) + 1, 0, f"Encoded: {grouped_result}")
+        
+        self.draw_debug_panel()
+        
+        win = self.get_active_window()
+        if win:
+            max_y, max_x = win.getmaxyx()
+            self.show_message(max_y - 1, 0, "Press any key to continue...")
+        
+        self.refresh_all_panels()
+        self.stdscr.getch()
+    
+    def query_settings_screen(self):
+        """Display all current settings"""
+        self.setup_screen()
+        
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        self.show_message(0, 0, "Querying settings from device...", curses.A_BOLD)
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        settings = self.controller.get_all_settings(debug_callback=debug_callback)
+        
+        # Update controller config with queried settings
+        self.controller.config.update(settings)
+        
+        self.setup_screen()
+        self.draw_settings_panel()  # Update top panel with new settings
+        
+        self.show_message(0, 0, "Current Settings:", curses.A_BOLD | curses.A_UNDERLINE)
+        
+        y = 1
+        self.show_message(y, 0, f"Mode: {settings.get('mode', 'N/A')}")
+        y += 1
+        self.show_message(y, 0, f"Rotor Set: {settings.get('rotor_set', 'N/A')}")
+        y += 1
+        self.show_message(y, 0, f"Ring Settings: {settings.get('ring_settings', 'N/A')}")
+        y += 1
+        self.show_message(y, 0, f"Ring Position: {settings.get('ring_position', 'N/A')}")
+        y += 1
+        self.show_message(y, 0, f"Pegboard: {settings.get('pegboard', 'N/A') or 'clear'}")
+        
+        self.draw_debug_panel()
+        
+        win = self.get_active_window()
+        if win:
+            max_y, max_x = win.getmaxyx()
+            self.show_message(max_y - 1, 0, "Press any key to continue...")
+        
+        self.refresh_all_panels()
+        self.stdscr.getch()
+    
+    def set_all_settings_screen(self):
+        """Set all settings from saved config file"""
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        # Reload config from file to ensure we use saved defaults, not current state
+        # Preserve device to avoid changing it during operation
+        self.controller.load_config(preserve_device=True)
+        
+        self.show_message(0, 0, "Setting all configurations from saved config...", curses.A_BOLD)
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        # Get saved config values (from file, not in-memory)
+        saved = self.controller.get_saved_config()
+        
+        config_errors = []
+        if not self.controller.set_mode(saved['config']['mode'], debug_callback=debug_callback):
+            config_errors.append("mode")
+        time.sleep(0.2)
+        if not self.controller.set_rotor_set(saved['config']['rotor_set'], debug_callback=debug_callback):
+            config_errors.append("rotor_set")
+        time.sleep(0.2)
+        if not self.controller.set_ring_settings(saved['config']['ring_settings'], debug_callback=debug_callback):
+            config_errors.append("ring_settings")
+        time.sleep(0.2)
+        if not self.controller.set_ring_position(saved['config']['ring_position'], debug_callback=debug_callback):
+            config_errors.append("ring_position")
+        time.sleep(0.2)
+        if not self.controller.set_pegboard(saved['config']['pegboard'], debug_callback=debug_callback):
+            config_errors.append("pegboard")
+        time.sleep(0.2)
+        self.controller.return_to_encode_mode(debug_callback=debug_callback)
+        
+        self.setup_screen()
+        self.draw_settings_panel()  # Update settings display
+        
+        if config_errors:
+            error_msg = f"Configuration errors detected: {', '.join(config_errors)}"
+            self.show_message(0, 0, error_msg, curses.A_BOLD | curses.A_REVERSE)
+            self.show_message(1, 0, "Switching to configuration menu...", curses.A_BOLD)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            self.config_menu()
+            return
+        else:
+            self.show_message(0, 0, "All settings configured successfully!", curses.A_BOLD)
+        
+        self.draw_debug_panel()
+        
+        win = self.get_active_window()
+        if win:
+            max_y, max_x = win.getmaxyx()
+            self.show_message(max_y - 1, 0, "Press any key to continue...")
+        
+        self.refresh_all_panels()
+        self.stdscr.getch()
+    
+    def museum_mode_screen(self):
+        """Museum mode selection"""
+        options = [
+            ("1", "Encode - EN"),
+            ("2", "Decode - EN"),
+            ("3", "Encode - DE"),
+            ("4", "Decode - DE"),
+            ("B", "Back")
+        ]
+        
+        selected = 0
+        while True:
+            self.show_menu("Museum Mode", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                self.run_museum_mode(options[selected][0])
+            elif key >= ord('1') and key <= ord('4'):
+                self.run_museum_mode(chr(key))
+    
+    def run_museum_mode(self, mode: str):
+        """Run museum mode"""
+        # Save original always_send_config value - we'll disable it during museum mode
+        # since we're setting config from JSON message objects, not from defaults
+        original_always_send_config = self.controller.always_send_config
+        self.controller.always_send_config = False
+        
+        # Determine operation mode (encode or decode)
+        is_encode = mode in ('1', '3')
+        
+        if mode == '1':
+            mode_name = 'Encode - EN'
+            json_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
+        elif mode == '2':
+            mode_name = 'Decode - EN'
+            json_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
+        elif mode == '3':
+            mode_name = 'Encode - DE'
+            json_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
+        elif mode == '4':
+            mode_name = 'Decode - DE'
+            json_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
+        else:
+            # Restore original value before returning
+            self.controller.always_send_config = original_always_send_config
+            return
+        
+        # Set function mode first so it's displayed in the top panel
+        self.controller.function_mode = mode_name
+        # Save function mode to config file
+        self.controller.save_config()
+        
+        # Load JSON file with message objects
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                message_objects = json.load(f)
+            if not isinstance(message_objects, list) or len(message_objects) == 0:
+                raise ValueError("Invalid or empty JSON file")
+        except (IOError, json.JSONDecodeError, ValueError) as e:
+            self.setup_screen()
+            self.draw_settings_panel()
+            self.show_message(0, 0, f"Error: Could not load messages from {os.path.basename(json_file)}", curses.A_BOLD)
+            self.show_message(1, 0, "Please generate encoded messages first using the Config menu.")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(3)
+            # Restore original always_send_config value before returning
+            self.controller.always_send_config = original_always_send_config
+            return
+        
+        # Validate message objects have required fields
+        valid_messages = []
+        for msg_obj in message_objects:
+            if isinstance(msg_obj, dict) and 'MSG' in msg_obj and 'CODED' in msg_obj:
+                valid_messages.append(msg_obj)
+        
+        if not valid_messages:
+            self.setup_screen()
+            self.draw_settings_panel()
+            self.show_message(0, 0, f"Error: No valid messages found in {os.path.basename(json_file)}", curses.A_BOLD)
+            self.show_message(1, 0, "Please generate encoded messages first using the Config menu.")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(3)
+            # Restore original always_send_config value before returning
+            self.controller.always_send_config = original_always_send_config
+            return
+        
+        # Setup screen and ensure function mode is displayed
+        self.setup_screen()
+        # Ensure function mode is set before drawing
+        self.controller.function_mode = mode_name
+        self.draw_settings_panel()  # Draw settings panel with updated function mode
+        self.draw_debug_panel()  # Draw debug panel
+        self.refresh_all_panels()  # Ensure top panel is refreshed
+        
+        win = self.get_active_window()
+        if not win:
+            return
+        
+        max_y, max_x = win.getmaxyx()
+        
+        # Header lines (fixed at top) - ensure function mode is current
+        # Function mode should already be set, but ensure it's current
+        self.controller.function_mode = mode_name
+        header_lines = [
+            f"Museum Mode: {self.controller.function_mode}",
+            f"Delay: {self.controller.museum_delay} seconds",
+            "Press Q to stop"
+        ]
+        
+        # Calculate available lines for log messages
+        header_height = len(header_lines)
+        log_start_y = header_height
+        max_log_lines = max_y - log_start_y - 1  # Reserve last line for potential overflow
+        
+        # List to store log messages (scrollable)
+        log_messages = []
+        
+        # Track current character being encoded (for web display highlighting)
+        current_char_index = [0]  # Use list to allow modification in nested functions
+        
+        # Track encoded/decoded text as it's being built (for real-time web display)
+        current_encoded_text = [""]  # Use list to allow modification in nested functions
+        
+        # Track pause state for verification failures
+        museum_paused = [False]  # Use list to allow modification in nested functions
+        last_unexpected_input_time = [0]  # Use list to allow modification in nested functions
+        
+        # Track slide information
+        current_message_index = [None]  # Index of current message in valid_messages
+        current_slide_number = [1]  # Current slide number (1.png, 2.png, etc.)
+        previous_slide_number = [0]  # Previous slide number to detect changes
+        
+        def draw_screen():
+            """Draw the entire screen with header and log messages"""
+            # Use current function_mode (may have changed to 'Interactive' if user input detected)
+            # Only set to mode_name if still in museum mode
+            if self.controller.function_mode.startswith(('Encode', 'Decode')):
+                # Still in museum mode, use mode_name
+                self.controller.function_mode = mode_name
+            # Otherwise, function_mode is already 'Interactive', keep it
+            self.setup_screen()
+            self.draw_settings_panel()  # This will display the current function mode
+            
+            # Draw header lines
+            for i, line in enumerate(header_lines):
+                if i < max_y:
+                    attr = curses.A_BOLD if i == 0 else curses.A_NORMAL
+                    self.show_message(i, 0, line[:max_x], attr)
+            
+            # Draw log messages (scrollable)
+            # Show most recent messages that fit
+            available_lines = max_y - log_start_y
+            messages_to_show = log_messages[-available_lines:] if len(log_messages) > available_lines else log_messages
+            
+            for i, log_msg in enumerate(messages_to_show):
+                y = log_start_y + i
+                if y < max_y:
+                    # Display full message (show_message will handle truncation for display)
+                    # Full message is stored in log_messages for web interface
+                    self.show_message(y, 0, log_msg)
+            
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        def add_log_message(msg: str):
+            """Add a message to the log and redraw"""
+            log_messages.append(msg)
+            # Keep only last max_log_lines messages
+            if len(log_messages) > max_log_lines:
+                log_messages.pop(0)
+            draw_screen()
+        
+        # Get saved config for reference
+        saved = self.controller.get_saved_config()
+        
+        # Web server setup (after add_log_message is defined)
+        web_server = None
+        web_enabled = saved.get('web_server_enabled', False)
+        web_port = saved.get('web_server_port', 8080)
+        
+        def get_slide_path():
+            """Determine slide directory and image path"""
+            if not self.controller.enable_slides or current_message_index[0] is None:
+                return None
+            
+            slides_dir = os.path.join(SCRIPT_DIR, 'slides')
+            message_index_dir = os.path.join(slides_dir, str(current_message_index[0]))
+            common_dir = os.path.join(slides_dir, 'common')
+            
+            # Check if message index directory exists, otherwise use common
+            if os.path.isdir(message_index_dir):
+                slide_dir = message_index_dir
+            elif os.path.isdir(common_dir):
+                slide_dir = common_dir
+            else:
+                return None
+            
+            # Find available slide images and cycle through them
+            slide_files = []
+            for i in range(1, 1000):  # Check up to 999.png
+                slide_file = os.path.join(slide_dir, f"{i}.png")
+                if os.path.exists(slide_file):
+                    slide_files.append(f"{i}.png")
+                else:
+                    break
+            
+            if not slide_files:
+                return None
+            
+            # Cycle through slides based on current_slide_number (1-based)
+            # Subtract 1 to convert to 0-based index, then modulo to cycle
+            slide_index = (current_slide_number[0] - 1) % len(slide_files)
+            slide_filename = slide_files[slide_index]
+            
+            # Return relative path from script directory for web server
+            return os.path.join('slides', os.path.basename(slide_dir), slide_filename)
+        
+        # Data callback for web server
+        def get_museum_data():
+            """Get current museum mode data for web server"""
+            slide_path = get_slide_path() if self.controller.enable_slides else None
+            return {
+                'function_mode': self.controller.function_mode,
+                'delay': self.controller.museum_delay,
+                'log_messages': log_messages.copy(),
+                'is_encode_mode': is_encode,  # Track if encode or decode mode
+                'config': self.controller.config.copy(),  # Current config for /status
+                'word_group_size': self.controller.word_group_size,  # For message formatting
+                'character_delay_ms': self.controller.character_delay_ms,  # Character delay setting
+                'current_char_index': current_char_index[0],  # Current character being encoded (1-based)
+                'current_encoded_text': current_encoded_text[0],  # Encoded/decoded text being built in real-time
+                'enable_slides': self.controller.enable_slides,  # Enable slides feature
+                'slide_path': slide_path  # Path to current slide image
+            }
+        
+        # Start web server if enabled
+        if web_enabled:
+            web_server = MuseumWebServer(web_enabled, web_port, get_museum_data)
+            server_ip = web_server.start()
+            if server_ip:
+                self.controller.web_server_ip = server_ip  # Store IP for display
+                add_log_message(f"Web server started: http://{server_ip}:{web_port}")
+            else:
+                web_server = None
+                self.controller.web_server_ip = None  # Clear IP if server failed
+                add_log_message(f"Failed to start web server on port {web_port}")
+        else:
+            self.controller.web_server_ip = None  # Clear IP when disabled
+        
+        draw_screen()
+        
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        # Helper function to restore spaces at exact positions from original message
+        def restore_spaces(decoded_text: str, original_msg: str) -> str:
+            """Restore spaces at exact positions from original message"""
+            # Remove any existing spaces from decoded text
+            decoded_no_spaces = decoded_text.replace(' ', '')
+            result = list(decoded_no_spaces)
+            
+            # Only restore spaces up to the current decoded length
+            current_length = len(decoded_no_spaces)
+            if current_length == 0:
+                return ''
+            
+            # Find space positions in original message (as character indices, not counting spaces)
+            # Map positions in the original MSG (with spaces) to positions in decoded text (without spaces)
+            space_positions = []
+            char_index = 0
+            for char in original_msg:
+                if char == ' ':
+                    # This space is at character position char_index in the non-spaced version
+                    if char_index < current_length:
+                        space_positions.append(char_index)
+                else:
+                    char_index += 1
+            
+            # Insert spaces at positions (reverse order to maintain indices)
+            for pos in reversed(space_positions):
+                if pos < len(result):
+                    result.insert(pos, ' ')
+            
+            return ''.join(result)
+        
+        # Helper function to normalize text for comparison (remove spaces)
+        def normalize_for_comparison(text: str) -> str:
+            """Remove spaces for comparison"""
+            return text.replace(' ', '').upper()
+        
+        last_message_time = 0
+        
+        while True:
+            self.stdscr.nodelay(True)
+            key = self.stdscr.getch()
+            if key == ord('q') or key == ord('Q'):
+                break
+            
+            current_time = time.time()
+            
+            # Check if paused due to verification failure or mismatch
+            if museum_paused[0]:
+                # Check for additional input from Enigma while paused
+                if self.controller.ser and self.controller.ser.is_open:
+                    try:
+                        if self.controller.ser.in_waiting > 0:
+                            # Additional input detected - read and clear it, then reset timer
+                            self.controller.ser.read(self.controller.ser.in_waiting)
+                            last_unexpected_input_time[0] = current_time
+                            if debug_callback:
+                                debug_callback("Additional input detected while paused - resetting timer")
+                    except Exception:
+                        pass  # Ignore read errors
+                
+                time_since_last_input = current_time - last_unexpected_input_time[0]
+                if time_since_last_input >= self.controller.museum_delay:
+                    # Resume museum mode - start over with a new random message immediately
+                    museum_paused[0] = False
+                    add_log_message("Museum mode resumed - starting new message")
+                    # Reset timer to trigger message sending immediately
+                    last_message_time = current_time - self.controller.museum_delay
+                    # Reset encoded text and character index
+                    current_char_index[0] = 0
+                    current_encoded_text[0] = ""
+                else:
+                    # Still paused, skip sending messages
+                    time.sleep(0.1)
+                    continue
+            
+            if current_time - last_message_time >= self.controller.museum_delay:
+                # Select random message object
+                msg_obj = random.choice(valid_messages)
+                # Track message index for slide directory lookup
+                current_message_index[0] = valid_messages.index(msg_obj)
+                # Reset slide number when starting new message
+                current_slide_number[0] = 1
+                previous_slide_number[0] = 0
+                # Log initial slide if slides are enabled
+                if self.controller.enable_slides:
+                    slide_path = get_slide_path()
+                    if slide_path:
+                        add_log_message(f"Slide: {slide_path}")
+                    else:
+                        add_log_message("Slide: No slide image available")
+                
+                # Apply configuration from JSON message object
+                if debug_callback:
+                    debug_callback(f"Applying configuration from message...")
+                
+                self.controller.set_mode(msg_obj.get('MODEL', 'I'), debug_callback=debug_callback)
+                time.sleep(0.2)
+                self.controller.set_rotor_set(msg_obj.get('ROTOR', 'A III IV I'), debug_callback=debug_callback)
+                time.sleep(0.2)
+                self.controller.set_ring_settings(msg_obj.get('RINGSET', '01 01 01'), debug_callback=debug_callback)
+                time.sleep(0.2)
+                self.controller.set_ring_position(msg_obj.get('RINGPOS', '20 6 10'), debug_callback=debug_callback)
+                time.sleep(0.2)
+                self.controller.set_pegboard(msg_obj.get('PLUG', ''), debug_callback=debug_callback)
+                time.sleep(0.2)
+                # Set word group size from JSON
+                self.controller.word_group_size = msg_obj.get('GROUP', 5)
+                self.controller.return_to_encode_mode(debug_callback=debug_callback)
+                time.sleep(0.5)
+                
+                # Determine message to send and expected result
+                if is_encode:
+                    message_to_send = msg_obj['MSG']
+                    expected_result = msg_obj['CODED']
+                    operation = "Encoding"
+                else:
+                    message_to_send = msg_obj['CODED']
+                    expected_result = msg_obj['MSG']
+                    operation = "Decoding"
+                
+                # Format message for display
+                formatted_message = self.controller.format_message_for_display(message_to_send)
+                # Display both MSG and CODED in museum mode
+                formatted_msg = self.controller.format_message_for_display(msg_obj['MSG'])
+                formatted_coded = self.controller.format_message_for_display(msg_obj['CODED'])
+                add_log_message(f"{operation}:")
+                add_log_message(f"  MSG: {formatted_msg}")
+                add_log_message(f"  CODED: {formatted_coded}")
+                
+                # Normalize expected result for character-by-character comparison
+                expected_normalized = normalize_for_comparison(expected_result)
+                
+                encoded_result = []
+                current_char_index[0] = 0  # Reset current character index
+                current_encoded_text[0] = ""  # Reset encoded text
+                
+                def progress_callback(index, total, original, encoded, response):
+                    encoded_result.append(encoded)
+                    # Update current character index for web display
+                    current_char_index[0] = index
+                    # Update encoded text in real-time
+                    decoded_text = ''.join(encoded_result)
+                    # Format for display based on mode
+                    if is_encode:
+                        # Encode mode: group the encoded text
+                        if decoded_text:
+                            current_encoded_text[0] = self.controller._group_encoded_text(decoded_text)
+                        else:
+                            current_encoded_text[0] = ""
+                    else:
+                        # Decode mode: restore spaces from MSG in real-time
+                        if decoded_text:
+                            current_encoded_text[0] = restore_spaces(decoded_text, msg_obj['MSG'])
+                        else:
+                            current_encoded_text[0] = ""
+                    
+                    # Update slide number every 10 characters
+                    # Characters 1-10: slide 1, 11-20: slide 2, 21-30: slide 3, etc.
+                    if self.controller.enable_slides:
+                        # Calculate slide number: max(1, (index - 1) // 10 + 1)
+                        # This gives: 0 -> 1, 1-10 -> 1, 11-20 -> 2, 21-30 -> 3, etc.
+                        new_slide_number = max(1, ((index - 1) // 10) + 1)
+                        if new_slide_number != previous_slide_number[0]:
+                            current_slide_number[0] = new_slide_number
+                            previous_slide_number[0] = new_slide_number
+                            # Log slide change with path
+                            slide_path = get_slide_path()
+                            if slide_path:
+                                add_log_message(f"Slide: {slide_path}")
+                            else:
+                                add_log_message("Slide: No slide image available")
+                        else:
+                            current_slide_number[0] = new_slide_number
+                    
+                    # Check if uppercase received in museum mode (indicates direct input from Enigma Touch)
+                    # In museum mode, we expect lowercase encoded characters
+                    # Note: Mode switch may have already happened in send_message, but check here too as backup
+                    if is_encode and self.controller.function_mode.startswith(('Encode', 'Decode')):
+                        # Check if received character was originally uppercase (direct input from device)
+                        if self.controller.last_char_received and self.controller.last_char_received.isupper():
+                            # Uppercase received in museum mode - direct input from Enigma Touch detected
+                            if not museum_paused[0]:
+                                museum_paused[0] = True
+                                last_unexpected_input_time[0] = time.time()
+                                self.controller.function_mode = 'Interactive'
+                                # Save the mode change to config file
+                                self.controller.save_config()
+                                # Update UI to show the mode change
+                                self.draw_settings_panel()
+                                self.refresh_all_panels()
+                                add_log_message(f"Direct input from Enigma Touch detected - switching to Interactive mode")
+                                if debug_callback:
+                                    debug_callback(f"Uppercase received in museum mode - direct input from Enigma Touch, switching to Interactive mode", color_type=self.COLOR_MISMATCH)
+                                # Return True to stop sending the message
+                                return True
+                    # Also check if mode was already switched to Interactive (from send_message)
+                    elif self.controller.function_mode == 'Interactive' and not museum_paused[0]:
+                        # Mode was switched in send_message due to uppercase detection
+                        museum_paused[0] = True
+                        last_unexpected_input_time[0] = time.time()
+                        # Update UI to show the mode change
+                        self.draw_settings_panel()
+                        self.refresh_all_panels()
+                        add_log_message(f"Switched to Interactive mode due to direct input from Enigma Touch")
+                        # Return True to stop sending the message
+                        return True
+                    
+                    # Compare with expected character
+                    if index > 0 and index <= len(expected_normalized):
+                        expected_char = expected_normalized[index - 1]
+                        encoded_upper = encoded.upper() if encoded else ''
+                        matches = encoded_upper == expected_char
+                        
+                        if debug_callback:
+                            if matches:
+                                debug_callback(f"Expected: {expected_char}, Got: {encoded_upper} ✓ MATCH", color_type=self.COLOR_MATCH)
+                            else:
+                                debug_callback(f"Expected: {expected_char}, Got: {encoded_upper} ✗ MISMATCH", color_type=self.COLOR_MISMATCH)
+                                # Mismatch detected - stop sending message and pause museum mode, switch to Interactive
+                                if not museum_paused[0]:
+                                    museum_paused[0] = True
+                                    last_unexpected_input_time[0] = time.time()
+                                    self.controller.function_mode = 'Interactive'
+                                    # Save the mode change to config file
+                                    self.controller.save_config()
+                                    # Update UI to show the mode change
+                                    self.draw_settings_panel()
+                                    self.refresh_all_panels()
+                                    add_log_message(f"Encoding interrupted by user input - character mismatch detected, switching to Interactive mode")
+                                    # Return True to stop sending the message
+                                    return True
+                    
+                    return False
+                
+                def position_update_callback():
+                    """Update settings panel when ring positions change or characters are sent/received"""
+                    self.draw_settings_panel()
+                    self.refresh_all_panels()
+                
+                config_error_occurred = [False]
+                
+                def config_error_callback(errors):
+                    """Handle config errors by notifying user and preparing to switch to config menu"""
+                    config_error_occurred[0] = True
+                    error_msg = f"Configuration error: {', '.join(errors)}. Switching to config menu..."
+                    add_log_message(error_msg)
+                    if debug_callback:
+                        debug_callback(error_msg, color_type=self.COLOR_MISMATCH)
+                
+                message_sent = self.controller.send_message(message_to_send, progress_callback, debug_callback, position_update_callback, config_error_callback)
+                
+                # If config error occurred, switch to config menu
+                if config_error_occurred[0]:
+                    add_log_message("Pausing museum mode to fix configuration")
+                    museum_paused[0] = True
+                    self.show_message(0, 0, "Configuration error detected! Switching to config menu...", curses.A_BOLD | curses.A_REVERSE)
+                    self.draw_settings_panel()
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)
+                    self.config_menu()
+                    # After returning from config menu, resume museum mode
+                    museum_paused[0] = False
+                    continue  # Skip to next message
+                
+                # Check if message was interrupted (stopped early due to mismatch or mode switch)
+                if museum_paused[0]:
+                    # Message was interrupted by mismatch or mode switch - already logged and paused
+                    # Update web display to show interruption
+                    if current_encoded_text[0]:
+                        current_encoded_text[0] = current_encoded_text[0] + " [INTERRUPTED]"
+                    else:
+                        current_encoded_text[0] = "[INTERRUPTED]"
+                    # Force UI update (including function mode change if switched to Interactive)
+                    self.draw_settings_panel()
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                elif not message_sent:
+                    # Message sending failed
+                    add_log_message(f"{operation} failed or cancelled")
+                else:
+                    # Message completed - verify result
+                    if encoded_result:
+                        result = ''.join(encoded_result)
+                        # Normalize for comparison (remove spaces)
+                        result_normalized = normalize_for_comparison(result)
+                        expected_normalized = normalize_for_comparison(expected_result)
+                        
+                        # Verify result matches expected
+                        if result_normalized == expected_normalized:
+                            # Success - format and display result
+                            if is_encode:
+                                grouped_result = self.controller._group_encoded_text(result)
+                                add_log_message(f"Encoded: {grouped_result}")
+                            else:
+                                # Decode mode: use MSG directly since decoded result matches it exactly
+                                formatted_decoded = self.controller.format_message_for_display(msg_obj['MSG'])
+                                add_log_message(f"Decoded: {formatted_decoded}")
+                        else:
+                            # Verification failed - pause museum mode
+                            add_log_message(f"Verification failed - pausing museum mode (Enigma may have been touched)")
+                            museum_paused[0] = True
+                            last_unexpected_input_time[0] = current_time
+                    else:
+                        add_log_message(f"{operation} failed or cancelled")
+                
+                # Reset current character index and encoded text after encoding completes
+                current_char_index[0] = 0
+                current_encoded_text[0] = ""
+                
+                last_message_time = current_time
+            
+            time.sleep(0.1)
+        
+        # Stop web server if running
+        if web_server:
+            web_server.stop()
+            self.controller.web_server_ip = None  # Clear IP when stopped
+            add_log_message("Web server stopped")
+        
+        # Restore screen state when exiting museum mode
+        self.controller.function_mode = 'Interactive'
+        self.stdscr.nodelay(False)  # Restore normal input mode
+        # Restore original always_send_config value
+        self.controller.always_send_config = original_always_send_config
+        # Clear and redraw screen to prevent flickering
+        self.setup_screen()
+        self.draw_settings_panel()
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+    
+    def run(self, config_only: bool = False, museum_mode: Optional[str] = None, debug_enabled: bool = True):
+        """Main UI loop
+        
+        Args:
+            config_only: If True, show only config menu and exit after
+            museum_mode: If set, start directly in specified museum mode ('1', '2', '3', or '4')
+            debug_enabled: If True, enable debug output panel at startup
+        """
+        # Set debug enabled if requested via command line (before initializing curses)
+        if debug_enabled:
+            self.debug_enabled = True
+        
+        # Initialize curses with error handling
+        try:
+            self.stdscr = curses.initscr()
+            # Update UIBase with stdscr
+            UIBase.__init__(self, self.controller, self.stdscr)
+            curses.noecho()
+            curses.cbreak()
+            curses.curs_set(0)
+            self.stdscr.keypad(True)
+        except curses.error as e:
+            # Clean up if initialization fails
+            try:
+                curses.endwin()
+            except:
+                pass
+            print(f"ERROR: Failed to initialize curses interface: {e}")
+            print("This usually happens when:")
+            print("  - The terminal doesn't support curses")
+            print("  - Running in a non-interactive environment")
+            print("  - The terminal is too small or misconfigured")
+            print("\nTry running in a proper terminal emulator (not a non-interactive shell).")
+            sys.exit(1)
+        
+        # Initialize colors if supported
+        if curses.has_colors():
+            curses.start_color()
+            # Cyan for data sent to Enigma
+            curses.init_pair(self.COLOR_SENT, curses.COLOR_CYAN, curses.COLOR_BLACK)
+            # Bright green for data received from Enigma (we'll add bold when using it)
+            curses.init_pair(self.COLOR_RECEIVED, curses.COLOR_GREEN, curses.COLOR_BLACK)
+            # Yellow for other info
+            curses.init_pair(self.COLOR_INFO, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+            # Light purple for character delay messages
+            curses.init_pair(self.COLOR_DELAY, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+            # Bright green for matching characters (with bold)
+            curses.init_pair(self.COLOR_MATCH, curses.COLOR_GREEN, curses.COLOR_BLACK)
+            # Red for mismatching characters
+            curses.init_pair(self.COLOR_MISMATCH, curses.COLOR_RED, curses.COLOR_BLACK)
+            # Grey for disabled web server
+            curses.init_pair(self.COLOR_WEB_DISABLED, curses.COLOR_WHITE, curses.COLOR_BLACK)  # Using white as grey (dim)
+        
+        # Check terminal size
+        min_cols = 100
+        min_lines = 25
+        if curses.COLS < min_cols or curses.LINES < min_lines:
+            self.stdscr.addstr(0, 0, f"Terminal too small! Need at least {min_cols}x{min_lines}, got {curses.COLS}x{curses.LINES}")
+            self.stdscr.addstr(1, 0, "Please resize your terminal and restart.")
+            self.stdscr.refresh()
+            self.stdscr.getch()
+            return
+        
+        try:
+            # If config-only mode, go straight to config menu
+            if config_only:
+                result = self.config_menu(exit_after=True)
+                if result == 'exit':
+                    return
+                # Should not reach here, but just in case
+                return
+            
+            # If museum mode specified, start directly in that mode
+            if museum_mode:
+                self.run_museum_mode(museum_mode)
+                return
+            
+            while True:
+                choice = self.main_menu()
+                
+                if choice == 'quit' or choice == 'Q':
+                    break
+                elif choice == '1':
+                    self.send_message_screen()
+                elif choice == '2':
+                    self.config_menu()
+                elif choice == '3':
+                    self.query_settings_screen()
+                elif choice == '4':
+                    self.museum_mode_screen()
+                elif choice == '5':
+                    self.set_all_settings_screen()
+        
+        finally:
+            self.destroy_subwindows()
+            curses.nocbreak()
+            self.stdscr.keypad(False)
+            curses.echo()
+            curses.endwin()
+
+

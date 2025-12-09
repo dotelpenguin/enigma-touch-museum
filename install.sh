@@ -353,7 +353,7 @@ show_installation_checklist() {
     echo "  [✓] Install Python 3 and pip3 (if not already installed)"
     echo "  [✓] Install pyserial library (via apt python3-serial or pip3)"
     echo "  [✓] Add user to dialout group (for serial device access)"
-    echo "  [✓] Set executable permissions on enigma-museum.py"
+    echo "  [✓] Set executable permissions on main.py"
     echo "  [✓] Create startup script (start-enigma-museum.sh)"
     echo ""
     echo -e "${YELLOW}Configuration Steps (you will be prompted):${NC}"
@@ -545,7 +545,7 @@ verify_serial_permissions
 
 # Make the main script executable
 echo -e "${YELLOW}[5/8] Setting permissions...${NC}"
-chmod +x "$SCRIPT_DIR/enigma-museum.py"
+chmod +x "$SCRIPT_DIR/main.py"
 
 # Prompt for default museum mode
 echo -e "${YELLOW}[6/8] Configuring default museum mode...${NC}"
@@ -598,7 +598,7 @@ cat > "$STARTUP_SCRIPT" << EOF
 
 # Get the directory where this script is located
 SCRIPT_DIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
-APP_SCRIPT="\$SCRIPT_DIR/enigma-museum.py"
+APP_SCRIPT="\$SCRIPT_DIR/main.py"
 DEFAULT_MODE="$DEFAULT_MUSEUM_MODE"
 
 # Function to wait for input with timeout
@@ -749,10 +749,10 @@ echo "  1. If you were added to dialout group, you MUST log out and back in"
 echo "     (or run: newgrp dialout) for group membership to take effect"
 if command -v raspi-config &> /dev/null || [ -f "/etc/systemd/system/getty@tty1.service.d/autologin.conf" ]; then
     echo "  2. If auto-login was enabled, reboot for it to take effect: sudo reboot"
-    echo "  3. Test the application: python3 $SCRIPT_DIR/enigma-museum.py --config"
+    echo "  3. Test the application: python3 $SCRIPT_DIR/main.py --config"
     echo "  4. Or run the startup script: $STARTUP_SCRIPT"
 else
-    echo "  2. Test the application: python3 $SCRIPT_DIR/enigma-museum.py --config"
+    echo "  2. Test the application: python3 $SCRIPT_DIR/main.py --config"
     echo "  3. Or run the startup script: $STARTUP_SCRIPT"
 fi
 echo ""
@@ -779,10 +779,10 @@ echo "  --debug                   Enable debug output panel"
 echo "  DEVICE                    Serial device path (e.g., /dev/ttyACM0)"
 echo ""
 echo "Examples:"
-echo "  python3 enigma-museum.py --config"
-echo "  python3 enigma-museum.py --museum-en-encode"
-echo "  python3 enigma-museum.py --museum-de-decode /dev/ttyUSB0"
-echo "  python3 enigma-museum.py --debug /dev/ttyACM0"
+echo "  python3 main.py --config"
+echo "  python3 main.py --museum-en-encode"
+echo "  python3 main.py --museum-de-decode /dev/ttyUSB0"
+echo "  python3 main.py --debug /dev/ttyACM0"
 echo ""
 echo "To remove auto-start, run: ./install.sh --uninstall"
 echo ""

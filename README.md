@@ -133,7 +133,7 @@ The installation script will:
 **After installation:**
 1. If you were added to the dialout group, **log out and back in** (or run `newgrp dialout`)
 2. If auto-login was enabled, **reboot** for it to take effect: `sudo reboot`
-3. Test the application: `python3 enigma-museum.py --config` (If not set to autostart)
+3. Test the application: `python3 main.py --config` (If not set to autostart)
 
 **Startup Script Behavior:**
 - On boot/login, the script waits 5 seconds for user input
@@ -247,7 +247,7 @@ You can configure:
 If the device is not connected, use the `--config` option to configure settings:
 
 ```bash
-python3 enigma-museum.py --config
+python3 main.py --config
 ```
 
 ## Usage
@@ -255,7 +255,7 @@ python3 enigma-museum.py --config
 ### Basic Usage
 
 ```bash
-python3 enigma-museum.py [OPTIONS] [DEVICE]
+python3 main.py [OPTIONS] [DEVICE]
 ```
 
 ### Command-Line Options
@@ -272,22 +272,22 @@ python3 enigma-museum.py [OPTIONS] [DEVICE]
 
 ```bash
 # Start with default device
-python3 enigma-museum.py
+python3 main.py
 
 # Configure settings without connecting
-python3 enigma-museum.py --config
+python3 main.py --config
 
 # Start directly in Encode - EN mode
-python3 enigma-museum.py --museum-en-encode
+python3 main.py --museum-en-encode
 
 # Start with specific device and debug enabled
-python3 enigma-museum.py --debug /dev/ttyACM0
+python3 main.py --debug /dev/ttyACM0
 
 # Start Decode - DE mode
-python3 enigma-museum.py --museum-de-decode
+python3 main.py --museum-de-decode
 
 # Start Encode - DE mode with specific device
-python3 enigma-museum.py --museum-de-encode /dev/ttyUSB0
+python3 main.py --museum-de-encode /dev/ttyUSB0
 ```
 
 ## Main Menu Options
