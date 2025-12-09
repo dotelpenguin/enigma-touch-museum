@@ -455,6 +455,12 @@ Future enhancements and improvements for the Enigma Museum Controller:
 - [ ] Logic not handling 4 Rotor configs
 - [ ] Logic issues with Lettered Rotors
 
+
+## Known Issues
+
+- Only ONE WebPage can be connected at a time due to limitations of the Python Library.
+
+
 ## License
 
 See [LICENSE](LICENSE) file for details.

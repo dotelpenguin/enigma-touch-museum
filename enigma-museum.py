@@ -5,7 +5,7 @@ Duplicates ESP32 controller functionality with curses-based menu interface
 """
 
 # Application Version
-VERSION = "v1.05"
+VERSION = "v1.20"
 
 import serial
 import time
@@ -803,15 +803,53 @@ class EnigmaController:
                             parts = resp_text.split()
                             encoded_char = None
                             
-                            # Find pattern: two consecutive single uppercase letters followed by "Positions"
+                            # Find pattern: two consecutive single letters followed by "Positions"
                             # This identifies the encoding response: "INPUT ENCODED Positions"
+                            # In museum mode, BOTH letters (input and encoded) are lowercase
+                            # In interactive mode, both letters are uppercase
+                            is_museum_mode = (self.function_mode.startswith('Encode') or 
+                                             self.function_mode.startswith('Decode'))
                             current_positions = None
+                            encoded_char_original = None  # Store original case before conversion
                             for j in range(len(parts) - 2):
-                                if (len(parts[j]) == 1 and parts[j].isalpha() and parts[j].isupper() and
-                                    len(parts[j+1]) == 1 and parts[j+1].isalpha() and parts[j+1].isupper() and
-                                    parts[j+2].lower() == 'positions'):
-                                    # Found: letter letter Positions - second letter is encoded
-                                    encoded_char = parts[j+1]
+                                # Pattern: INPUT ENCODED Positions
+                                # In museum mode: both letters are lowercase (e.g., "a m Positions")
+                                # In interactive mode: both letters are uppercase (e.g., "A M Positions")
+                                # Check if this matches the pattern based on mode
+                                part1 = parts[j]
+                                part2 = parts[j+1]
+                                part3 = parts[j+2]
+                                
+                                # Check if both are single letters and part3 is "positions"
+                                if (len(part1) == 1 and part1.isalpha() and
+                                    len(part2) == 1 and part2.isalpha() and
+                                    part3.lower() == 'positions'):
+                                    # Check case based on mode
+                                    if is_museum_mode:
+                                        # In museum mode, expect lowercase for both
+                                        if part1.islower() and part2.islower():
+                                            # Found lowercase pattern in museum mode (expected)
+                                            encoded_char_original = part2
+                                            encoded_char = encoded_char_original.upper()
+                                        elif part1.isupper() or part2.isupper():
+                                            # Uppercase detected in museum mode - direct input from Enigma Touch!
+                                            # This means someone is typing directly on the device
+                                            encoded_char_original = part2
+                                            encoded_char = encoded_char_original.upper()
+                                            # Switch to Interactive mode immediately
+                                            self.function_mode = 'Interactive'
+                                            # Save the mode change to config file
+                                            self.save_config()
+                                            if debug_callback:
+                                                debug_callback(f"Uppercase detected in museum mode - direct input from Enigma Touch, switching to Interactive mode", color_type=7)  # COLOR_MISMATCH
+                                    else:
+                                        # In interactive mode, expect uppercase for both
+                                        if part1.isupper() and part2.isupper():
+                                            encoded_char_original = part2
+                                            encoded_char = encoded_char_original.upper()
+                                        else:
+                                            # Skip this pattern - doesn't match expected case
+                                            continue
                                     
                                     # Extract rotor positions (should be 3 numbers after "Positions")
                                     if j + 5 < len(parts):
@@ -825,15 +863,16 @@ class EnigmaController:
                                                 debug_callback(f"Warning: Could not parse positions from response")
                                     
                                     if debug_callback:
-                                        debug_callback(f"Found: {parts[j]} -> {encoded_char}")
+                                        debug_callback(f"Found: {part1} -> {encoded_char} (original case: {encoded_char_original})")
                                         if current_positions:
                                             debug_callback(f"Positions: {current_positions[0]} {current_positions[1]} {current_positions[2]}")
                                     break
                             
                             if encoded_char:
                                 # Update last character info
+                                # Store original case for detection (lowercase = expected in museum mode, uppercase = keyboard touch)
                                 self.last_char_original = char
-                                self.last_char_received = encoded_char
+                                self.last_char_received = encoded_char_original if encoded_char_original else encoded_char
                                 
                                 # Verify that positions have updated (for characters after the first)
                                 if previous_positions is not None and current_positions is not None:
@@ -858,23 +897,51 @@ class EnigmaController:
                                                 parts = resp_text.split()
                                                 # Look for updated positions
                                                 for k in range(len(parts) - 2):
-                                                    if (len(parts[k]) == 1 and parts[k].isalpha() and parts[k].isupper() and
-                                                        len(parts[k+1]) == 1 and parts[k+1].isalpha() and parts[k+1].isupper() and
-                                                        parts[k+2].lower() == 'positions' and k + 5 < len(parts)):
-                                                        try:
-                                                            new_pos1 = int(parts[k+3])
-                                                            new_pos2 = int(parts[k+4])
-                                                            new_pos3 = int(parts[k+5])
-                                                            new_positions = (new_pos1, new_pos2, new_pos3)
-                                                            if new_positions != previous_positions:
-                                                                # Found updated positions!
-                                                                current_positions = new_positions
-                                                                encoded_char = parts[k+1]  # Update encoded char in case it's different
+                                                    part_k1 = parts[k]
+                                                    part_k2 = parts[k+1]
+                                                    part_k3 = parts[k+2]
+                                                    
+                                                    if (len(part_k1) == 1 and part_k1.isalpha() and
+                                                        len(part_k2) == 1 and part_k2.isalpha() and
+                                                        part_k3.lower() == 'positions' and k + 5 < len(parts)):
+                                                        # Check case based on mode (same logic as main pattern matching)
+                                                        pattern_matches = False
+                                                        if is_museum_mode:
+                                                            # In museum mode, accept lowercase for both
+                                                            if part_k1.islower() and part_k2.islower():
+                                                                pattern_matches = True
+                                                            elif part_k1.isupper() or part_k2.isupper():
+                                                                # Uppercase detected - direct input from Enigma Touch!
+                                                                # Switch to Interactive mode immediately
+                                                                self.function_mode = 'Interactive'
+                                                                # Save the mode change to config file
+                                                                self.save_config()
                                                                 if debug_callback:
-                                                                    debug_callback(f"Found updated positions: {previous_positions} -> {current_positions}")
-                                                                break
-                                                        except (ValueError, IndexError):
-                                                            pass
+                                                                    debug_callback(f"Uppercase detected in museum mode - direct input from Enigma Touch, switching to Interactive mode", color_type=7)  # COLOR_MISMATCH
+                                                                pattern_matches = True
+                                                        else:
+                                                            # In interactive mode, expect uppercase for both
+                                                            if part_k1.isupper() and part_k2.isupper():
+                                                                pattern_matches = True
+                                                        
+                                                        if pattern_matches:
+                                                            try:
+                                                                new_pos1 = int(parts[k+3])
+                                                                new_pos2 = int(parts[k+4])
+                                                                new_pos3 = int(parts[k+5])
+                                                                new_positions = (new_pos1, new_pos2, new_pos3)
+                                                                if new_positions != previous_positions:
+                                                                    # Found updated positions!
+                                                                    current_positions = new_positions
+                                                                    # Store original case before converting (needed for keyboard touch detection)
+                                                                    encoded_char_original = part_k2
+                                                                    # Always convert to uppercase for consistency (display/comparison always uses uppercase)
+                                                                    encoded_char = encoded_char_original.upper()
+                                                                    if debug_callback:
+                                                                        debug_callback(f"Found updated positions: {previous_positions} -> {current_positions}")
+                                                                    break
+                                                            except (ValueError, IndexError):
+                                                                pass
                                                 if current_positions != previous_positions:
                                                     break
                                             time.sleep(0.05)
@@ -948,6 +1015,7 @@ class EnigmaController:
                                     debug_callback(f"Warning: Could not parse encoded character")
                                     debug_callback(f"Response: {resp_text}")
                                     debug_callback(f"Parts: {parts}")
+                                    debug_callback(f"Museum mode: {is_museum_mode}, Function mode: {self.function_mode}")
                         except Exception as e:
                             if debug_callback:
                                 debug_callback(f"Error parsing response: {e}")
@@ -1339,6 +1407,10 @@ class MuseumWebServer:
                 # Use current config (updates in real-time)
                 config = data.get('config', {})
                 log_messages = data.get('log_messages', [])
+                
+                # Get function mode to determine if Interactive mode
+                function_mode = data.get('function_mode', 'N/A')
+                is_interactive_mode = (function_mode == 'Interactive')
                 
                 # Get mode type (encode or decode)
                 is_encode_mode = data.get('is_encode_mode', True)
@@ -1744,7 +1816,13 @@ class MuseumWebServer:
                     # Two separate boxes side by side, each 50% width
                     html += """        <div class="message-container">
             <div class="message-section">
-                <div class="message-label">Current Message</div>
+                <div class="message-label">"""
+                    # In Interactive mode, show "Input Letter" instead of "Current Message"
+                    if is_interactive_mode:
+                        html += "Input Letter"
+                    else:
+                        html += "Current Message"
+                    html += """</div>
                 <div class="message-text">"""
                     
                     # Build message with character highlighting if delay >= 2000ms
@@ -1774,9 +1852,14 @@ class MuseumWebServer:
                     html += """</div>
 """
                     # Display result message (encoded or decoded) with appropriate label
-                    result_label = "Encoded" if is_encode_mode else "Decoded"
+                    # In Interactive mode, show "Encoded Letter" instead of "Encoded Message"
+                    if is_interactive_mode:
+                        result_label = "Encoded Letter"
+                    else:
+                        result_label = "Encoded" if is_encode_mode else "Decoded"
+                        result_label += " Message"
                     if result_message:
-                        html += f'                <div class="message-label">{result_label} Message</div>\n'
+                        html += f'                <div class="message-label">{result_label}</div>\n'
                         html += f'                <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
                     
                     html += """            </div>
@@ -1798,7 +1881,13 @@ class MuseumWebServer:
                 else:
                     # Single box (original layout)
                     html += """        <div class="message-section">
-            <div class="message-label">Current Message</div>
+            <div class="message-label">"""
+                    # In Interactive mode, show "Input Letter" instead of "Current Message"
+                    if is_interactive_mode:
+                        html += "Input Letter"
+                    else:
+                        html += "Current Message"
+                    html += """</div>
             <div class="message-text">"""
                     
                     # Build message with character highlighting if delay >= 2000ms
@@ -1828,9 +1917,14 @@ class MuseumWebServer:
                     html += """</div>
 """
                     # Display result message (encoded or decoded) with appropriate label
-                    result_label = "Encoded" if is_encode_mode else "Decoded"
+                    # In Interactive mode, show "Encoded Letter" instead of "Encoded Message"
+                    if is_interactive_mode:
+                        result_label = "Encoded Letter"
+                    else:
+                        result_label = "Encoded" if is_encode_mode else "Decoded"
+                        result_label += " Message"
                     if result_message:
-                        html += f'            <div class="message-label">{result_label} Message</div>\n'
+                        html += f'            <div class="message-label">{result_label}</div>\n'
                         html += f'            <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
                     
                     html += """        </div>
@@ -3552,10 +3646,14 @@ class EnigmaMuseumUI:
         
         def draw_screen():
             """Draw the entire screen with header and log messages"""
-            # Ensure function mode is current before drawing
-            self.controller.function_mode = mode_name
+            # Use current function_mode (may have changed to 'Interactive' if user input detected)
+            # Only set to mode_name if still in museum mode
+            if self.controller.function_mode.startswith(('Encode', 'Decode')):
+                # Still in museum mode, use mode_name
+                self.controller.function_mode = mode_name
+            # Otherwise, function_mode is already 'Interactive', keep it
             self.setup_screen()
-            self.draw_settings_panel()  # This will display the updated function mode
+            self.draw_settings_panel()  # This will display the current function mode
             
             # Draw header lines
             for i, line in enumerate(header_lines):
@@ -3844,6 +3942,39 @@ class EnigmaMuseumUI:
                         else:
                             current_slide_number[0] = new_slide_number
                     
+                    # Check if uppercase received in museum mode (indicates direct input from Enigma Touch)
+                    # In museum mode, we expect lowercase encoded characters
+                    # Note: Mode switch may have already happened in send_message, but check here too as backup
+                    if is_encode and self.controller.function_mode.startswith(('Encode', 'Decode')):
+                        # Check if received character was originally uppercase (direct input from device)
+                        if self.controller.last_char_received and self.controller.last_char_received.isupper():
+                            # Uppercase received in museum mode - direct input from Enigma Touch detected
+                            if not museum_paused[0]:
+                                museum_paused[0] = True
+                                last_unexpected_input_time[0] = time.time()
+                                self.controller.function_mode = 'Interactive'
+                                # Save the mode change to config file
+                                self.controller.save_config()
+                                # Update UI to show the mode change
+                                self.draw_settings_panel()
+                                self.refresh_all_panels()
+                                add_log_message(f"Direct input from Enigma Touch detected - switching to Interactive mode")
+                                if debug_callback:
+                                    debug_callback(f"Uppercase received in museum mode - direct input from Enigma Touch, switching to Interactive mode", color_type=self.COLOR_MISMATCH)
+                                # Return True to stop sending the message
+                                return True
+                    # Also check if mode was already switched to Interactive (from send_message)
+                    elif self.controller.function_mode == 'Interactive' and not museum_paused[0]:
+                        # Mode was switched in send_message due to uppercase detection
+                        museum_paused[0] = True
+                        last_unexpected_input_time[0] = time.time()
+                        # Update UI to show the mode change
+                        self.draw_settings_panel()
+                        self.refresh_all_panels()
+                        add_log_message(f"Switched to Interactive mode due to direct input from Enigma Touch")
+                        # Return True to stop sending the message
+                        return True
+                    
                     # Compare with expected character
                     if index > 0 and index <= len(expected_normalized):
                         expected_char = expected_normalized[index - 1]
@@ -3855,11 +3986,17 @@ class EnigmaMuseumUI:
                                 debug_callback(f"Expected: {expected_char}, Got: {encoded_upper} ✓ MATCH", color_type=self.COLOR_MATCH)
                             else:
                                 debug_callback(f"Expected: {expected_char}, Got: {encoded_upper} ✗ MISMATCH", color_type=self.COLOR_MISMATCH)
-                                # Mismatch detected - stop sending message and pause museum mode
+                                # Mismatch detected - stop sending message and pause museum mode, switch to Interactive
                                 if not museum_paused[0]:
                                     museum_paused[0] = True
                                     last_unexpected_input_time[0] = time.time()
-                                    add_log_message(f"Encoding interrupted by user input - character mismatch detected")
+                                    self.controller.function_mode = 'Interactive'
+                                    # Save the mode change to config file
+                                    self.controller.save_config()
+                                    # Update UI to show the mode change
+                                    self.draw_settings_panel()
+                                    self.refresh_all_panels()
+                                    add_log_message(f"Encoding interrupted by user input - character mismatch detected, switching to Interactive mode")
                                     # Return True to stop sending the message
                                     return True
                     
@@ -3896,16 +4033,17 @@ class EnigmaMuseumUI:
                     museum_paused[0] = False
                     continue  # Skip to next message
                 
-                # Check if message was interrupted (stopped early due to mismatch)
+                # Check if message was interrupted (stopped early due to mismatch or mode switch)
                 if museum_paused[0]:
-                    # Message was interrupted by mismatch - already logged and paused
+                    # Message was interrupted by mismatch or mode switch - already logged and paused
                     # Update web display to show interruption
                     if current_encoded_text[0]:
                         current_encoded_text[0] = current_encoded_text[0] + " [INTERRUPTED]"
                     else:
                         current_encoded_text[0] = "[INTERRUPTED]"
-                    # Force UI update
+                    # Force UI update (including function mode change if switched to Interactive)
                     self.draw_settings_panel()
+                    self.draw_debug_panel()
                     self.refresh_all_panels()
                 elif not message_sent:
                     # Message sending failed
@@ -4144,6 +4282,18 @@ def main():
             # This should be the device path
             device = arg
         i += 1
+    
+    # Display firmware version requirement notice
+    print("=" * 60)
+    print("Enigma Museum Controller")
+    print("=" * 60)
+    print("⚠️  FIRMWARE REQUIREMENT: Enigma Touch firmware version 1.20 or higher")
+    print("   is required to use this software.")
+    print("")
+    print("   Note: Automatic firmware version checking will be available")
+    print("   in Enigma Touch firmware version 1.21.")
+    print("=" * 60)
+    print("")
     
     # If no device specified on command line, load from config file
     if device is None:
