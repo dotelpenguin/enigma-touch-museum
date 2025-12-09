@@ -14,5 +14,12 @@
   "web_server_enabled": true,
   "web_server_port": 8080,
   "enable_slides": true,
+  "lock_model": true,
+  "lock_rotor": true,
+  "lock_ring": true,
+  "disable_power_off": true,
+  "brightness": 3,
+  "volume": 0,
+  "screen_saver": 0,
   "device": "/dev/tty.usbmodem207A39584B471"
 }

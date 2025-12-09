@@ -79,6 +79,15 @@ class EnigmaController:
         self.web_server_port = 8080  # Default web server port
         self.web_server_ip: Optional[str] = None  # Web server IP address when running
         self.enable_slides = False  # Enable slides feature
+        # Device lock settings (booleans)
+        self.lock_model = True  # Lock Model setting
+        self.lock_rotor = True  # Lock Rotor/Wheel setting
+        self.lock_ring = True  # Lock Ring setting
+        self.disable_power_off = True  # Disable Power-Off setting
+        # Device display/sound settings (integers)
+        self.brightness = 3  # Brightness (1-5, default 3)
+        self.volume = 0  # Volume (0-3, default 0)
+        self.screen_saver = 0  # Screen Saver (0-99, default 0)
         self.config_file = CONFIG_FILE
         self.last_char_sent: Optional[str] = None  # Last character sent TO Enigma
         self.last_char_received: Optional[str] = None  # Last character received FROM Enigma (encoded)
@@ -114,6 +123,13 @@ class EnigmaController:
                 'web_server_enabled': self.web_server_enabled,
                 'web_server_port': self.web_server_port,
                 'enable_slides': self.enable_slides,
+                'lock_model': self.lock_model,
+                'lock_rotor': self.lock_rotor,
+                'lock_ring': self.lock_ring,
+                'disable_power_off': self.disable_power_off,
+                'brightness': self.brightness,
+                'volume': self.volume,
+                'screen_saver': self.screen_saver,
                 'device': self.device
             }
             with open(self.config_file, 'w') as f:
@@ -151,6 +167,20 @@ class EnigmaController:
                         self.web_server_port = config_data['web_server_port']
                     if 'enable_slides' in config_data:
                         self.enable_slides = config_data['enable_slides']
+                    if 'lock_model' in config_data:
+                        self.lock_model = config_data['lock_model']
+                    if 'lock_rotor' in config_data:
+                        self.lock_rotor = config_data['lock_rotor']
+                    if 'lock_ring' in config_data:
+                        self.lock_ring = config_data['lock_ring']
+                    if 'disable_power_off' in config_data:
+                        self.disable_power_off = config_data['disable_power_off']
+                    if 'brightness' in config_data:
+                        self.brightness = config_data['brightness']
+                    if 'volume' in config_data:
+                        self.volume = config_data['volume']
+                    if 'screen_saver' in config_data:
+                        self.screen_saver = config_data['screen_saver']
                     if 'device' in config_data and not preserve_device:
                         self.device = config_data['device']
                 return True
@@ -178,6 +208,13 @@ class EnigmaController:
                     saved_config['web_server_enabled'] = config_data.get('web_server_enabled', self.web_server_enabled)
                     saved_config['web_server_port'] = config_data.get('web_server_port', self.web_server_port)
                     saved_config['enable_slides'] = config_data.get('enable_slides', self.enable_slides)
+                    saved_config['lock_model'] = config_data.get('lock_model', self.lock_model)
+                    saved_config['lock_rotor'] = config_data.get('lock_rotor', self.lock_rotor)
+                    saved_config['lock_ring'] = config_data.get('lock_ring', self.lock_ring)
+                    saved_config['disable_power_off'] = config_data.get('disable_power_off', self.disable_power_off)
+                    saved_config['brightness'] = config_data.get('brightness', self.brightness)
+                    saved_config['volume'] = config_data.get('volume', self.volume)
+                    saved_config['screen_saver'] = config_data.get('screen_saver', self.screen_saver)
                     saved_config['device'] = config_data.get('device', self.device)
                     return saved_config
         except Exception:
@@ -186,6 +223,13 @@ class EnigmaController:
         return {
             'config': self.config.copy(),
             'function_mode': self.function_mode,
+            'lock_model': self.lock_model,
+            'lock_rotor': self.lock_rotor,
+            'lock_ring': self.lock_ring,
+            'disable_power_off': self.disable_power_off,
+            'brightness': self.brightness,
+            'volume': self.volume,
+            'screen_saver': self.screen_saver,
             'museum_delay': self.museum_delay,
             'always_send_config': self.always_send_config,
             'word_group_size': self.word_group_size,
@@ -2585,34 +2629,19 @@ class EnigmaMuseumUI:
                 return chr(key)
     
     def config_menu(self, exit_after: bool = False):
-        """Configuration submenu
+        """Configuration menu with sections
         
         Args:
             exit_after: If True, exit the application after leaving the menu
         """
-        def get_options():
-            """Get menu options using saved config values"""
-            saved = self.controller.get_saved_config()
-            return [
-                ("1", f"Set Mode (current: {saved['config']['mode']})"),
-                ("2", f"Set Rotor Set (current: {saved['config']['rotor_set']})"),
-                ("3", f"Set Ring Settings (current: {saved['config']['ring_settings']})"),
-                ("4", f"Set Ring Position (current: {saved['config']['ring_position']})"),
-                ("5", f"Set Pegboard (current: {saved['config']['pegboard']})"),
-                ("6", f"Set Museum Delay (current: {saved['museum_delay']}s)"),
-                ("7", f"Always Send Config Before Message: {'ON' if saved['always_send_config'] else 'OFF'}"),
-                ("8", f"Set Word Group Size (current: {saved['word_group_size']})"),
-                ("9", f"Set Character Delay (current: {saved.get('character_delay_ms', 0)}ms)"),
-                ("10", "Generate Coded Messages - EN"),
-                ("11", "Generate Coded Messages - DE"),
-                ("12", f"Set Device (current: {saved['device']})"),
-                ("13", f"Set Web Server Port (current: {saved.get('web_server_port', 8080)})"),
-                ("14", f"Web Server: {'ENABLED' if saved.get('web_server_enabled', False) else 'DISABLED'}"),
-                ("15", f"Enable Slides: {'ON' if saved.get('enable_slides', False) else 'OFF'}"),
+        options = [
+            ("1", "Enigma Options"),
+            ("2", "WebPage Options"),
+            ("3", "Kiosk Options"),
+            ("4", "Utilities"),
             ("B", "Back")
         ]
         
-        options = get_options()
         selected = 0
         while True:
             self.show_menu("Configuration", options, selected)
@@ -2635,19 +2664,212 @@ class EnigmaMuseumUI:
                     if exit_after:
                         return 'exit'
                     return
-                self.handle_config_option(options[selected][0])
-                # Refresh menu to show updated values from saved config
+                elif options[selected][0] == '1':
+                    self.config_menu_enigma()
+                elif options[selected][0] == '2':
+                    self.config_menu_webpage()
+                elif options[selected][0] == '3':
+                    self.config_menu_kiosk()
+                elif options[selected][0] == '4':
+                    self.config_menu_utilities()
+            elif key >= ord('1') and key <= ord('4'):
+                section = chr(key)
+                if section == '1':
+                    self.config_menu_enigma()
+                elif section == '2':
+                    self.config_menu_webpage()
+                elif section == '3':
+                    self.config_menu_kiosk()
+                elif section == '4':
+                    self.config_menu_utilities()
+    
+    def config_menu_enigma(self):
+        """Enigma Options submenu"""
+        def get_options():
+            saved = self.controller.get_saved_config()
+            return [
+                ("1", f"Set Device (current: {saved['device']})"),
+                ("2", f"Set Mode (current: {saved['config']['mode']})"),
+                ("3", f"Set Rotor Set (current: {saved['config']['rotor_set']})"),
+                ("4", f"Set Rings (current: {saved['config']['ring_settings']})"),
+                ("5", f"Set Ring Position (current: {saved['config']['ring_position']})"),
+                ("6", f"Set Pegboard (current: {saved['config']['pegboard']})"),
+                ("7", f"Always Send Config Before Message: {'ON' if saved['always_send_config'] else 'OFF'}"),
+                ("B", "Back")
+            ]
+        
+        options = get_options()
+        selected = 0
+        while True:
+            self.show_menu("Enigma Options", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                self.handle_config_option_enigma(options[selected][0])
                 options = get_options()
-            elif key >= ord('1') and key <= ord('9'):
-                self.handle_config_option(chr(key))
-                # Refresh menu to show updated values from saved config
+            elif key >= ord('1') and key <= ord('7'):
+                self.handle_config_option_enigma(chr(key))
                 options = get_options()
-            elif key == ord('0'):
-                # Handle option 10 (0 key)
-                self.handle_config_option('10')
-                # Refresh menu to show updated values from saved config
+    
+    def config_menu_webpage(self):
+        """WebPage Options submenu"""
+        def get_options():
+            saved = self.controller.get_saved_config()
+            return [
+                ("1", f"Set Word Group (current: {saved['word_group_size']})"),
+                ("2", f"Set Character Delay (current: {saved.get('character_delay_ms', 0)}ms)"),
+                ("3", f"Web Server: {'ENABLED' if saved.get('web_server_enabled', False) else 'DISABLED'}"),
+                ("4", f"Set Web Server Port (current: {saved.get('web_server_port', 8080)})"),
+                ("5", f"Enable Slides: {'ON' if saved.get('enable_slides', False) else 'OFF'}"),
+                ("B", "Back")
+            ]
+        
+        options = get_options()
+        selected = 0
+        while True:
+            self.show_menu("WebPage Options", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                self.handle_config_option_webpage(options[selected][0])
                 options = get_options()
-            # Note: Options 11, 12, and 13 are handled via menu selection (ENTER key) since they require multiple digits
+            elif key >= ord('1') and key <= ord('5'):
+                self.handle_config_option_webpage(chr(key))
+                options = get_options()
+    
+    def config_menu_kiosk(self):
+        """Kiosk Options submenu"""
+        def get_options():
+            saved = self.controller.get_saved_config()
+            return [
+                ("1", f"Set Museum Delay (current: {saved['museum_delay']}s)"),
+                ("2", f"Lock Model: {'ON' if saved.get('lock_model', True) else 'OFF'}"),
+                ("3", f"Lock Rotor/Wheel: {'ON' if saved.get('lock_rotor', True) else 'OFF'}"),
+                ("4", f"Lock Ring: {'ON' if saved.get('lock_ring', True) else 'OFF'}"),
+                ("5", f"Disable Auto-PowerOff: {'ON' if saved.get('disable_power_off', True) else 'OFF'}"),
+                ("6", f"Set Brightness (current: {saved.get('brightness', 3)}, range: 1-5)"),
+                ("7", f"Set Volume (current: {saved.get('volume', 0)}, range: 0-3)"),
+                ("8", f"Set Screen Saver (current: {saved.get('screen_saver', 0)}, range: 0-99)"),
+                ("B", "Back")
+            ]
+        
+        options = get_options()
+        selected = 0
+        while True:
+            self.show_menu("Kiosk Options", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                self.handle_config_option_kiosk(options[selected][0])
+                options = get_options()
+            elif key >= ord('1') and key <= ord('8'):
+                self.handle_config_option_kiosk(chr(key))
+                options = get_options()
+    
+    def config_menu_utilities(self):
+        """Utilities submenu"""
+        options = [
+            ("1", "Generate Coded Messages - EN"),
+            ("2", "Generate Coded Messages - DE"),
+            ("B", "Back")
+        ]
+        
+        selected = 0
+        while True:
+            self.show_menu("Utilities", options, selected)
+            key = self.stdscr.getch()
+            
+            if key == ord('b') or key == ord('B'):
+                return
+            elif key == ord('q') or key == ord('Q'):
+                return
+            elif key == curses.KEY_UP:
+                selected = (selected - 1) % len(options)
+            elif key == curses.KEY_DOWN:
+                selected = (selected + 1) % len(options)
+            elif key == ord('\n') or key == ord('\r'):
+                if options[selected][0] == 'B':
+                    return
+                elif options[selected][0] == '1':
+                    self.handle_config_option('10')  # Generate EN
+                elif options[selected][0] == '2':
+                    self.handle_config_option('11')  # Generate DE
+            elif key >= ord('1') and key <= ord('2'):
+                if chr(key) == '1':
+                    self.handle_config_option('10')  # Generate EN
+                elif chr(key) == '2':
+                    self.handle_config_option('11')  # Generate DE
+    
+    def handle_config_option_enigma(self, option: str):
+        """Handle Enigma Options section"""
+        # Map section options to original option numbers
+        option_map = {
+            '1': '12',  # Set Device
+            '2': '1',   # Set Mode
+            '3': '2',   # Set Rotor Set
+            '4': '3',   # Set Rings (Ring Settings)
+            '5': '4',   # Set Ring Position
+            '6': '5',   # Set Pegboard
+            '7': '7'    # Always Send Config Before Message
+        }
+        self.handle_config_option(option_map.get(option, option))
+    
+    def handle_config_option_webpage(self, option: str):
+        """Handle WebPage Options section"""
+        # Map section options to original option numbers
+        option_map = {
+            '1': '8',   # Set Word Group
+            '2': '9',   # Set Character Delay
+            '3': '14',  # Web Server
+            '4': '13',  # Set Web Server Port
+            '5': '15'   # Enable Slides
+        }
+        self.handle_config_option(option_map.get(option, option))
+    
+    def handle_config_option_kiosk(self, option: str):
+        """Handle Kiosk Options section"""
+        # Map section options to original option numbers
+        option_map = {
+            '1': '6',   # Set Museum Delay
+            '2': '16',  # Lock Model
+            '3': '17',  # Lock Rotor/Wheel
+            '4': '18',  # Lock Ring
+            '5': '19',  # Disable Auto-PowerOff
+            '6': '20',  # Set Brightness
+            '7': '21',  # Set Volume
+            '8': '22'   # Set Screen Saver
+        }
+        self.handle_config_option(option_map.get(option, option))
     
     def handle_config_option(self, option: str):
         """Handle configuration option selection"""
@@ -2946,6 +3168,123 @@ class EnigmaMuseumUI:
             self.draw_debug_panel()
             self.refresh_all_panels()
             time.sleep(1)
+        
+        elif option == '16':
+            # Toggle lock_model
+            current_locked = saved.get('lock_model', True)
+            self.controller.lock_model = not current_locked
+            self.controller.save_config()  # Save config after change
+            status = "ON" if self.controller.lock_model else "OFF"
+            self.show_message(0, 0, f"Lock Model: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '17':
+            # Toggle lock_rotor
+            current_locked = saved.get('lock_rotor', True)
+            self.controller.lock_rotor = not current_locked
+            self.controller.save_config()  # Save config after change
+            status = "ON" if self.controller.lock_rotor else "OFF"
+            self.show_message(0, 0, f"Lock Rotor/Wheel: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '18':
+            # Toggle lock_ring
+            current_locked = saved.get('lock_ring', True)
+            self.controller.lock_ring = not current_locked
+            self.controller.save_config()  # Save config after change
+            status = "ON" if self.controller.lock_ring else "OFF"
+            self.show_message(0, 0, f"Lock Ring: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '19':
+            # Toggle disable_power_off
+            current_disabled = saved.get('disable_power_off', True)
+            self.controller.disable_power_off = not current_disabled
+            self.controller.save_config()  # Save config after change
+            status = "ON" if self.controller.disable_power_off else "OFF"
+            self.show_message(0, 0, f"Disable Power-Off: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
+        
+        elif option == '20':
+            # Set brightness (1-5)
+            self.show_message(0, 0, f"Set Brightness (current: {saved.get('brightness', 3)}, range: 1-5):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            value = self.get_input(1, 0, "Brightness (1-5): ", str(saved.get('brightness', 3)))
+            try:
+                brightness = int(value)
+                if brightness < 1 or brightness > 5:
+                    self.show_message(2, 0, "Invalid brightness! Must be 1-5")
+                else:
+                    self.controller.brightness = brightness
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, f"Brightness set to {brightness}")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid brightness value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+        
+        elif option == '21':
+            # Set volume (0-3)
+            self.show_message(0, 0, f"Set Volume (current: {saved.get('volume', 0)}, range: 0-3):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            value = self.get_input(1, 0, "Volume (0-3): ", str(saved.get('volume', 0)))
+            try:
+                volume = int(value)
+                if volume < 0 or volume > 3:
+                    self.show_message(2, 0, "Invalid volume! Must be 0-3")
+                else:
+                    self.controller.volume = volume
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, f"Volume set to {volume}")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid volume value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+        
+        elif option == '22':
+            # Set screen_saver (0-99)
+            self.show_message(0, 0, f"Set Screen Saver (current: {saved.get('screen_saver', 0)}, range: 0-99):")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            value = self.get_input(1, 0, "Screen Saver (0-99): ", str(saved.get('screen_saver', 0)))
+            try:
+                screen_saver = int(value)
+                if screen_saver < 0 or screen_saver > 99:
+                    self.show_message(2, 0, "Invalid screen saver! Must be 0-99")
+                else:
+                    self.controller.screen_saver = screen_saver
+                    self.controller.save_config()  # Save config after change
+                    self.show_message(2, 0, f"Screen Saver set to {screen_saver}")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
+            except:
+                self.show_message(2, 0, "Invalid screen saver value!")
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(1)
     
     def generate_coded_messages(self, language: str):
         """Generate coded messages from english.msg or german.msg"""

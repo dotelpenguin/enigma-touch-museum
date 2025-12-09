@@ -454,6 +454,7 @@ Future enhancements and improvements for the Enigma Museum Controller:
 - [ ] WebHost Display flickers due to refresh
 - [ ] Logic not handling 4 Rotor configs
 - [ ] Logic issues with Lettered Rotors
+- [ ] New Function to Configure Enigma Touch over USB for Museum Mode. Config to set andrestore on exit
 
 
 ## Known Issues
