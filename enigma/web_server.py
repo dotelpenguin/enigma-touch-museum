@@ -458,6 +458,9 @@ class MuseumWebServer:
         .encoded-text {{ font-size: min(2.2vw, 22px); color: #0f0; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; margin-top: min(1vh, 10px); padding-top: min(1vh, 10px); border-top: 1px solid rgba(0, 255, 0, 0.3); flex-shrink: 0; overflow-y: auto; overflow-x: hidden; max-height: 20vh; }}
         .rotor-display {{ display: flex; justify-content: center; gap: min(1vw, 10px); margin: min(1vh, 10px) 0; flex-wrap: wrap; }}
         .rotor-box {{ background: rgba(255, 215, 0, 0.2); border: 2px solid #ffd700; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #ffd700; min-width: 60px; }}
+        .model-box {{ background: rgba(128, 100, 128, 0.3); border: 2px solid #806480; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #c0a0c0; min-width: 60px; }}
+        .ring-settings-box {{ background: rgba(100, 120, 150, 0.3); border: 2px solid #647896; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #90a8c8; min-width: 60px; }}
+        .ring-position-box {{ background: rgba(120, 150, 160, 0.3); border: 2px solid #7896a0; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #a0c0d0; min-width: 60px; }}
         .footer {{ margin-top: min(0.5vh, 5px); color: #888; font-size: min(1.1vw, 11px); flex-shrink: 0; }}
         .disconnected-banner {{ background: rgba(255, 0, 0, 0.8); color: #fff; padding: min(1.5vh, 15px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #f00; border-radius: 10px; margin-bottom: min(1vh, 10px); }}
         .interactive-container {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
@@ -477,29 +480,41 @@ class MuseumWebServer:
         
         <div class="machine-display">
             <div class="config-label" style="margin-bottom: 10px;">Configuration</div>
-            <div class="config-grid">
-                <div class="config-item">
-                    <div class="config-label">Model</div>
-                    <div class="config-value">{mode}</div>
+            <div class="rotor-display">
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="config-label" style="margin-bottom: 0.3vh;">Model</div>
+                    <div class="model-box">{html_module.escape(mode)}</div>
                 </div>
-                <div class="config-item">
-                    <div class="config-label">Ring Settings</div>
-                    <div class="config-value">{ring_settings}</div>
-                </div>
-                <div class="config-item">
-                    <div class="config-label">Ring Position</div>
-                    <div class="config-value">{ring_position}</div>
-                </div>
-            </div>
-            <div style="margin-top: 12px;">
-                <div class="config-label">Rotors</div>
-                <div class="rotor-display">
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="config-label" style="margin-bottom: 0.3vh;">Rotors</div>
+                    <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
 """
                 rotor_parts = rotor_display.split()
                 for rotor in rotor_parts:
-                    html += f'                    <div class="rotor-box">{html_module.escape(rotor)}</div>\n'
+                    html += f'                        <div class="rotor-box">{html_module.escape(rotor)}</div>\n'
                 
-                html += f"""                </div>
+                html += f"""                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="config-label" style="margin-bottom: 0.3vh;">Ring Settings</div>
+                    <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
+"""
+                ring_settings_parts = ring_settings.split()
+                for setting in ring_settings_parts:
+                    html += f'                        <div class="ring-settings-box">{html_module.escape(setting)}</div>\n'
+                
+                html += f"""                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="config-label" style="margin-bottom: 0.3vh;">Ring Position</div>
+                    <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
+"""
+                ring_position_parts = ring_position.split()
+                for position in ring_position_parts:
+                    html += f'                        <div class="ring-position-box">{html_module.escape(position)}</div>\n'
+                
+                html += f"""                    </div>
+                </div>
             </div>
         </div>
 """
