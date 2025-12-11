@@ -140,6 +140,8 @@ class MuseumWebServer:
                 log_messages = data.get('log_messages', [])
                 always_send = data.get('always_send', False)
                 config = data.get('config', {})
+                device_connected = data.get('device_connected', True)
+                device_disconnected_message = data.get('device_disconnected_message', None)
                 
                 mode = config.get('mode', 'N/A')
                 rotors = config.get('rotor_set', 'N/A')
@@ -151,7 +153,7 @@ class MuseumWebServer:
 <html>
 <head>
     <title>Enigma Museum Mode</title>
-    <meta http-equiv="refresh" content="2">
+    <meta http-equiv="refresh" content="{'1' if is_interactive_mode else '2'}">
     <style>
         body {{
             font-family: 'Courier New', monospace;
@@ -249,7 +251,12 @@ class MuseumWebServer:
                     <span class="setting-label">Delay:</span>
                     <span class="setting-value">{delay} seconds</span>
                 </div>
+                <div class="setting-item">
+                    <span class="setting-label">Device Status:</span>
+                    <span class="setting-value" style="color: {'#0f0' if device_connected else '#f00'}">{'Connected' if device_connected else 'Disconnected'}</span>
+                </div>
             </div>
+            {f'<div class="note" style="color: #f00; font-weight: bold;">{html_module.escape(device_disconnected_message)}</div>' if device_disconnected_message else ''}
             {f'<div class="note">Note: Sending saved configuration before each message...</div>' if always_send else ''}
         </div>
         
@@ -313,6 +320,10 @@ class MuseumWebServer:
                 character_delay_ms = data.get('character_delay_ms', 0)
                 current_char_index = data.get('current_char_index', 0)
                 current_encoded_text = data.get('current_encoded_text', '')
+                device_connected = data.get('device_connected', True)
+                device_disconnected_message = data.get('device_disconnected_message', None)
+                last_char_original = data.get('last_char_original', None)
+                last_char_received = data.get('last_char_received', None)
                 
                 current_message = None
                 result_message = None
@@ -410,11 +421,15 @@ class MuseumWebServer:
                         rotor_display = ' '.join(parts[1:])
                 
                 # Generate the HTML (abbreviated for brevity - full HTML is in original)
+                banner_html = ''
+                if device_disconnected_message:
+                    banner_html = f'        <div class="disconnected-banner">{html_module.escape(device_disconnected_message)}</div>\n'
+                
                 html = f"""<!DOCTYPE html>
 <html>
 <head>
     <title>Enigma Museum Kiosk</title>
-    <meta http-equiv="refresh" content="2">
+    <meta http-equiv="refresh" content="{'1' if is_interactive_mode else '2'}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -432,8 +447,8 @@ class MuseumWebServer:
         .config-value {{ font-size: min(2vw, 20px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; }}
         .message-container {{ display: flex; flex-direction: row; gap: min(1vw, 10px); margin: min(1vh, 10px) 0; flex-grow: 1; min-height: 0; max-height: 50vh; }}
         .message-section {{ margin: min(1vh, 10px) 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; max-height: 50vh; }}
-        .message-container .message-section {{ margin: 0; width: 50%; max-height: none; }}
-        .slide-section {{ margin: 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; width: 50%; }}
+        .message-container .message-section {{ margin: 0; width: 75%; max-height: none; }}
+        .slide-section {{ margin: 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; width: 25%; }}
         .slide-placeholder {{ background: rgba(255, 255, 255, 0.05); border: 2px dashed rgba(255, 215, 0, 0.5); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: rgba(255, 215, 0, 0.6); font-size: min(2vw, 20px); font-style: italic; width: 100%; height: 100%; min-height: 200px; }}
         .slide-image {{ width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; display: block; }}
         .slide-section {{ overflow: hidden; }}
@@ -444,11 +459,17 @@ class MuseumWebServer:
         .rotor-display {{ display: flex; justify-content: center; gap: min(1vw, 10px); margin: min(1vh, 10px) 0; flex-wrap: wrap; }}
         .rotor-box {{ background: rgba(255, 215, 0, 0.2); border: 2px solid #ffd700; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #ffd700; min-width: 60px; }}
         .footer {{ margin-top: min(0.5vh, 5px); color: #888; font-size: min(1.1vw, 11px); flex-shrink: 0; }}
+        .disconnected-banner {{ background: rgba(255, 0, 0, 0.8); color: #fff; padding: min(1.5vh, 15px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #f00; border-radius: 10px; margin-bottom: min(1vh, 10px); }}
+        .interactive-container {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
+        .char-box {{ background: rgba(0, 255, 255, 0.2); border: 3px solid #0ff; border-radius: 15px; padding: min(4vh, 40px) min(4vw, 40px); min-width: min(15vw, 150px); min-height: min(15vw, 150px); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0, 255, 255, 0.3); }}
+        .char-box-label {{ font-size: min(1.2vw, 12px); color: #0ff; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
+        .char-box-value {{ font-size: min(10vw, 100px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; line-height: 1; }}
+        .char-arrow {{ font-size: min(6vw, 60px); color: #ffd700; font-weight: bold; }}
     </style>
 </head>
 <body>
     <div class="kiosk-container">
-        <div class="logo-section">
+{banner_html}        <div class="logo-section">
             <img src="/enigma.png" alt="Enigma Machine" class="logo-image" onerror="this.style.display='none'; document.querySelector('.enigma-logo').style.display='block';">
             <div class="enigma-logo" style="display: none;">ENIGMA</div>
             <div class="subtitle">Cipher Machine</div>
@@ -483,48 +504,64 @@ class MuseumWebServer:
         </div>
 """
                 if enable_slides:
-                    html += """        <div class="message-container">
-            <div class="message-section">
-                <div class="message-label">"""
                     if is_interactive_mode:
-                        html += "Input Letter"
+                        # Interactive mode: Show large Received -> Encoded boxes
+                        html += """        <div class="message-container">
+            <div class="message-section" style="display: flex; flex-direction: column; justify-content: center;">
+                <div class="interactive-container">
+                    <div class="char-box">
+                        <div class="char-box-label">Received</div>
+                        <div class="char-box-value">"""
+                        received_char = last_char_original.upper() if last_char_original else '--'
+                        html += html_module.escape(str(received_char))
+                        html += """</div>
+                    </div>
+                    <div class="char-arrow">&rarr;</div>
+                    <div class="char-box">
+                        <div class="char-box-label">Encoded</div>
+                        <div class="char-box-value">"""
+                        encoded_char = last_char_received.upper() if last_char_received else '--'
+                        html += html_module.escape(str(encoded_char))
+                        html += """</div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-section">"""
                     else:
-                        html += "Current Message"
-                    html += """</div>
+                        html += """        <div class="message-container">
+            <div class="message-section">
+                <div class="message-label">Current Message</div>
                 <div class="message-text">"""
-                    
-                    if current_message and character_delay_ms >= 2000 and current_char_index > 0:
-                        message_no_spaces = current_message.replace(' ', '')
-                        if current_char_index <= len(message_no_spaces):
-                            char_count = 0
-                            highlighted_message = ""
-                            for char in current_message:
-                                if char != ' ':
-                                    char_count += 1
-                                    if char_count == current_char_index:
-                                        highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
+                        
+                        if current_message and character_delay_ms >= 2000 and current_char_index > 0:
+                            message_no_spaces = current_message.replace(' ', '')
+                            if current_char_index <= len(message_no_spaces):
+                                char_count = 0
+                                highlighted_message = ""
+                                for char in current_message:
+                                    if char != ' ':
+                                        char_count += 1
+                                        if char_count == current_char_index:
+                                            highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
+                                        else:
+                                            highlighted_message += html_module.escape(char)
                                     else:
                                         highlighted_message += html_module.escape(char)
-                                else:
-                                    highlighted_message += html_module.escape(char)
-                            html += highlighted_message
+                                html += highlighted_message
+                            else:
+                                html += html_module.escape(current_message)
                         else:
-                            html += html_module.escape(current_message)
-                    else:
-                        html += html_module.escape(current_message) if current_message else 'Waiting for message...'
-                    
-                    html += """</div>
+                            html += html_module.escape(current_message) if current_message else 'Waiting for message...'
+                        
+                        html += """</div>
 """
-                    if is_interactive_mode:
-                        result_label = "Encoded Letter"
-                    else:
                         result_label = "Encoded" if is_encode_mode else "Decoded"
                         result_label += " Message"
-                    if result_message:
-                        html += f'                <div class="message-label">{result_label}</div>\n'
-                        html += f'                <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
-                    
-                    html += """            </div>
+                        if result_message:
+                            html += f'                <div class="message-label">{result_label}</div>\n'
+                            html += f'                <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
+                        
+                        html += """            </div>
             <div class="slide-section">"""
                     
                     if slide_path:
@@ -541,47 +578,62 @@ class MuseumWebServer:
         </div>
 """
                 else:
-                    html += """        <div class="message-section">
-            <div class="message-label">"""
                     if is_interactive_mode:
-                        html += "Input Letter"
+                        # Interactive mode: Show large Received -> Encoded boxes
+                        html += """        <div class="message-section" style="display: flex; flex-direction: column; justify-content: center;">
+            <div class="interactive-container">
+                <div class="char-box">
+                    <div class="char-box-label">Received</div>
+                    <div class="char-box-value">"""
+                        received_char = last_char_original if last_char_original else '-'
+                        html += html_module.escape(str(received_char))
+                        html += """</div>
+                </div>
+                <div class="char-arrow">&rarr;</div>
+                <div class="char-box">
+                    <div class="char-box-label">Encoded</div>
+                    <div class="char-box-value">"""
+                        encoded_char = last_char_received if last_char_received else '-'
+                        html += html_module.escape(str(encoded_char))
+                        html += """</div>
+                </div>
+            </div>
+        </div>
+"""
                     else:
-                        html += "Current Message"
-                    html += """</div>
+                        html += """        <div class="message-section">
+            <div class="message-label">Current Message</div>
             <div class="message-text">"""
-                    
-                    if current_message and character_delay_ms >= 2000 and current_char_index > 0:
-                        message_no_spaces = current_message.replace(' ', '')
-                        if current_char_index <= len(message_no_spaces):
-                            char_count = 0
-                            highlighted_message = ""
-                            for char in current_message:
-                                if char != ' ':
-                                    char_count += 1
-                                    if char_count == current_char_index:
-                                        highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
+                        
+                        if current_message and character_delay_ms >= 2000 and current_char_index > 0:
+                            message_no_spaces = current_message.replace(' ', '')
+                            if current_char_index <= len(message_no_spaces):
+                                char_count = 0
+                                highlighted_message = ""
+                                for char in current_message:
+                                    if char != ' ':
+                                        char_count += 1
+                                        if char_count == current_char_index:
+                                            highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
+                                        else:
+                                            highlighted_message += html_module.escape(char)
                                     else:
                                         highlighted_message += html_module.escape(char)
-                                else:
-                                    highlighted_message += html_module.escape(char)
-                            html += highlighted_message
+                                html += highlighted_message
+                            else:
+                                html += html_module.escape(current_message)
                         else:
-                            html += html_module.escape(current_message)
-                    else:
-                        html += html_module.escape(current_message) if current_message else 'Waiting for message...'
-                    
-                    html += """</div>
+                            html += html_module.escape(current_message) if current_message else 'Waiting for message...'
+                        
+                        html += """</div>
 """
-                    if is_interactive_mode:
-                        result_label = "Encoded Letter"
-                    else:
                         result_label = "Encoded" if is_encode_mode else "Decoded"
                         result_label += " Message"
-                    if result_message:
-                        html += f'            <div class="message-label">{result_label}</div>\n'
-                        html += f'            <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
-                    
-                    html += """        </div>
+                        if result_message:
+                            html += f'            <div class="message-label">{result_label}</div>\n'
+                            html += f'            <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
+                        
+                        html += """        </div>
 """
                 
                 html += f"""        

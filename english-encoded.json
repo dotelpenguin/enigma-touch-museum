@@ -1,0 +1,22 @@
+[
+  {
+    "MSG": "HOWDY",
+    "MODEL": "M3",
+    "ROTOR": "B I V II",
+    "RINGSET": "D G F",
+    "RINGPOS": "V G H",
+    "PLUG": "FV PQ",
+    "GROUP": 5,
+    "CODED": "PTICK"
+  },
+  {
+    "MSG": "SEND HELP REGIMENT EATEN BY GRUE",
+    "MODEL": "I",
+    "ROTOR": "B III IV I",
+    "RINGSET": "01 01 01",
+    "RINGPOS": "20 06 10",
+    "PLUG": "FV PQ",
+    "GROUP": 5,
+    "CODED": "NJSHJZFYAUVGGAZSNJZNCPLPTIJ"
+  }
+]

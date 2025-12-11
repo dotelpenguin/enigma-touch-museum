@@ -11,6 +11,72 @@ from typing import Optional, Tuple, Callable
 from .constants import BAUD_RATE, CMD_TIMEOUT
 
 
+def _parse_position_value(value: str) -> int:
+    """Parse a position value (letter A-Z or number 01-26) to integer 1-26
+    
+    Args:
+        value: Single letter (A-Z) or two-digit number (01-26) as string
+        
+    Returns:
+        Integer value 1-26
+        
+    Raises:
+        ValueError: If value cannot be parsed or is out of range
+    """
+    value = value.strip().upper()
+    
+    # Check if it's a letter (A-Z)
+    if len(value) == 1 and value.isalpha():
+        return ord(value) - ord('A') + 1
+    
+    # Check if it's a number (01-26)
+    try:
+        num = int(value)
+        if 1 <= num <= 26:
+            return num
+        raise ValueError(f"Position value {value} out of range (must be 1-26)")
+    except ValueError:
+        raise ValueError(f"Invalid position value: {value} (must be A-Z or 01-26)")
+
+
+def _get_rotor_count(model: str) -> int:
+    """Get the number of rotors for a given model
+    
+    Args:
+        model: Model name (e.g., 'M4', 'M3', 'I')
+        
+    Returns:
+        Number of rotors: 4 for M4, 3 for all other models
+    """
+    if model.upper() == 'M4':
+        return 4
+    return 3
+
+
+def _parse_positions(parts: list, start_idx: int, rotor_count: int) -> Optional[Tuple[int, ...]]:
+    """Parse position values from a parts list
+    
+    Args:
+        parts: List of strings from split response
+        start_idx: Starting index in parts where positions begin
+        rotor_count: Number of rotors (3 or 4)
+        
+    Returns:
+        Tuple of integers representing positions, or None on error
+    """
+    if start_idx + rotor_count > len(parts):
+        return None
+    
+    try:
+        positions = []
+        for i in range(rotor_count):
+            pos_value = _parse_position_value(parts[start_idx + i])
+            positions.append(pos_value)
+        return tuple(positions)
+    except (ValueError, IndexError):
+        return None
+
+
 class SerialConnection:
     """Handles low-level serial communication with Enigma device"""
     
@@ -26,6 +92,15 @@ class SerialConnection:
     
     def connect(self) -> bool:
         """Connect to serial device"""
+        # Ensure any existing connection is properly closed first
+        if self.ser:
+            try:
+                if self.ser.is_open:
+                    self.ser.close()
+            except Exception:
+                pass
+            self.ser = None
+        
         try:
             self.ser = serial.Serial(
                 port=self.device,
@@ -40,13 +115,37 @@ class SerialConnection:
             self.ser.reset_output_buffer()
             return True
         except serial.SerialException:
+            # Ensure ser is None on failure
+            self.ser = None
             return False
     
     def disconnect(self):
-        """Close serial connection"""
+        """Close serial connection and release port"""
         self.stop_monitoring()
-        if self.ser and self.ser.is_open:
-            self.ser.close()
+        if self.ser:
+            try:
+                if self.ser.is_open:
+                    self.ser.close()
+            except Exception:
+                pass  # Ignore errors during disconnect
+            finally:
+                # Release reference to allow port to be reused
+                self.ser = None
+    
+    def is_connected(self) -> bool:
+        """Check if serial connection is open and accessible"""
+        if not self.ser:
+            return False
+        if not self.ser.is_open:
+            return False
+        # Try to check if port is still accessible by checking port status
+        try:
+            # Attempt a simple operation to verify connection
+            # Reading port status doesn't send data but checks if port is accessible
+            _ = self.ser.in_waiting
+            return True
+        except (serial.SerialException, OSError, AttributeError):
+            return False
     
     def start_monitoring(self):
         """Start background thread to monitor Enigma input (no-op, monitoring was removed)"""
@@ -112,17 +211,18 @@ class SerialConnection:
                                     encoded_char = parts[j+1]
                                     found_keypress = True
                                     
+                                    # Get rotor count from config
+                                    model = config.get('mode', 'I')
+                                    rotor_count = _get_rotor_count(model)
+                                    
                                     # Log keypress to debug output
                                     if self.monitoring_debug_callback:
                                         pos_info = ""
-                                        if j + 5 < len(parts):
-                                            try:
-                                                pos1 = int(parts[j+3])
-                                                pos2 = int(parts[j+4])
-                                                pos3 = int(parts[j+5])
-                                                pos_info = f" Positions {pos1:02d} {pos2:02d} {pos3:02d}"
-                                            except (ValueError, IndexError):
-                                                pass
+                                        # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
+                                        positions = _parse_positions(parts, j + 3, rotor_count)
+                                        if positions:
+                                            pos_str = ' '.join(f"{p:02d}" for p in positions)
+                                            pos_info = f" Positions {pos_str}"
                                         self.monitoring_debug_callback(f">>> '{original_char}'")
                                         self.monitoring_debug_callback(f"<<< {original_char} {encoded_char}{pos_info}")
                                     
@@ -147,12 +247,36 @@ class SerialConnection:
                                             pass  # Ignore errors in callback
                                     
                                     # Extract positions if available
-                                    if j + 5 < len(parts):
-                                        try:
-                                            pos1 = int(parts[j+3])
-                                            pos2 = int(parts[j+4])
-                                            pos3 = int(parts[j+5])
-                                            pos_str = f"{pos1:02d} {pos2:02d} {pos3:02d}"
+                                    # Check if we have enough parts for positions (2 + rotor_count)
+                                    if j + 2 + rotor_count <= len(parts):
+                                        # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
+                                        positions = _parse_positions(parts, j + 3, rotor_count)
+                                        if positions:
+                                            # Format preserving original format (letters or numbers)
+                                            # Check if original parts were letters or numbers
+                                            pos_str_parts = []
+                                            for i in range(rotor_count):
+                                                original_value = parts[j + 3 + i].strip().upper()
+                                                # Check if original was a letter (A-Z)
+                                                if len(original_value) == 1 and original_value.isalpha():
+                                                    # Format as letter
+                                                    pos_str_parts.append(chr(ord('A') + positions[i] - 1))
+                                                else:
+                                                    # Format as number - preserve original format exactly
+                                                    try:
+                                                        # Try to parse as int to verify it's a valid number
+                                                        original_num = int(original_value)
+                                                        # Verify the parsed value matches what we have
+                                                        if original_num == positions[i]:
+                                                            # Preserve the exact original format
+                                                            pos_str_parts.append(original_value)
+                                                        else:
+                                                            # Mismatch - fallback to two-digit format
+                                                            pos_str_parts.append(f"{positions[i]:02d}")
+                                                    except ValueError:
+                                                        # Not a number, fallback to two-digit format
+                                                        pos_str_parts.append(f"{positions[i]:02d}")
+                                            pos_str = ' '.join(pos_str_parts)
                                             # Update ring position if different
                                             if config.get('ring_position') != pos_str:
                                                 config['ring_position'] = pos_str
@@ -161,8 +285,6 @@ class SerialConnection:
                                                         self.monitoring_config_update_callback()
                                                     except Exception:
                                                         pass
-                                        except (ValueError, IndexError):
-                                            pass
                                     
                                     break
                             

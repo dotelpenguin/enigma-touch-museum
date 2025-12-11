@@ -204,6 +204,10 @@ class EnigmaController:
         """Close serial connection"""
         self.serial_conn.disconnect()
     
+    def is_connected(self) -> bool:
+        """Check if serial connection is open and accessible"""
+        return self.serial_conn.is_connected()
+    
     def start_monitoring(self):
         """Start background thread to monitor Enigma input (no-op, monitoring was removed)"""
         pass
@@ -273,6 +277,113 @@ class EnigmaController:
                     pos = line.replace('Positions', '').strip()
                     return pos
         return None
+    
+    def _parse_position_value(self, value: str) -> int:
+        """Parse a position value (letter A-Z or number 01-26) to integer 1-26
+        
+        Args:
+            value: Single letter (A-Z) or two-digit number (01-26) as string
+            
+        Returns:
+            Integer value 1-26
+            
+        Raises:
+            ValueError: If value cannot be parsed or is out of range
+        """
+        value = value.strip().upper()
+        
+        # Check if it's a letter (A-Z)
+        if len(value) == 1 and value.isalpha():
+            return ord(value) - ord('A') + 1
+        
+        # Check if it's a number (01-26)
+        try:
+            num = int(value)
+            if 1 <= num <= 26:
+                return num
+            raise ValueError(f"Position value {value} out of range (must be 1-26)")
+        except ValueError:
+            raise ValueError(f"Invalid position value: {value} (must be A-Z or 01-26)")
+    
+    def _get_rotor_count(self, model: Optional[str] = None) -> int:
+        """Get the number of rotors for a given model
+        
+        Args:
+            model: Model name (e.g., 'M4', 'M3', 'I'). If None, uses self.config['mode']
+            
+        Returns:
+            Number of rotors: 4 for M4, 3 for all other models
+        """
+        if model is None:
+            model = self.config.get('mode', 'I')
+        
+        if model.upper() == 'M4':
+            return 4
+        return 3
+    
+    def _parse_positions(self, parts: list, start_idx: int, rotor_count: int) -> Optional[Tuple[int, ...]]:
+        """Parse position values from a parts list
+        
+        Args:
+            parts: List of strings from split response
+            start_idx: Starting index in parts where positions begin
+            rotor_count: Number of rotors (3 or 4)
+            
+        Returns:
+            Tuple of integers representing positions, or None on error
+        """
+        if start_idx + rotor_count > len(parts):
+            return None
+        
+        try:
+            positions = []
+            for i in range(rotor_count):
+                pos_value = self._parse_position_value(parts[start_idx + i])
+                positions.append(pos_value)
+            return tuple(positions)
+        except (ValueError, IndexError):
+            return None
+    
+    def _format_positions(self, parts: list, start_idx: int, rotor_count: int, positions: Tuple[int, ...]) -> str:
+        """Format position values preserving original format (letters or numbers)
+        
+        Args:
+            parts: List of strings from split response (to check original format)
+            start_idx: Starting index in parts where positions begin
+            rotor_count: Number of rotors (3 or 4)
+            positions: Tuple of integer positions (1-26)
+            
+        Returns:
+            Formatted position string preserving original format
+        """
+        if start_idx + rotor_count > len(parts):
+            # Fallback to numbers if we can't check original format
+            return ' '.join(f"{p:02d}" for p in positions)
+        
+        formatted = []
+        for i in range(rotor_count):
+            original_value = parts[start_idx + i].strip().upper()
+            # Check if original was a letter (A-Z)
+            if len(original_value) == 1 and original_value.isalpha():
+                # Format as letter
+                formatted.append(chr(ord('A') + positions[i] - 1))
+            else:
+                # Format as number - preserve original format exactly
+                try:
+                    # Try to parse as int to verify it's a valid number
+                    original_num = int(original_value)
+                    # Verify the parsed value matches what we have
+                    if original_num == positions[i]:
+                        # Preserve the exact original format
+                        formatted.append(original_value)
+                    else:
+                        # Mismatch - fallback to two-digit format
+                        formatted.append(f"{positions[i]:02d}")
+                except ValueError:
+                    # Not a number, fallback to two-digit format
+                    formatted.append(f"{positions[i]:02d}")
+        
+        return ' '.join(formatted)
     
     def query_pegboard(self, debug_callback=None) -> Optional[str]:
         """Query pegboard settings"""
@@ -505,10 +616,22 @@ class EnigmaController:
         char_count = 0
         previous_positions = None
         
-        def update_ring_position(new_positions):
-            """Helper to update ring position in config and notify UI"""
+        def update_ring_position(new_positions, parts=None, start_idx=None):
+            """Helper to update ring position in config and notify UI
+            
+            Args:
+                new_positions: Tuple of integer positions
+                parts: Optional list of strings from response (to preserve format)
+                start_idx: Optional starting index in parts where positions begin
+            """
             if new_positions:
-                pos_str = f"{new_positions[0]:02d} {new_positions[1]:02d} {new_positions[2]:02d}"
+                # Format positions preserving original format if parts provided
+                if parts is not None and start_idx is not None:
+                    rotor_count = len(new_positions)
+                    pos_str = self._format_positions(parts, start_idx, rotor_count, new_positions)
+                else:
+                    # Fallback to numbers if original format not available
+                    pos_str = ' '.join(f"{p:02d}" for p in new_positions)
                 self.config['ring_position'] = pos_str
                 if position_update_callback:
                     position_update_callback()
@@ -584,6 +707,9 @@ class EnigmaController:
                         current_positions = None
                         encoded_char_original = None
                         
+                        # Get rotor count based on current model
+                        rotor_count = self._get_rotor_count()
+                        
                         try:
                             resp_text = response.decode('ascii', errors='replace')
                             resp_text = resp_text.replace('\r', ' ').replace('\n', ' ')
@@ -594,7 +720,10 @@ class EnigmaController:
                             
                             parts = resp_text.split()
                             
-                            for j in range(len(parts) - 2):
+                            # Look for pattern: "INPUT ENCODED Positions XX XX XX" (or XX XX XX XX for M4)
+                            # Need at least 2 + rotor_count parts after "positions"
+                            min_parts_needed = 2 + rotor_count
+                            for j in range(len(parts) - min_parts_needed):
                                 part1 = parts[j]
                                 part2 = parts[j+1]
                                 part3 = parts[j+2]
@@ -609,8 +738,13 @@ class EnigmaController:
                                             encoded_char = encoded_char_original.upper()
                                         elif part1.isupper() or part2.isupper():
                                             # Uppercase detected - switch to Interactive mode (uppercase)
-                                            encoded_char_original = part2
-                                            encoded_char = encoded_char_original.upper()
+                                            # When switching to Interactive mode, initialize display values to None
+                                            # so they show as "-" until we receive actual Interactive mode input
+                                            encoded_char_original = part2  # Use exact value from Enigma
+                                            encoded_char = encoded_char_original.upper()  # Ensure uppercase for processing
+                                            # Initialize to None so web display shows "-" until we receive Interactive mode input
+                                            self.last_char_original = None  # Will be set when Interactive mode input is received
+                                            self.last_char_received = None  # Will be set when Interactive mode input is received
                                             self.function_mode = 'Interactive'
                                             self.save_config(preserve_always_send_config=True)
                                             if mode_update_callback:
@@ -622,28 +756,44 @@ class EnigmaController:
                                         if part1.isupper() and part2.isupper():
                                             encoded_char_original = part2
                                             encoded_char = encoded_char_original.upper()
+                                            # Ensure uppercase when storing in Interactive mode
+                                            self.last_char_original = part1.upper() if part1 else None
+                                            self.last_char_received = part2.upper() if part2 else None
                                         else:
                                             continue
                                     
-                                    if j + 5 < len(parts):
-                                        try:
-                                            pos1 = int(parts[j+3])
-                                            pos2 = int(parts[j+4])
-                                            pos3 = int(parts[j+5])
-                                            current_positions = (pos1, pos2, pos3)
-                                        except (ValueError, IndexError):
-                                            if debug_callback:
-                                                debug_callback(f"Warning: Could not parse positions from response")
+                                    # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
+                                    current_positions = self._parse_positions(parts, j + 3, rotor_count)
+                                    if current_positions is None:
+                                        if debug_callback:
+                                            debug_callback(f"Warning: Could not parse positions from response")
                                     
                                     if debug_callback:
                                         debug_callback(f"Found: {part1} -> {encoded_char} (original case: {encoded_char_original})")
                                         if current_positions:
-                                            debug_callback(f"Positions: {current_positions[0]} {current_positions[1]} {current_positions[2]}")
+                                            # Format preserving original format (letters or numbers)
+                                            pos_str = self._format_positions(parts, j + 3, rotor_count, current_positions)
+                                            debug_callback(f"Positions: {pos_str}")
                                     break
                             
                             if encoded_char:
-                                self.last_char_original = char
-                                self.last_char_received = encoded_char_original if encoded_char_original else encoded_char
+                                # Only update last_char if not already set by Interactive mode switch
+                                # (Interactive mode switch sets these to uppercase values from LOCAL INPUT above)
+                                # LOCAL INPUT FROM ENIGMA TAKES PRIORITY - don't overwrite with message character (char)
+                                if self.function_mode != 'Interactive':
+                                    # Not in Interactive mode - update normally with message character
+                                    self.last_char_original = char
+                                    self.last_char_received = encoded_char_original if encoded_char_original else encoded_char
+                                elif not (self.last_char_original and self.last_char_original.isupper()):
+                                    # In Interactive mode but values not set yet (shouldn't happen, but safety check)
+                                    # This should not occur if Interactive mode switch worked correctly
+                                    # If it does, preserve any existing uppercase values rather than overwriting with char
+                                    if not self.last_char_original or not self.last_char_original.isupper():
+                                        # Only set if truly missing - prefer preserving local input
+                                        encoded_val = encoded_char_original if encoded_char_original else encoded_char
+                                        self.last_char_received = encoded_val.upper() if encoded_val else None
+                                    # Note: We don't set last_char_original here because it should have been set
+                                    # by the Interactive mode switch above with the LOCAL INPUT (part1)
                                 
                                 if previous_positions is not None and current_positions is not None:
                                     if current_positions == previous_positions:
@@ -664,9 +814,10 @@ class EnigmaController:
                                                     part_k2 = parts[k+1]
                                                     part_k3 = parts[k+2]
                                                     
+                                                    # Check if we have enough parts for positions (2 + rotor_count)
                                                     if (len(part_k1) == 1 and part_k1.isalpha() and
                                                         len(part_k2) == 1 and part_k2.isalpha() and
-                                                        part_k3.lower() == 'positions' and k + 5 < len(parts)):
+                                                        part_k3.lower() == 'positions' and k + 2 + rotor_count <= len(parts)):
                                                         pattern_matches = False
                                                         if expect_lowercase:
                                                             # Museum mode or Message Interactive mode: expect lowercase
@@ -674,6 +825,9 @@ class EnigmaController:
                                                                 pattern_matches = True
                                                             elif part_k1.isupper() or part_k2.isupper():
                                                                 # Uppercase detected - switch to Interactive mode (uppercase)
+                                                                # Initialize display values to None so they show as "-" until Interactive mode input is received
+                                                                self.last_char_original = None
+                                                                self.last_char_received = None
                                                                 self.function_mode = 'Interactive'
                                                                 self.save_config(preserve_always_send_config=True)
                                                                 if mode_update_callback:
@@ -687,20 +841,18 @@ class EnigmaController:
                                                                 pattern_matches = True
                                                         
                                                         if pattern_matches:
-                                                            try:
-                                                                new_pos1 = int(parts[k+3])
-                                                                new_pos2 = int(parts[k+4])
-                                                                new_pos3 = int(parts[k+5])
-                                                                new_positions = (new_pos1, new_pos2, new_pos3)
-                                                                if new_positions != previous_positions:
-                                                                    current_positions = new_positions
-                                                                    encoded_char_original = part_k2
-                                                                    encoded_char = encoded_char_original.upper()
-                                                                    if debug_callback:
-                                                                        debug_callback(f"Found updated positions: {previous_positions} -> {current_positions}")
-                                                                    break
-                                                            except (ValueError, IndexError):
-                                                                pass
+                                                            # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
+                                                            new_positions = self._parse_positions(parts, k + 3, rotor_count)
+                                                            if new_positions is not None and new_positions != previous_positions:
+                                                                current_positions = new_positions
+                                                                encoded_char_original = part_k2
+                                                                encoded_char = encoded_char_original.upper()
+                                                                if debug_callback:
+                                                                    # Format preserving original format (letters or numbers)
+                                                                    pos_str_prev = self._format_positions(parts, k + 3, rotor_count, previous_positions) if previous_positions else "None"
+                                                                    pos_str_new = self._format_positions(parts, k + 3, rotor_count, new_positions)
+                                                                    debug_callback(f"Found updated positions: {pos_str_prev} -> {pos_str_new}")
+                                                                break
                                                 if current_positions != previous_positions:
                                                     break
                                             time.sleep(0.05)
@@ -708,7 +860,8 @@ class EnigmaController:
                                         if current_positions != previous_positions:
                                             encoded_chars.append(encoded_char)
                                             previous_positions = current_positions
-                                            update_ring_position(current_positions)
+                                            # Preserve original format (letters or numbers) when updating
+                                            update_ring_position(current_positions, parts, j + 3)
                                             success = True
                                             if callback:
                                                 if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
@@ -724,7 +877,8 @@ class EnigmaController:
                                             debug_callback(f"Positions updated: {previous_positions} -> {current_positions}")
                                         encoded_chars.append(encoded_char)
                                         previous_positions = current_positions
-                                        update_ring_position(current_positions)
+                                        # Preserve original format (letters or numbers) when updating
+                                        update_ring_position(current_positions, parts, j + 3)
                                         success = True
                                         if callback:
                                             if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
@@ -734,7 +888,8 @@ class EnigmaController:
                                 elif current_positions is not None:
                                     encoded_chars.append(encoded_char)
                                     previous_positions = current_positions
-                                    update_ring_position(current_positions)
+                                    # Preserve original format (letters or numbers) when updating
+                                    update_ring_position(current_positions, parts, j + 3)
                                     success = True
                                     if callback:
                                         if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
