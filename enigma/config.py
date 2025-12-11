@@ -92,7 +92,10 @@ class ConfigManager:
                 'use_models_json': normalize_boolean(config_data.get('use_models_json', False)),
                 'brightness': config_data['brightness'],
                 'volume': config_data['volume'],
-                'screen_saver': config_data['screen_saver'],
+                'screen_saver': config_data.get('screen_saver', config_data.get('timeout_screen_saver', 0)),
+                'timeout_battery': config_data.get('timeout_battery', 15),
+                'timeout_plugged': config_data.get('timeout_plugged', 0),
+                'timeout_setup_modes': config_data.get('timeout_setup_modes', 0),
                 'device': config_data['device']
             }
             with open(self.config_file, 'w') as f:
@@ -151,6 +154,12 @@ class ConfigManager:
                         result['volume'] = config_data['volume']
                     if 'screen_saver' in config_data:
                         result['screen_saver'] = config_data['screen_saver']
+                    if 'timeout_battery' in config_data:
+                        result['timeout_battery'] = config_data['timeout_battery']
+                    if 'timeout_plugged' in config_data:
+                        result['timeout_plugged'] = config_data['timeout_plugged']
+                    if 'timeout_setup_modes' in config_data:
+                        result['timeout_setup_modes'] = config_data['timeout_setup_modes']
                     if 'device' in config_data and not preserve_device:
                         result['device'] = config_data['device']
         except Exception:
@@ -191,7 +200,10 @@ class ConfigManager:
                     saved_config['use_models_json'] = normalize_boolean(config_data.get('use_models_json', current_config.get('use_models_json', False)))
                     saved_config['brightness'] = config_data.get('brightness', current_config['brightness'])
                     saved_config['volume'] = config_data.get('volume', current_config['volume'])
-                    saved_config['screen_saver'] = config_data.get('screen_saver', current_config['screen_saver'])
+                    saved_config['screen_saver'] = config_data.get('screen_saver', current_config.get('screen_saver', 0))
+                    saved_config['timeout_battery'] = config_data.get('timeout_battery', current_config.get('timeout_battery', 15))
+                    saved_config['timeout_plugged'] = config_data.get('timeout_plugged', current_config.get('timeout_plugged', 0))
+                    saved_config['timeout_setup_modes'] = config_data.get('timeout_setup_modes', current_config.get('timeout_setup_modes', 0))
                     saved_config['device'] = config_data.get('device', current_config['device'])
                     return saved_config
         except Exception:
@@ -205,9 +217,12 @@ class ConfigManager:
             'lock_ring': current_config['lock_ring'],
             'disable_power_off': current_config['disable_power_off'],
             'use_models_json': current_config.get('use_models_json', False),
-            'brightness': current_config['brightness'],
-            'volume': current_config['volume'],
-            'screen_saver': current_config['screen_saver'],
+            'brightness': current_config.get('brightness', 3),
+            'volume': current_config.get('volume', 0),
+            'screen_saver': current_config.get('screen_saver', 0),
+            'timeout_battery': current_config.get('timeout_battery', 15),
+            'timeout_plugged': current_config.get('timeout_plugged', 0),
+            'timeout_setup_modes': current_config.get('timeout_setup_modes', 0),
             'museum_delay': current_config['museum_delay'],
             'always_send_config': current_config['always_send_config'],
             'word_group_size': current_config['word_group_size'],

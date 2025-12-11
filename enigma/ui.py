@@ -358,7 +358,7 @@ class EnigmaMuseumUI(UIBase):
                 ("3", f"Set Rotor Set (current: {saved['config']['rotor_set']})"),
                 ("4", f"Set Rings (current: {saved['config']['ring_settings']})"),
                 ("5", f"Set Ring Position (current: {saved['config']['ring_position']})"),
-                ("6", f"Set Pegboard (current: {saved['config']['pegboard']})"),
+                ("6", f"Set Plugboard (current: {saved['config']['pegboard']})"),
                 ("7", f"Always Send Config Before Message: {str(saved['always_send_config']).lower()}"),
                 ("B", "Back")
             ]
@@ -1006,7 +1006,7 @@ class EnigmaMuseumUI(UIBase):
                     break  # Success, exit loop
                 else:
                     # Error occurred - show message and loop back for retry
-                    self.show_message(2, 0, "Error! Please re-enter pegboard.")
+                    self.show_message(2, 0, "Error! Please re-enter plugboard.")
                     self.draw_debug_panel()
                     self.refresh_all_panels()
                     time.sleep(2)  # Show error message longer
@@ -1907,15 +1907,95 @@ class EnigmaMuseumUI(UIBase):
         self.show_message(0, 0, "Current Settings:", curses.A_BOLD | curses.A_UNDERLINE)
         
         y = 1
-        self.show_message(y, 0, f"Mode: {settings.get('mode', 'N/A')}")
+        # Enigma Configuration
+        self.show_message(y, 0, "Enigma Configuration:", curses.A_BOLD)
         y += 1
-        self.show_message(y, 0, f"Rotor Set: {settings.get('rotor_set', 'N/A')}")
+        self.show_message(y, 0, f"  Mode: {settings.get('mode', 'N/A')}")
         y += 1
-        self.show_message(y, 0, f"Ring Settings: {settings.get('ring_settings', 'N/A')}")
+        self.show_message(y, 0, f"  Rotor Set: {settings.get('rotor_set', 'N/A')}")
         y += 1
-        self.show_message(y, 0, f"Ring Position: {settings.get('ring_position', 'N/A')}")
+        self.show_message(y, 0, f"  Ring Settings: {settings.get('ring_settings', 'N/A')}")
         y += 1
-        self.show_message(y, 0, f"Pegboard: {settings.get('pegboard', 'N/A') or 'clear'}")
+        self.show_message(y, 0, f"  Ring Position: {settings.get('ring_position', 'N/A')}")
+        y += 1
+        self.show_message(y, 0, f"  Plugboard: {settings.get('pegboard', 'N/A') or 'clear'}")
+        y += 1
+        
+        # Lock Settings
+        self.show_message(y, 0, "Lock Settings:", curses.A_BOLD)
+        y += 1
+        lock_model = settings.get('lock_model', 'N/A')
+        lock_model_str = 'locked' if lock_model is True else ('unlocked' if lock_model is False else 'N/A')
+        self.show_message(y, 0, f"  Model: {lock_model_str}")
+        y += 1
+        lock_rotor = settings.get('lock_rotor', 'N/A')
+        lock_rotor_str = 'locked' if lock_rotor is True else ('unlocked' if lock_rotor is False else 'N/A')
+        self.show_message(y, 0, f"  Rotor/Wheel: {lock_rotor_str}")
+        y += 1
+        lock_ring = settings.get('lock_ring', 'N/A')
+        lock_ring_str = 'locked' if lock_ring is True else ('unlocked' if lock_ring is False else 'N/A')
+        self.show_message(y, 0, f"  Ring: {lock_ring_str}")
+        y += 1
+        lock_power = settings.get('disable_power_off', 'N/A')
+        lock_power_str = 'disabled' if lock_power is True else ('enabled' if lock_power is False else 'N/A')
+        self.show_message(y, 0, f"  Power-Off Button: {lock_power_str}")
+        y += 1
+        
+        # UI Settings
+        self.show_message(y, 0, "UI Settings:", curses.A_BOLD)
+        y += 1
+        brightness = settings.get('brightness', 'N/A')
+        self.show_message(y, 0, f"  Brightness: {brightness if brightness != 'N/A' else 'N/A'} (1-5)")
+        y += 1
+        volume = settings.get('volume', 'N/A')
+        self.show_message(y, 0, f"  Volume: {volume if volume != 'N/A' else 'N/A'} (0-3)")
+        y += 1
+        logging_format = settings.get('logging_format')
+        if logging_format is not None:
+            format_desc = {1: 'short/5', 2: 'short/4', 3: 'extended/5', 4: 'extended/4'}.get(logging_format, f'{logging_format}')
+            self.show_message(y, 0, f"  Logging Format: {format_desc}")
+        else:
+            self.show_message(y, 0, "  Logging Format: N/A")
+        y += 1
+        
+        # Timeout Settings
+        self.show_message(y, 0, "Timeout Settings:", curses.A_BOLD)
+        y += 1
+        timeout_battery = settings.get('timeout_battery', 'N/A')
+        if timeout_battery == 0:
+            timeout_battery_str = 'disabled'
+        elif timeout_battery != 'N/A':
+            timeout_battery_str = f'{timeout_battery} minutes'
+        else:
+            timeout_battery_str = 'N/A'
+        self.show_message(y, 0, f"  Battery Power-Off: {timeout_battery_str}")
+        y += 1
+        timeout_plugged = settings.get('timeout_plugged', 'N/A')
+        if timeout_plugged == 0:
+            timeout_plugged_str = 'disabled'
+        elif timeout_plugged != 'N/A':
+            timeout_plugged_str = f'{timeout_plugged} minutes'
+        else:
+            timeout_plugged_str = 'N/A'
+        self.show_message(y, 0, f"  Plugged-In Power-Off: {timeout_plugged_str}")
+        y += 1
+        timeout_screen_saver = settings.get('screen_saver', 'N/A')
+        if timeout_screen_saver == 0:
+            timeout_screen_saver_str = 'disabled'
+        elif timeout_screen_saver != 'N/A':
+            timeout_screen_saver_str = f'{timeout_screen_saver} minutes'
+        else:
+            timeout_screen_saver_str = 'N/A'
+        self.show_message(y, 0, f"  Screen Saver: {timeout_screen_saver_str}")
+        y += 1
+        timeout_setup_modes = settings.get('timeout_setup_modes', 'N/A')
+        if timeout_setup_modes == 0:
+            timeout_setup_modes_str = 'disabled'
+        elif timeout_setup_modes != 'N/A':
+            timeout_setup_modes_str = f'{timeout_setup_modes} seconds'
+        else:
+            timeout_setup_modes_str = 'N/A'
+        self.show_message(y, 0, f"  Setup Mode Inactivity: {timeout_setup_modes_str}")
         
         self.draw_debug_panel()
         
@@ -1965,6 +2045,11 @@ class EnigmaMuseumUI(UIBase):
             config_errors.append("pegboard")
         time.sleep(0.2)
         self.controller.return_to_encode_mode(debug_callback=debug_callback)
+        
+        # Apply kiosk/demo settings (locks, UI, timeouts)
+        time.sleep(0.2)
+        if not self.controller.apply_kiosk_settings(debug_callback=debug_callback):
+            config_errors.append("kiosk_settings")
         
         self.setup_screen()
         self.draw_settings_panel()  # Update settings display
@@ -2149,6 +2234,17 @@ class EnigmaMuseumUI(UIBase):
             self.setup_screen()
             self.draw_settings_panel()  # This will display the current function mode
             
+            # Get fresh window dimensions after setup_screen() may have recreated windows
+            current_win = self.get_active_window()
+            if not current_win:
+                # Window not ready yet, skip drawing
+                return
+            try:
+                current_max_y, current_max_x = current_win.getmaxyx()
+            except Exception:
+                # Window might not be fully initialized, skip drawing
+                return
+            
             # Generate header lines dynamically based on current function mode
             current_header_lines = [
                 f"Museum Mode: {self.controller.function_mode}",
@@ -2156,20 +2252,24 @@ class EnigmaMuseumUI(UIBase):
                 "Press Q to stop"
             ]
             
+            # Recalculate log_start_y based on current header height
+            current_header_height = len(current_header_lines)
+            current_log_start_y = current_header_height
+            
             # Draw header lines
             for i, line in enumerate(current_header_lines):
-                if i < max_y:
+                if i < current_max_y:
                     attr = curses.A_BOLD if i == 0 else curses.A_NORMAL
-                    self.show_message(i, 0, line[:max_x], attr)
+                    self.show_message(i, 0, line[:current_max_x], attr)
             
             # Draw log messages (scrollable)
             # Show most recent messages that fit
-            available_lines = max_y - log_start_y
+            available_lines = current_max_y - current_log_start_y
             messages_to_show = log_messages[-available_lines:] if len(log_messages) > available_lines else log_messages
             
             for i, log_msg in enumerate(messages_to_show):
-                y = log_start_y + i
-                if y < max_y:
+                y = current_log_start_y + i
+                if y < current_max_y:
                     # Display full message (show_message will handle truncation for display)
                     # Full message is stored in log_messages for web interface
                     self.show_message(y, 0, log_msg)
@@ -2177,13 +2277,44 @@ class EnigmaMuseumUI(UIBase):
             self.draw_debug_panel()
             self.refresh_all_panels()
         
-        def add_log_message(msg: str):
-            """Add a message to the log and redraw"""
+        # Track if screen is ready for drawing
+        screen_ready = [False]
+        
+        def add_log_message(msg: str, redraw: bool = True):
+            """Add a message to the log and optionally redraw"""
             log_messages.append(msg)
             # Keep only last max_log_lines messages
-            if len(log_messages) > max_log_lines:
-                log_messages.pop(0)
-            draw_screen()
+            try:
+                if len(log_messages) > max_log_lines:
+                    log_messages.pop(0)
+            except (NameError, UnboundLocalError):
+                # max_log_lines might not be defined yet, just keep all messages for now
+                pass
+            # Only redraw if screen is ready and redraw is requested
+            if redraw and screen_ready[0]:
+                try:
+                    draw_screen()
+                except Exception:
+                    # If draw_screen fails, just skip drawing
+                    # The message is still added to log_messages
+                    pass
+        
+        # Apply kiosk and lock settings when entering museum mode (only once at start)
+        def debug_callback_init(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        if self.controller.is_connected():
+            # Add log messages without redrawing (screen not ready yet)
+            add_log_message("Applying kiosk and lock settings...", redraw=False)
+            if not self.controller.apply_kiosk_settings(debug_callback=debug_callback_init):
+                add_log_message("Warning: Some kiosk settings failed to apply", redraw=False)
+            else:
+                add_log_message("Kiosk settings applied successfully", redraw=False)
+            self.draw_settings_panel()  # Refresh settings panel
+            self.draw_debug_panel()
+            self.refresh_all_panels()
         
         # Get saved config for reference
         saved = self.controller.get_saved_config()
@@ -2278,6 +2409,8 @@ class EnigmaMuseumUI(UIBase):
         else:
             self.controller.web_server_ip = None  # Clear IP when disabled
         
+        # Mark screen as ready and draw initial screen (will display all log messages)
+        screen_ready[0] = True
         draw_screen()
         
         def debug_callback(msg, color_type=None):

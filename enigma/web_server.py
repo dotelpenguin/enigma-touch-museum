@@ -256,6 +256,7 @@ class MuseumWebServer:
                     <span class="setting-label">Device Status:</span>
                     <span class="setting-value" style="color: {'#0f0' if device_connected else '#f00'}">{'Connected' if device_connected else 'Disconnected'}</span>
                 </div>
+                {('<div class="setting-item"><span class="setting-label">Plugboard:</span><span class="setting-value">' + html_module.escape(pegboard) + '</span></div>') if (pegboard and pegboard.strip() and pegboard.lower() != 'clear') else ''}
             </div>
             {f'<div class="note" style="color: #f00; font-weight: bold;">{html_module.escape(device_disconnected_message)}</div>' if device_disconnected_message else ''}
             {f'<div class="note">Note: Sending saved configuration before each message...</div>' if always_send else ''}
@@ -281,7 +282,7 @@ class MuseumWebServer:
                     <span class="setting-value">{ring_position}</span>
                 </div>
                 <div class="setting-item">
-                    <span class="setting-label">Pegboard:</span>
+                    <span class="setting-label">Plugboard:</span>
                     <span class="setting-value">{pegboard}</span>
                 </div>
             </div>
@@ -414,6 +415,7 @@ class MuseumWebServer:
                 rotors = config.get('rotor_set', 'N/A')
                 ring_settings = config.get('ring_settings', 'N/A')
                 ring_position = config.get('ring_position', 'N/A')
+                pegboard = config.get('pegboard', 'clear')
                 
                 rotor_display = rotors
                 if ' ' in rotors:
@@ -462,6 +464,7 @@ class MuseumWebServer:
         .model-box {{ background: rgba(128, 100, 128, 0.3); border: 2px solid #806480; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #c0a0c0; min-width: 60px; }}
         .ring-settings-box {{ background: rgba(100, 120, 150, 0.3); border: 2px solid #647896; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #90a8c8; min-width: 60px; }}
         .ring-position-box {{ background: rgba(120, 150, 160, 0.3); border: 2px solid #7896a0; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #a0c0d0; min-width: 60px; }}
+        .plugboard-box {{ background: rgba(150, 100, 120, 0.3); border: 2px solid #966478; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2vw, 20px); font-weight: bold; color: #c890a8; min-width: 60px; }}
         .footer {{ margin-top: min(0.5vh, 5px); color: #888; font-size: min(1.1vw, 11px); flex-shrink: 0; }}
         .disconnected-banner {{ background: rgba(255, 0, 0, 0.8); color: #fff; padding: min(1.5vh, 15px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #f00; border-radius: 10px; margin-bottom: min(1vh, 10px); }}
         .interactive-container {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
@@ -516,7 +519,20 @@ class MuseumWebServer:
                 html += f"""                    </div>
                 </div>
             </div>
-        </div>
+"""
+                # Add plugboard display on its own line if configured
+                if pegboard and pegboard.strip() and pegboard.lower() != 'clear':
+                    html += f"""            <div style="display: flex; flex-direction: column; align-items: center; margin-top: min(1vh, 10px);">
+                <div class="config-label">Plugboard</div>
+                <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
+"""
+                    plugboard_parts = pegboard.split()
+                    for plug in plugboard_parts:
+                        html += f'                    <div class="plugboard-box">{html_module.escape(plug)}</div>\n'
+                    html += f"""                </div>
+            </div>
+"""
+                html += f"""        </div>
 """
                 if enable_slides:
                     if is_interactive_mode:

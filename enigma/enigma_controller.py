@@ -4,6 +4,7 @@ Main Enigma device controller
 """
 
 import time
+import re
 from typing import Optional, Tuple
 from .constants import DEFAULT_DEVICE, CONFIG_FILE, CHAR_TIMEOUT
 from .config import ConfigManager
@@ -43,6 +44,9 @@ class EnigmaController:
             'brightness': 3,
             'volume': 0,
             'screen_saver': 0,
+            'timeout_battery': 15,
+            'timeout_plugged': 0,
+            'timeout_setup_modes': 0,
             'device': device
         }
         
@@ -67,7 +71,10 @@ class EnigmaController:
         self.use_models_json = loaded_config.get('use_models_json', False)
         self.brightness = loaded_config['brightness']
         self.volume = loaded_config['volume']
-        self.screen_saver = loaded_config['screen_saver']
+        self.screen_saver = loaded_config.get('screen_saver', 0)
+        self.timeout_battery = loaded_config.get('timeout_battery', 15)
+        self.timeout_plugged = loaded_config.get('timeout_plugged', 0)
+        self.timeout_setup_modes = loaded_config.get('timeout_setup_modes', 0)
         self.device = loaded_config['device']
         self.config_file = CONFIG_FILE
         
@@ -117,6 +124,9 @@ class EnigmaController:
             'brightness': self.brightness,
             'volume': self.volume,
             'screen_saver': self.screen_saver,
+            'timeout_battery': getattr(self, 'timeout_battery', 15),
+            'timeout_plugged': getattr(self, 'timeout_plugged', 0),
+            'timeout_setup_modes': getattr(self, 'timeout_setup_modes', 0),
             'device': self.device
         }
         return self.config_manager.save_config(config_data, preserve_ring_position=preserve_ring_position)
@@ -147,6 +157,9 @@ class EnigmaController:
             'brightness': self.brightness,
             'volume': self.volume,
             'screen_saver': self.screen_saver,
+            'timeout_battery': getattr(self, 'timeout_battery', 15),
+            'timeout_plugged': getattr(self, 'timeout_plugged', 0),
+            'timeout_setup_modes': getattr(self, 'timeout_setup_modes', 0),
             'device': self.device
         }
         loaded_config = self.config_manager.load_config(default_config, preserve_device=preserve_device)
@@ -172,7 +185,10 @@ class EnigmaController:
         self.use_models_json = loaded_config.get('use_models_json', False)
         self.brightness = loaded_config['brightness']
         self.volume = loaded_config['volume']
-        self.screen_saver = loaded_config['screen_saver']
+        self.screen_saver = loaded_config.get('screen_saver', 0)
+        self.timeout_battery = loaded_config.get('timeout_battery', 15)
+        self.timeout_plugged = loaded_config.get('timeout_plugged', 0)
+        self.timeout_setup_modes = loaded_config.get('timeout_setup_modes', 0)
         if not preserve_device:
             self.device = loaded_config['device']
         
@@ -198,6 +214,9 @@ class EnigmaController:
             'brightness': self.brightness,
             'volume': self.volume,
             'screen_saver': self.screen_saver,
+            'timeout_battery': getattr(self, 'timeout_battery', 15),
+            'timeout_plugged': getattr(self, 'timeout_plugged', 0),
+            'timeout_setup_modes': getattr(self, 'timeout_setup_modes', 0),
             'device': self.device
         }
         return self.config_manager.get_saved_config(current_config)
@@ -403,6 +422,189 @@ class EnigmaController:
                     return pb
         return None
     
+    def query_lock_model(self, debug_callback=None) -> Optional[bool]:
+        """Query lock state for model setup mode
+        
+        Returns:
+            True if locked, False if unlocked, None on error
+        """
+        response = self.send_command(b'\r\n?LM\r\n', debug_callback=debug_callback)
+        if response:
+            # Response should contain "1" for locked or "0" for unlocked
+            response_lower = response.lower()
+            if '1' in response or 'locked' in response_lower:
+                return True
+            elif '0' in response or 'unlocked' in response_lower:
+                return False
+            # Try to find a number in the response
+            match = re.search(r'\b([01])\b', response)
+            if match:
+                return match.group(1) == '1'
+        return None
+    
+    def query_lock_rotor(self, debug_callback=None) -> Optional[bool]:
+        """Query lock state for rotor (wheel) setup mode
+        
+        Returns:
+            True if locked, False if unlocked, None on error
+        """
+        response = self.send_command(b'\r\n?LW\r\n', debug_callback=debug_callback)
+        if response:
+            response_lower = response.lower()
+            if '1' in response or 'locked' in response_lower:
+                return True
+            elif '0' in response or 'unlocked' in response_lower:
+                return False
+            match = re.search(r'\b([01])\b', response)
+            if match:
+                return match.group(1) == '1'
+        return None
+    
+    def query_lock_ring(self, debug_callback=None) -> Optional[bool]:
+        """Query lock state for ring setup mode
+        
+        Returns:
+            True if locked, False if unlocked, None on error
+        """
+        response = self.send_command(b'\r\n?LR\r\n', debug_callback=debug_callback)
+        if response:
+            response_lower = response.lower()
+            if '1' in response or 'locked' in response_lower:
+                return True
+            elif '0' in response or 'unlocked' in response_lower:
+                return False
+            match = re.search(r'\b([01])\b', response)
+            if match:
+                return match.group(1) == '1'
+        return None
+    
+    def query_lock_power_off(self, debug_callback=None) -> Optional[bool]:
+        """Query lock state for power-off button
+        
+        Returns:
+            True if locked (disabled), False if unlocked (enabled), None on error
+        """
+        response = self.send_command(b'\r\n?LP\r\n', debug_callback=debug_callback)
+        if response:
+            response_lower = response.lower()
+            if '1' in response or 'locked' in response_lower or 'disabled' in response_lower:
+                return True
+            elif '0' in response or 'unlocked' in response_lower or 'enabled' in response_lower:
+                return False
+            import re
+            match = re.search(r'\b([01])\b', response)
+            if match:
+                return match.group(1) == '1'
+        return None
+    
+    def query_brightness(self, debug_callback=None) -> Optional[int]:
+        """Query current brightness level
+        
+        Returns:
+            Brightness level (1-5) or None on error
+        """
+        response = self.send_command(b'\r\n?MB\r\n', debug_callback=debug_callback)
+        if response:
+            import re
+            # Look for a number 1-5 in the response
+            match = re.search(r'\b([1-5])\b', response)
+            if match:
+                return int(match.group(1))
+        return None
+    
+    def query_volume(self, debug_callback=None) -> Optional[int]:
+        """Query current volume level
+        
+        Returns:
+            Volume level (0-3) or None on error
+        """
+        response = self.send_command(b'\r\n?MV\r\n', debug_callback=debug_callback)
+        if response:
+            # Look for a number 0-3 in the response
+            match = re.search(r'\b([0-3])\b', response)
+            if match:
+                return int(match.group(1))
+        return None
+    
+    def query_logging_format(self, debug_callback=None) -> Optional[int]:
+        """Query current logging format
+        
+        Returns:
+            Logging format (1-4) or None on error
+        """
+        response = self.send_command(b'\r\n?ML\r\n', debug_callback=debug_callback)
+        if response:
+            import re
+            # Look for a number 1-4 in the response
+            match = re.search(r'\b([1-4])\b', response)
+            if match:
+                return int(match.group(1))
+        return None
+    
+    def query_timeout_battery(self, debug_callback=None) -> Optional[int]:
+        """Query power-off timeout when battery-operated
+        
+        Returns:
+            Timeout in minutes (0-99) or None on error
+        """
+        response = self.send_command(b'\r\n?TB\r\n', debug_callback=debug_callback)
+        if response:
+            # Look for a number 0-99 in the response
+            match = re.search(r'\b([0-9]{1,2})\b', response)
+            if match:
+                value = int(match.group(1))
+                if 0 <= value <= 99:
+                    return value
+        return None
+    
+    def query_timeout_plugged(self, debug_callback=None) -> Optional[int]:
+        """Query power-off timeout when plugged in
+        
+        Returns:
+            Timeout in minutes (0-99) or None on error
+        """
+        response = self.send_command(b'\r\n?TP\r\n', debug_callback=debug_callback)
+        if response:
+            # Look for a number 0-99 in the response
+            match = re.search(r'\b([0-9]{1,2})\b', response)
+            if match:
+                value = int(match.group(1))
+                if 0 <= value <= 99:
+                    return value
+        return None
+    
+    def query_timeout_screen_saver(self, debug_callback=None) -> Optional[int]:
+        """Query screen saver timeout
+        
+        Returns:
+            Timeout in minutes (0-99) or None on error
+        """
+        response = self.send_command(b'\r\n?TS\r\n', debug_callback=debug_callback)
+        if response:
+            # Look for a number 0-99 in the response
+            match = re.search(r'\b([0-9]{1,2})\b', response)
+            if match:
+                value = int(match.group(1))
+                if 0 <= value <= 99:
+                    return value
+        return None
+    
+    def query_timeout_setup_modes(self, debug_callback=None) -> Optional[int]:
+        """Query setup mode inactivity timeout
+        
+        Returns:
+            Timeout in seconds (0-99) or None on error
+        """
+        response = self.send_command(b'\r\n?TM\r\n', debug_callback=debug_callback)
+        if response:
+            # Look for a number 0-99 in the response
+            match = re.search(r'\b([0-9]{1,2})\b', response)
+            if match:
+                value = int(match.group(1))
+                if 0 <= value <= 99:
+                    return value
+        return None
+
     def get_all_settings(self, debug_callback=None) -> dict:
         """Query all settings"""
         settings = {}
@@ -415,6 +617,46 @@ class EnigmaController:
         settings['ring_position'] = self.query_ring_position(debug_callback=debug_callback) or self.config['ring_position']
         time.sleep(0.2)
         settings['pegboard'] = self.query_pegboard(debug_callback=debug_callback) or self.config['pegboard']
+        
+        # Query lock settings
+        time.sleep(0.2)
+        lock_model = self.query_lock_model(debug_callback=debug_callback)
+        settings['lock_model'] = lock_model if lock_model is not None else self.lock_model
+        time.sleep(0.2)
+        lock_rotor = self.query_lock_rotor(debug_callback=debug_callback)
+        settings['lock_rotor'] = lock_rotor if lock_rotor is not None else self.lock_rotor
+        time.sleep(0.2)
+        lock_ring = self.query_lock_ring(debug_callback=debug_callback)
+        settings['lock_ring'] = lock_ring if lock_ring is not None else self.lock_ring
+        time.sleep(0.2)
+        lock_power_off = self.query_lock_power_off(debug_callback=debug_callback)
+        settings['disable_power_off'] = lock_power_off if lock_power_off is not None else self.disable_power_off
+        
+        # Query UI settings
+        time.sleep(0.2)
+        brightness = self.query_brightness(debug_callback=debug_callback)
+        settings['brightness'] = brightness if brightness is not None else self.brightness
+        time.sleep(0.2)
+        volume = self.query_volume(debug_callback=debug_callback)
+        settings['volume'] = volume if volume is not None else self.volume
+        time.sleep(0.2)
+        logging_format = self.query_logging_format(debug_callback=debug_callback)
+        settings['logging_format'] = logging_format
+        
+        # Query timeout settings
+        time.sleep(0.2)
+        timeout_battery = self.query_timeout_battery(debug_callback=debug_callback)
+        settings['timeout_battery'] = timeout_battery if timeout_battery is not None else getattr(self, 'timeout_battery', 15)
+        time.sleep(0.2)
+        timeout_plugged = self.query_timeout_plugged(debug_callback=debug_callback)
+        settings['timeout_plugged'] = timeout_plugged if timeout_plugged is not None else getattr(self, 'timeout_plugged', 0)
+        time.sleep(0.2)
+        timeout_screen_saver = self.query_timeout_screen_saver(debug_callback=debug_callback)
+        settings['screen_saver'] = timeout_screen_saver if timeout_screen_saver is not None else self.screen_saver
+        time.sleep(0.2)
+        timeout_setup_modes = self.query_timeout_setup_modes(debug_callback=debug_callback)
+        settings['timeout_setup_modes'] = timeout_setup_modes if timeout_setup_modes is not None else getattr(self, 'timeout_setup_modes', 0)
+        
         return settings
     
     def set_mode(self, mode: str, debug_callback=None) -> bool:
@@ -525,6 +767,378 @@ class EnigmaController:
             self.config['pegboard'] = pegboard
         return True
     
+    def set_lock_model(self, lock: bool, debug_callback=None) -> bool:
+        """Set lock state for model setup mode
+        
+        Args:
+            lock: True to lock, False to unlock
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        value = 1 if lock else 0
+        cmd = f"!LM {value}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting lock_model to {lock})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.lock_model = lock
+        return True
+    
+    def set_lock_rotor(self, lock: bool, debug_callback=None) -> bool:
+        """Set lock state for rotor (wheel) setup mode
+        
+        Args:
+            lock: True to lock, False to unlock
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        value = 1 if lock else 0
+        cmd = f"!LW {value}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting lock_rotor to {lock})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.lock_rotor = lock
+        return True
+    
+    def set_lock_ring(self, lock: bool, debug_callback=None) -> bool:
+        """Set lock state for ring setup mode
+        
+        Args:
+            lock: True to lock, False to unlock
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        value = 1 if lock else 0
+        cmd = f"!LR {value}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting lock_ring to {lock})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.lock_ring = lock
+        return True
+    
+    def set_lock_power_off(self, lock: bool, debug_callback=None) -> bool:
+        """Set lock state for power-off button
+        
+        Args:
+            lock: True to disable power-off button, False to enable
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        value = 1 if lock else 0
+        cmd = f"!LP {value}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting disable_power_off to {lock})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.disable_power_off = lock
+        return True
+    
+    def set_brightness(self, level: int, debug_callback=None) -> bool:
+        """Set display brightness
+        
+        Args:
+            level: Brightness level (1-5)
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        if not (1 <= level <= 5):
+            if debug_callback:
+                debug_callback(f"ERROR: Brightness level must be 1-5 (got {level})", color_type=7)
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        cmd = f"!MB {level}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting brightness to {level})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.brightness = level
+        return True
+    
+    def set_volume(self, level: int, debug_callback=None) -> bool:
+        """Set volume level
+        
+        Args:
+            level: Volume level (0-3)
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        if not (0 <= level <= 3):
+            if debug_callback:
+                debug_callback(f"ERROR: Volume level must be 0-3 (got {level})", color_type=7)
+            return False
+        cmd = f"!MV {level}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting volume to {level})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.volume = level
+        return True
+    
+    def set_logging_format(self, format: int, debug_callback=None) -> bool:
+        """Set logging format
+        
+        Args:
+            format: Logging format (1-4)
+                1 = short/5, 2 = short/4, 3 = extended/5, 4 = extended/4
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        if not (1 <= format <= 4):
+            if debug_callback:
+                debug_callback(f"ERROR: Logging format must be 1-4 (got {format})", color_type=7)
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        cmd = f"!ML {format}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting logging format to {format})", color_type=7)
+            return False
+        if response is None:
+            return False
+        return True
+    
+    def set_timeout_battery(self, minutes: int, debug_callback=None) -> bool:
+        """Set power-off timeout when battery-operated
+        
+        Args:
+            minutes: Timeout in minutes (0-99, 0 = disabled)
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        if not (0 <= minutes <= 99):
+            if debug_callback:
+                debug_callback(f"ERROR: Timeout must be 0-99 minutes (got {minutes})", color_type=7)
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        cmd = f"!TB {minutes}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting timeout_battery to {minutes})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.timeout_battery = minutes
+        return True
+    
+    def set_timeout_plugged(self, minutes: int, debug_callback=None) -> bool:
+        """Set power-off timeout when plugged in
+        
+        Args:
+            minutes: Timeout in minutes (0-99, 0 = disabled)
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        if not (0 <= minutes <= 99):
+            if debug_callback:
+                debug_callback(f"ERROR: Timeout must be 0-99 minutes (got {minutes})", color_type=7)
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        cmd = f"!TP {minutes}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting timeout_plugged to {minutes})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.timeout_plugged = minutes
+        return True
+    
+    def set_timeout_screen_saver(self, minutes: int, debug_callback=None) -> bool:
+        """Set screen saver timeout
+        
+        Args:
+            minutes: Timeout in minutes (0-99, 0 = disabled)
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        if not (0 <= minutes <= 99):
+            if debug_callback:
+                debug_callback(f"ERROR: Timeout must be 0-99 minutes (got {minutes})", color_type=7)
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        cmd = f"!TS {minutes}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting screen_saver timeout to {minutes})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.screen_saver = minutes
+        return True
+    
+    def set_timeout_setup_modes(self, seconds: int, debug_callback=None) -> bool:
+        """Set setup mode inactivity timeout
+        
+        Args:
+            seconds: Timeout in seconds (0-99, 0 = disabled)
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        if not (0 <= seconds <= 99):
+            if debug_callback:
+                debug_callback(f"ERROR: Timeout must be 0-99 seconds (got {seconds})", color_type=7)
+            return False
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.05)
+        cmd = f"!TM {seconds}\r\n".encode('ascii')
+        response = self.send_command(cmd, debug_callback=debug_callback)
+        has_error, error_message = self._has_error_response(response)
+        if has_error:
+            if debug_callback:
+                debug_callback(f"ERROR: {error_message} (setting timeout_setup_modes to {seconds})", color_type=7)
+            return False
+        if response is None:
+            return False
+        self.timeout_setup_modes = seconds
+        return True
+    
+    def apply_kiosk_settings(self, debug_callback=None) -> bool:
+        """Apply all kiosk/demo mode settings from saved config
+        
+        This method sends all locking, UI, and timeout settings to the device.
+        
+        Args:
+            debug_callback: Optional callback for debug messages
+            
+        Returns:
+            True if all settings applied successfully, False otherwise
+        """
+        if not self.ser or not self.ser.is_open:
+            if debug_callback:
+                debug_callback("ERROR: Not connected to device", color_type=7)
+            return False
+        
+        saved = self.get_saved_config()
+        config_errors = []
+        
+        # Apply lock settings
+        if debug_callback:
+            debug_callback("Applying lock settings...")
+        time.sleep(0.1)
+        if not self.set_lock_model(saved.get('lock_model', True), debug_callback=debug_callback):
+            config_errors.append("lock_model")
+        time.sleep(0.1)
+        if not self.set_lock_rotor(saved.get('lock_rotor', True), debug_callback=debug_callback):
+            config_errors.append("lock_rotor")
+        time.sleep(0.1)
+        if not self.set_lock_ring(saved.get('lock_ring', True), debug_callback=debug_callback):
+            config_errors.append("lock_ring")
+        time.sleep(0.1)
+        if not self.set_lock_power_off(saved.get('disable_power_off', True), debug_callback=debug_callback):
+            config_errors.append("disable_power_off")
+        
+        # Apply UI settings
+        if debug_callback:
+            debug_callback("Applying UI settings...")
+        time.sleep(0.1)
+        if not self.set_brightness(saved.get('brightness', 3), debug_callback=debug_callback):
+            config_errors.append("brightness")
+        time.sleep(0.1)
+        if not self.set_volume(saved.get('volume', 0), debug_callback=debug_callback):
+            config_errors.append("volume")
+        time.sleep(0.1)
+        # Set logging format based on word_group_size
+        # Format 3 = extended/5 chars, Format 4 = extended/4 chars
+        word_group_size = saved.get('word_group_size', self.word_group_size)
+        if word_group_size == 5:
+            desired_logging_format = 3  # extended/5
+        elif word_group_size == 4:
+            desired_logging_format = 4  # extended/4
+        else:
+            # Default to extended/5 if word_group_size is not 4 or 5
+            desired_logging_format = 3
+        
+        # Check current logging format before setting
+        current_logging_format = self.query_logging_format(debug_callback=debug_callback)
+        if current_logging_format != desired_logging_format:
+            if debug_callback:
+                debug_callback(f"Setting logging format from {current_logging_format} to {desired_logging_format} (word_group_size={word_group_size})")
+            if not self.set_logging_format(desired_logging_format, debug_callback=debug_callback):
+                config_errors.append("logging_format")
+        else:
+            if debug_callback:
+                debug_callback(f"Logging format already set to {desired_logging_format} (word_group_size={word_group_size})")
+        
+        # Apply timeout settings
+        if debug_callback:
+            debug_callback("Applying timeout settings...")
+        time.sleep(0.1)
+        if not self.set_timeout_battery(saved.get('timeout_battery', 15), debug_callback=debug_callback):
+            config_errors.append("timeout_battery")
+        time.sleep(0.1)
+        if not self.set_timeout_plugged(saved.get('timeout_plugged', 0), debug_callback=debug_callback):
+            config_errors.append("timeout_plugged")
+        time.sleep(0.1)
+        if not self.set_timeout_screen_saver(saved.get('screen_saver', 0), debug_callback=debug_callback):
+            config_errors.append("screen_saver")
+        time.sleep(0.1)
+        if not self.set_timeout_setup_modes(saved.get('timeout_setup_modes', 0), debug_callback=debug_callback):
+            config_errors.append("timeout_setup_modes")
+        
+        if config_errors:
+            if debug_callback:
+                error_msg = f"Kiosk settings errors: {', '.join(config_errors)}"
+                debug_callback(f"ERROR: {error_msg}", color_type=7)
+            return False
+        
+        if debug_callback:
+            debug_callback("All kiosk settings applied successfully")
+        return True
+    
     def return_to_encode_mode(self, debug_callback=None) -> bool:
         """Return to encode mode"""
         response = self.send_command(b'?MO\r\n', timeout=1.0, debug_callback=debug_callback)
@@ -598,6 +1212,13 @@ class EnigmaController:
                 if config_error_callback:
                     config_error_callback(config_errors)
                 return False
+            
+            # Apply kiosk/demo settings (locks, UI, timeouts)
+            time.sleep(0.2)
+            if not self.apply_kiosk_settings(debug_callback=debug_callback):
+                # Log error but don't fail message sending - kiosk settings are optional
+                if debug_callback:
+                    debug_callback("Warning: Some kiosk settings failed to apply", color_type=3)
             
             self.return_to_encode_mode(debug_callback=debug_callback)
             time.sleep(0.5)

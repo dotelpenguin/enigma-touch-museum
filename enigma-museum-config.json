@@ -1,12 +1,23 @@
 {
   "config": {
-    "mode": "N",
-    "rotor_set": "N II V III",
-    "ring_settings": "05 10 15",
+    "mode": "K",
+    "rotor_set": "K III II I",
+    "ring_settings": "F G R T",
     "ring_position": "10 15 20",
-    "pegboard": "AB CD EF GH IJ"
+    "pegboard": "",
+    "lock_model": true,
+    "lock_rotor": true,
+    "lock_ring": true,
+    "disable_power_off": true,
+    "brightness": 1,
+    "volume": 0,
+    "logging_format": null,
+    "timeout_battery": 15,
+    "timeout_plugged": 0,
+    "screen_saver": 0,
+    "timeout_setup_modes": 0
   },
-  "function_mode": "Decode - EN",
+  "function_mode": "Encode - EN",
   "museum_delay": 60,
   "always_send_config": true,
   "word_group_size": 5,
@@ -22,5 +33,8 @@
   "brightness": 3,
   "volume": 0,
   "screen_saver": 0,
+  "timeout_battery": 15,
+  "timeout_plugged": 0,
+  "timeout_setup_modes": 0,
   "device": "/dev/ttyACM0"
 }

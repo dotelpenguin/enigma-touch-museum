@@ -438,18 +438,18 @@ If you receive configuration errors when sending settings to the Enigma device:
 Future enhancements and improvements for the Enigma Museum Controller:
 
 - [ ] Full German Translation (requires German speaker)
-- [ ] Add option to generate random Model, Ring/Rotor settings when generating messages
+- [X] Add option to generate random Model, Ring/Rotor settings when generating messages
 - [ ] Configure to Set and Lock Attact settings once firmware supports them
-- [ ] Break Python into modules, and cleanup code
-- [ ] Verify Enigma Touch is correctly configured and connected
+- [X] Break Python into modules, and cleanup code
+- [X] Verify Enigma Touch is correctly configured and connected
 - [ ] Pre-built Raspberry Pi image for easier kiosk deployment
 - [ ] Advanced web interface with JavaScript/WebSockets (better than refresh)
-- [ ] Slideshow for messages. Image slides every X characters. Common folder, or numbered folder for each message
+- [X] Slideshow for messages. Image slides every X characters. Common folder, or numbered folder for each message
 - [ ] Simulation Mode (when Enigma Touch is not connected)
 - [ ] Enhance web interface with additional display options
 - [ ] Add support for multiple simultaneous device connections (Interactive Encoding/Decoding)
 - [ ] Add remote control API endpoints
-- [ ] Improve error handling and recovery mechanisms
+- [X] Improve error handling and recovery mechanisms
 - [ ] Add unit tests and integration tests
 - [ ] WebHost Display flickers due to refresh
 - [ ] Logic not handling 4 Rotor configs

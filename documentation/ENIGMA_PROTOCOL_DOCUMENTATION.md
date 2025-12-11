@@ -216,6 +216,257 @@ Plugboard AB CD EF
 
 ---
 
+## Version 4.20 Commands (Demo/Kiosk Mode)
+
+### Locking Setup Modes and Power-Off Button
+
+The setup modes for Model selection and replica settings, Rotor (= Wheel) selection, and Ring settings can be locked. The modes will still be accessible via the front panel buttons to view the current settings, but will not respond to the sliders. A lock icon in the upper left display window indicates when a mode is locked.
+
+#### !LM - Lock/Unlock Model Setup Mode
+**Command**: `\r\n!LM [VALUE]\r\n`
+
+**Accepted Values**:
+- `1` - Locks access via the front panel button
+- `0` - Unlocks access
+
+**Query Command**: `\r\n?LM\r\n` - Prints access status
+
+**Notes**:
+- `!LM` also controls access to the Reflector D re-wiring (long press of Modell button) and Diagnostic Mode (very long press)
+- When locked, the mode is still viewable but sliders won't respond
+
+**Examples**:
+```
+\r\n!LM 1\r\n    # Lock model setup mode
+\r\n!LM 0\r\n    # Unlock model setup mode
+\r\n?LM\r\n      # Query lock status
+```
+
+---
+
+#### !LW - Lock/Unlock Rotor (Wheel) Setup Mode
+**Command**: `\r\n!LW [VALUE]\r\n`
+
+**Accepted Values**:
+- `1` - Locks access via the front panel button
+- `0` - Unlocks access
+
+**Query Command**: `\r\n?LW\r\n` - Prints access status
+
+**Notes**:
+- The long-press function of the Rotor button remains available even if the setup mode is locked
+
+**Examples**:
+```
+\r\n!LW 1\r\n    # Lock rotor setup mode
+\r\n!LW 0\r\n    # Unlock rotor setup mode
+\r\n?LW\r\n      # Query lock status
+```
+
+---
+
+#### !LR - Lock/Unlock Ring Setup Mode
+**Command**: `\r\n!LR [VALUE]\r\n`
+
+**Accepted Values**:
+- `1` - Locks access via the front panel button
+- `0` - Unlocks access
+
+**Query Command**: `\r\n?LR\r\n` - Prints access status
+
+**Notes**:
+- The long-press function of the Ring button remains available even if the setup mode is locked
+
+**Examples**:
+```
+\r\n!LR 1\r\n    # Lock ring setup mode
+\r\n!LR 0\r\n    # Unlock ring setup mode
+\r\n?LR\r\n      # Query lock status
+```
+
+---
+
+#### !LP - Lock/Unlock Power-Off Button
+**Command**: `\r\n!LP [VALUE]\r\n`
+
+**Accepted Values**:
+- `1` - Disables the power-off functionality of the power button
+- `0` - Re-enables power-off functionality
+
+**Query Command**: `\r\n?LP\r\n` - Prints lock status
+
+**Notes**:
+- When the power-off button is locked, the Enigma touch can only be powered off by:
+  - (a) Removing external power (if no battery installed)
+  - (b) An inactivity timeout
+  - (c) The USB command `!PO`
+- The power button will still be used to turn the power ON
+
+**Examples**:
+```
+\r\n!LP 1\r\n    # Disable power-off button
+\r\n!LP 0\r\n    # Enable power-off button
+\r\n?LP\r\n      # Query lock status
+```
+
+---
+
+### Control User Interface Settings
+
+The following commands control the UI settings. They are mainly meant for use with an external "museum mode controller". As usual, `?Mx` can be used to view the current setting.
+
+#### !MB - Set Brightness
+**Command**: `\r\n!MB [LEVEL]\r\n`
+
+**Accepted Values**:
+- `1` through `5` - Brightness level (1 = dimmest, 5 = brightest)
+
+**Query Command**: `\r\n?MB\r\n` - Returns current brightness level
+
+**Examples**:
+```
+\r\n!MB 3\r\n    # Set brightness to level 3
+\r\n!MB 5\r\n    # Set brightness to maximum
+\r\n?MB\r\n      # Query current brightness
+```
+
+---
+
+#### !MV - Set Volume
+**Command**: `\r\n!MV [LEVEL]\r\n`
+
+**Accepted Values**:
+- `0` through `3` - Volume level (0 = silent, 3 = maximum)
+
+**Query Command**: `\r\n?MV\r\n` - Returns current volume level
+
+**Examples**:
+```
+\r\n!MV 0\r\n    # Set volume to silent
+\r\n!MV 2\r\n    # Set volume to level 2
+\r\n?MV\r\n      # Query current volume
+```
+
+---
+
+#### !ML - Set Logging Format
+**Command**: `\r\n!ML [FORMAT]\r\n`
+
+**Accepted Values**:
+- `1` - Short format, 5 characters per group
+- `2` - Short format, 4 characters per group
+- `3` - Extended format, 5 characters per group
+- `4` - Extended format, 4 characters per group
+
+**Query Command**: `\r\n?ML\r\n` - Returns current logging format
+
+**Notes**:
+- `!ML` only supports those settings which keep the USB serial connection active
+- Keyboard mode or completely disabled USB can only be selected from the front panel
+- This prevents locking yourself out of USB communication
+
+**Examples**:
+```
+\r\n!ML 1\r\n    # Set to short format, 5 chars per group
+\r\n!ML 3\r\n    # Set to extended format, 5 chars per group
+\r\n?ML\r\n      # Query current logging format
+```
+
+---
+
+### Timeout Control
+
+Earlier firmware versions had a fixed inactivity timeout (automatic power-off) of 15 minutes in battery-operated mode, and no timeout when operated on an external 5V supply. Version 4.20 gives you control over these timeouts and adds an optional screen saver.
+
+All times are given in minutes, with valid values from 1..99. Value 0 disables the respective automatic timeout.
+
+#### !TB - Set Battery Power-Off Timeout
+**Command**: `\r\n!TB [MINUTES]\r\n`
+
+**Accepted Values**:
+- `0` - Disables automatic power-off timeout
+- `1` through `99` - Timeout in minutes
+
+**Query Command**: `\r\n?TB\r\n` - Returns current timeout setting
+
+**Default**: 15 minutes
+
+**Examples**:
+```
+\r\n!TB 15\r\n   # Set timeout to 15 minutes (default)
+\r\n!TB 30\r\n   # Set timeout to 30 minutes
+\r\n!TB 0\r\n    # Disable timeout
+\r\n?TB\r\n      # Query current timeout
+```
+
+---
+
+#### !TP - Set Plugged-In Power-Off Timeout
+**Command**: `\r\n!TP [MINUTES]\r\n`
+
+**Accepted Values**:
+- `0` - Disables automatic power-off timeout (default)
+- `1` through `99` - Timeout in minutes
+
+**Query Command**: `\r\n?TP\r\n` - Returns current timeout setting
+
+**Default**: 0 (disabled)
+
+**Examples**:
+```
+\r\n!TP 0\r\n    # Disable timeout (default)
+\r\n!TP 60\r\n    # Set timeout to 60 minutes when plugged in
+\r\n?TP\r\n      # Query current timeout
+```
+
+---
+
+#### !TS - Set Screen Saver Timeout
+**Command**: `\r\n!TS [MINUTES]\r\n`
+
+**Accepted Values**:
+- `0` - Disables screen saver
+- `1` through `99` - Timeout in minutes before screen saver activates
+
+**Query Command**: `\r\n?TS\r\n` - Returns current screen saver timeout
+
+**Default**: 10 minutes
+
+**Examples**:
+```
+\r\n!TS 10\r\n   # Set screen saver to 10 minutes (default)
+\r\n!TS 5\r\n    # Set screen saver to 5 minutes
+\r\n!TS 0\r\n    # Disable screen saver
+\r\n?TS\r\n      # Query current screen saver timeout
+```
+
+---
+
+#### !TM - Set Setup Mode Inactivity Timeout
+**Command**: `\r\n!TM [SECONDS]\r\n`
+
+**Accepted Values**:
+- `0` - Disables automatic timeout (default)
+- `1` through `99` - Timeout in seconds
+
+**Query Command**: `\r\n?TM\r\n` - Returns current timeout setting
+
+**Notes**:
+- After a specified inactivity period, the Enigma touch can revert to its regular encryption mode
+- Unlike other timeout commands, this timeout is specified in **seconds** rather than minutes
+
+**Default**: 0 (disabled)
+
+**Examples**:
+```
+\r\n!TM 0\r\n    # Disable setup mode timeout (default)
+\r\n!TM 30\r\n   # Close setup modes after 30 seconds of inactivity
+\r\n!TM 60\r\n   # Close setup modes after 60 seconds of inactivity
+\r\n?TM\r\n      # Query current timeout
+```
+
+---
+
 ## Character Encoding
 
 ### Format
@@ -277,8 +528,8 @@ Common error messages:
 ## Protocol Summary
 
 ### Command Structure
-1. **Query Commands**: Start with `?` (e.g., `?MO`, `?RO`, `?RI`, `?RP`, `?PB`)
-2. **Set Commands**: Start with `!` (e.g., `!MO`, `!RO`, `!RI`, `!RP`, `!PB`)
+1. **Query Commands**: Start with `?` (e.g., `?MO`, `?RO`, `?RI`, `?RP`, `?PB`, `?LM`, `?LW`, `?LR`, `?LP`, `?MB`, `?MV`, `?ML`, `?TB`, `?TP`, `?TS`, `?TM`)
+2. **Set Commands**: Start with `!` (e.g., `!MO`, `!RO`, `!RI`, `!RP`, `!PB`, `!LM`, `!LW`, `!LR`, `!LP`, `!MB`, `!MV`, `!ML`, `!TB`, `!TP`, `!TS`, `!TM`)
 3. **All commands**: Must be prefixed with `\r\n` and suffixed with `\r\n`
 
 ### Character Encoding Protocol
