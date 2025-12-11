@@ -16,7 +16,8 @@ BOOLEAN_FIELDS = [
     'lock_model',
     'lock_rotor',
     'lock_ring',
-    'disable_power_off'
+    'disable_power_off',
+    'use_models_json'
 ]
 
 
@@ -88,6 +89,7 @@ class ConfigManager:
                 'lock_rotor': normalize_boolean(config_data['lock_rotor']),
                 'lock_ring': normalize_boolean(config_data['lock_ring']),
                 'disable_power_off': normalize_boolean(config_data['disable_power_off']),
+                'use_models_json': normalize_boolean(config_data.get('use_models_json', False)),
                 'brightness': config_data['brightness'],
                 'volume': config_data['volume'],
                 'screen_saver': config_data['screen_saver'],
@@ -141,6 +143,8 @@ class ConfigManager:
                         result['lock_ring'] = normalize_boolean(config_data['lock_ring'])
                     if 'disable_power_off' in config_data:
                         result['disable_power_off'] = normalize_boolean(config_data['disable_power_off'])
+                    if 'use_models_json' in config_data:
+                        result['use_models_json'] = normalize_boolean(config_data['use_models_json'])
                     if 'brightness' in config_data:
                         result['brightness'] = config_data['brightness']
                     if 'volume' in config_data:
@@ -184,6 +188,7 @@ class ConfigManager:
                     saved_config['lock_rotor'] = normalize_boolean(config_data.get('lock_rotor', current_config['lock_rotor']))
                     saved_config['lock_ring'] = normalize_boolean(config_data.get('lock_ring', current_config['lock_ring']))
                     saved_config['disable_power_off'] = normalize_boolean(config_data.get('disable_power_off', current_config['disable_power_off']))
+                    saved_config['use_models_json'] = normalize_boolean(config_data.get('use_models_json', current_config.get('use_models_json', False)))
                     saved_config['brightness'] = config_data.get('brightness', current_config['brightness'])
                     saved_config['volume'] = config_data.get('volume', current_config['volume'])
                     saved_config['screen_saver'] = config_data.get('screen_saver', current_config['screen_saver'])
@@ -199,6 +204,7 @@ class ConfigManager:
             'lock_rotor': current_config['lock_rotor'],
             'lock_ring': current_config['lock_ring'],
             'disable_power_off': current_config['disable_power_off'],
+            'use_models_json': current_config.get('use_models_json', False),
             'brightness': current_config['brightness'],
             'volume': current_config['volume'],
             'screen_saver': current_config['screen_saver'],

@@ -1,22 +1,12 @@
 [
   {
-    "MSG": "HOWDY",
-    "MODEL": "M3",
-    "ROTOR": "B I V II",
-    "RINGSET": "D G F",
-    "RINGPOS": "V G H",
-    "PLUG": "FV PQ",
+    "MSG": "CONVOY FOUND",
+    "MODEL": "N",
+    "ROTOR": "N II V III",
+    "RINGSET": "05 10 15",
+    "RINGPOS": "10 15 20",
+    "PLUG": "AB CD EF GH IJ",
     "GROUP": 5,
-    "CODED": "PTICK"
-  },
-  {
-    "MSG": "SEND HELP REGIMENT EATEN BY GRUE",
-    "MODEL": "I",
-    "ROTOR": "B III IV I",
-    "RINGSET": "01 01 01",
-    "RINGPOS": "20 06 10",
-    "PLUG": "FV PQ",
-    "GROUP": 5,
-    "CODED": "NJSHJZFYAUVGGAZSNJZNCPLPTIJ"
+    "CODED": "TTWOEGZMACJ"
   }
 ]

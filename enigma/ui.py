@@ -467,11 +467,16 @@ class EnigmaMuseumUI(UIBase):
             ("1", "Generate Coded Messages - EN"),
             ("2", "Generate Coded Messages - DE"),
             ("3", "Validate Models.json"),
+            ("4", ""),  # Will be set in loop
             ("B", "Back")
         ]
         
         selected = 0
         while True:
+            # Refresh status from controller's current value (updated immediately after toggle)
+            use_models_json_status = str(getattr(self.controller, 'use_models_json', False)).lower()
+            options[3] = ("4", f"Use models.json when generating: {use_models_json_status}")
+            
             self.show_menu("Utilities", options, selected)
             key = self.stdscr.getch()
             
@@ -492,13 +497,17 @@ class EnigmaMuseumUI(UIBase):
                     self.handle_config_option('11')  # Generate DE
                 elif options[selected][0] == '3':
                     self.handle_config_option('23')  # Validate Models.json
-            elif key >= ord('1') and key <= ord('3'):
+                elif options[selected][0] == '4':
+                    self.handle_config_option('24')  # Toggle Use models.json
+            elif key >= ord('1') and key <= ord('4'):
                 if chr(key) == '1':
                     self.handle_config_option('10')  # Generate EN
                 elif chr(key) == '2':
                     self.handle_config_option('11')  # Generate DE
                 elif chr(key) == '3':
                     self.handle_config_option('23')  # Validate Models.json
+                elif chr(key) == '4':
+                    self.handle_config_option('24')  # Toggle Use models.json
     
     def draw_validation_progress(self, current_idx: int, total: int, name: str, status: str, valid_count: int, invalid_count: int, results: list):
         """Draw validation progress in the left window"""
@@ -1293,6 +1302,18 @@ class EnigmaMuseumUI(UIBase):
         elif option == '23':
             # Validate Models.json
             self.validate_models_json(debug_callback=debug_callback)
+        
+        elif option == '24':
+            # Toggle use_models_json - use controller's current value
+            self.controller.use_models_json = not getattr(self.controller, 'use_models_json', False)
+            # Save config after change
+            self.controller.save_config()
+            status = str(self.controller.use_models_json).lower()
+            self.show_message(0, 0, f"Use models.json when generating: {status}")
+            self.draw_settings_panel()  # Update settings display
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(1)
     
     def generate_coded_messages(self, language: str):
         """Generate coded messages from english.msg or german.msg"""
@@ -1335,6 +1356,43 @@ class EnigmaMuseumUI(UIBase):
         if key != ord('y') and key != ord('Y'):
             return
         
+        # Check if use_models_json is enabled
+        saved = self.controller.get_saved_config()
+        use_models_json = saved.get('use_models_json', False)
+        models = None
+        
+        if use_models_json:
+            # Load models.json
+            models_file = os.path.join(SCRIPT_DIR, 'models.json')
+            if not os.path.exists(models_file):
+                self.show_message(0, 0, f"Error: models.json not found at {models_file}", curses.A_BOLD)
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(2)
+                return
+            
+            try:
+                with open(models_file, 'r', encoding='utf-8') as f:
+                    models = json.load(f)
+                if not isinstance(models, list) or len(models) == 0:
+                    self.show_message(0, 0, "Error: models.json must contain a non-empty array", curses.A_BOLD)
+                    self.draw_debug_panel()
+                    self.refresh_all_panels()
+                    time.sleep(2)
+                    return
+            except json.JSONDecodeError as e:
+                self.show_message(0, 0, f"Error: Invalid JSON in models.json: {e}", curses.A_BOLD)
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(2)
+                return
+            except Exception as e:
+                self.show_message(0, 0, f"Error: Failed to read models.json: {e}", curses.A_BOLD)
+                self.draw_debug_panel()
+                self.refresh_all_panels()
+                time.sleep(2)
+                return
+        
         # Check if output file exists
         file_exists = os.path.exists(output_file)
         coded_messages = []
@@ -1367,7 +1425,7 @@ class EnigmaMuseumUI(UIBase):
                 start_index = 0
         
         # Get saved config values for comparison
-        saved = self.controller.get_saved_config()
+        # Note: saved was already loaded above
         saved_config_values = saved['config']
         current_settings = {
             'MODEL': saved_config_values['mode'],
@@ -1476,18 +1534,92 @@ class EnigmaMuseumUI(UIBase):
         for i in range(start_index, message_count):
             message = messages[i]
             
+            # If use_models_json is enabled, pick a random model for this message
+            message_settings = None
+            selected_model = None
+            model_index = None
+            if use_models_json and models:
+                # Pick a random model from models.json
+                model_index = random.randint(0, len(models) - 1)
+                selected_model = models[model_index]
+                message_settings = {
+                    'MODEL': selected_model.get('MODEL', ''),
+                    'ROTOR': selected_model.get('ROTOR', ''),
+                    'RINGSET': selected_model.get('RINGSET', ''),
+                    'RINGPOS': selected_model.get('RINGPOS', ''),
+                    'PLUG': selected_model.get('PLUG', ''),
+                    'GROUP': saved['word_group_size']  # Use saved word_group_size
+                }
+                if debug_callback:
+                    model_name = selected_model.get('name', 'Unknown')
+                    model_desc = selected_model.get('description', '')
+                    debug_callback(f"Using model {model_index + 1}/{len(models)}: {model_name}")
+                    if model_desc:
+                        debug_callback(f"  Description: {model_desc}")
+                    debug_callback(f"  Configuration: MODEL={message_settings['MODEL']}, ROTOR={message_settings['ROTOR']}, RINGSET={message_settings['RINGSET']}, RINGPOS={message_settings['RINGPOS']}, PLUG={message_settings['PLUG'] if message_settings['PLUG'] else '(none)'}")
+            else:
+                # Use saved config settings
+                message_settings = current_settings.copy()
+            
             # Update progress display
             self.left_win.clear()
             max_y, max_x = self.left_win.getmaxyx()
             self.left_win.addstr(0, 0, f"Generating Coded Messages - {language}", curses.A_BOLD)
             self.left_win.addstr(1, 0, f"Progress: {i+1}/{message_count}")
-            self.left_win.addstr(2, 0, f"Processing message {i+1}: {message[:max_x-20] if len(message) > max_x-20 else message}")
-            self.left_win.addstr(3, 0, "-" * max_x)
+            
+            y_pos = 2
+            if use_models_json and models and selected_model:
+                model_name = selected_model.get('name', 'Unknown')
+                model_desc = selected_model.get('description', '')
+                # Show model info prominently
+                if y_pos < max_y:
+                    self.left_win.addstr(y_pos, 0, f"Using Model [{model_index + 1}/{len(models)}]:", curses.A_BOLD)
+                    y_pos += 1
+                if y_pos < max_y:
+                    self.left_win.addstr(y_pos, 0, f"  {model_name[:max_x-2]}")
+                    y_pos += 1
+                if model_desc and y_pos < max_y:
+                    desc_line = f"  {model_desc[:max_x-2]}"
+                    self.left_win.addstr(y_pos, 0, desc_line[:max_x], curses.A_DIM)
+                    y_pos += 1
+                if y_pos < max_y:
+                    config_line = f"  MODEL: {message_settings['MODEL']} | ROTOR: {message_settings['ROTOR'][:max_x-30]}"
+                    self.left_win.addstr(y_pos, 0, config_line[:max_x])
+                    y_pos += 1
+                if y_pos < max_y:
+                    config_line2 = f"  RINGSET: {message_settings['RINGSET']} | RINGPOS: {message_settings['RINGPOS']}"
+                    self.left_win.addstr(y_pos, 0, config_line2[:max_x])
+                    y_pos += 1
+                if y_pos < max_y:
+                    plug_text = message_settings['PLUG'] if message_settings['PLUG'] else '(none)'
+                    plug_line = f"  PLUG: {plug_text[:max_x-8]}"
+                    self.left_win.addstr(y_pos, 0, plug_line[:max_x])
+                    y_pos += 1
+                if y_pos < max_y:
+                    self.left_win.addstr(y_pos, 0, "-" * max_x)
+                    y_pos += 1
+                # Show message being processed
+                if y_pos < max_y:
+                    msg_line = f"Processing message {i+1}: {message[:max_x-25] if len(message) > max_x-25 else message}"
+                    self.left_win.addstr(y_pos, 0, msg_line[:max_x])
+                    y_pos += 1
+                if y_pos < max_y:
+                    self.left_win.addstr(y_pos, 0, "-" * max_x)
+                    y_pos += 1
+                display_start_y = y_pos
+            else:
+                if y_pos < max_y:
+                    self.left_win.addstr(y_pos, 0, f"Processing message {i+1}: {message[:max_x-20] if len(message) > max_x-20 else message}")
+                    y_pos += 1
+                if y_pos < max_y:
+                    self.left_win.addstr(y_pos, 0, "-" * max_x)
+                    y_pos += 1
+                display_start_y = y_pos
             
             # Show already encoded messages
             if coded_messages:
-                self.left_win.addstr(4, 0, "Encoded so far:")
-                display_y = 5
+                self.left_win.addstr(display_start_y, 0, "Encoded so far:")
+                display_y = display_start_y + 1
                 for idx, coded in enumerate(coded_messages[-5:], start=max(0, len(coded_messages)-5)):
                     # Handle both old string format and new object format
                     if isinstance(coded, dict):
@@ -1516,19 +1648,19 @@ class EnigmaMuseumUI(UIBase):
             
             # Check each config setting for errors
             config_errors = []
-            if not self.controller.set_mode(saved_config_values['mode'], debug_callback=debug_callback):
+            if not self.controller.set_mode(message_settings['MODEL'], debug_callback=debug_callback):
                 config_errors.append("mode")
             time.sleep(0.2)
-            if not self.controller.set_rotor_set(saved_config_values['rotor_set'], debug_callback=debug_callback):
+            if not self.controller.set_rotor_set(message_settings['ROTOR'], debug_callback=debug_callback):
                 config_errors.append("rotor_set")
             time.sleep(0.2)
-            if not self.controller.set_ring_settings(saved_config_values['ring_settings'], debug_callback=debug_callback):
+            if not self.controller.set_ring_settings(message_settings['RINGSET'], debug_callback=debug_callback):
                 config_errors.append("ring_settings")
             time.sleep(0.2)
-            if not self.controller.set_ring_position(saved_config_values['ring_position'], debug_callback=debug_callback):
+            if not self.controller.set_ring_position(message_settings['RINGPOS'], debug_callback=debug_callback):
                 config_errors.append("ring_position")
             time.sleep(0.2)
-            if not self.controller.set_pegboard(saved_config_values['pegboard'], debug_callback=debug_callback):
+            if not self.controller.set_pegboard(message_settings['PLUG'], debug_callback=debug_callback):
                 config_errors.append("pegboard")
             time.sleep(0.2)
             
@@ -1574,14 +1706,16 @@ class EnigmaMuseumUI(UIBase):
                 # Ensure we have a valid string before creating message object
                 if encoded_result and isinstance(encoded_result, str):
                     # Create message object with all metadata
+                    # Use message_settings which contains either the random model settings
+                    # or the current_settings depending on use_models_json
                     message_obj = {
                         'MSG': message,
-                        'MODEL': current_settings['MODEL'],
-                        'ROTOR': current_settings['ROTOR'],
-                        'RINGSET': current_settings['RINGSET'],
-                        'RINGPOS': current_settings['RINGPOS'],
-                        'PLUG': current_settings['PLUG'],
-                        'GROUP': current_settings['GROUP'],
+                        'MODEL': message_settings['MODEL'],
+                        'ROTOR': message_settings['ROTOR'],
+                        'RINGSET': message_settings['RINGSET'],
+                        'RINGPOS': message_settings['RINGPOS'],
+                        'PLUG': message_settings['PLUG'],
+                        'GROUP': message_settings['GROUP'],
                         'CODED': encoded_result
                     }
                     coded_messages.append(message_obj)
@@ -2440,8 +2574,15 @@ class EnigmaMuseumUI(UIBase):
                     time.sleep(0.2)
                     # Set word group size from JSON
                     self.controller.word_group_size = msg_obj.get('GROUP', 5)
-                    self.controller.return_to_encode_mode(debug_callback=debug_callback)
-                    time.sleep(0.5)
+                    # Only return to encode mode if we're in encode mode
+                    # In decode mode, the device should already be in the correct mode
+                    if is_encode:
+                        self.controller.return_to_encode_mode(debug_callback=debug_callback)
+                        time.sleep(0.5)
+                    else:
+                        # For decode mode, ensure we're ready to decode
+                        # The device should be in decode mode (set by user or device state)
+                        time.sleep(0.5)
                 except (serial.SerialException, OSError, AttributeError) as e:
                     # Serial operation failed - likely disconnection
                     device_disconnected[0] = True
@@ -2467,9 +2608,23 @@ class EnigmaMuseumUI(UIBase):
                 # Display both MSG and CODED in museum mode
                 formatted_msg = self.controller.format_message_for_display(msg_obj['MSG'])
                 formatted_coded = self.controller.format_message_for_display(msg_obj['CODED'])
+                formatted_expected = self.controller.format_message_for_display(expected_result)
                 add_log_message(f"{operation}:")
                 add_log_message(f"  MSG: {formatted_msg}")
                 add_log_message(f"  CODED: {formatted_coded}")
+                if is_encode:
+                    add_log_message(f"  Expected encoded result: {formatted_expected}")
+                else:
+                    add_log_message(f"  Expected decoded result: {formatted_expected}")
+                
+                # Also show in debug callback
+                if debug_callback:
+                    debug_callback(f"{operation} message:")
+                    debug_callback(f"  Sending: {formatted_message}")
+                    if is_encode:
+                        debug_callback(f"  Expected encoded result: {formatted_expected}")
+                    else:
+                        debug_callback(f"  Expected decoded result: {formatted_expected}")
                 
                 # Normalize expected result for character-by-character comparison
                 expected_normalized = normalize_for_comparison(expected_result)
@@ -2656,10 +2811,17 @@ class EnigmaMuseumUI(UIBase):
                             if is_encode:
                                 grouped_result = self.controller._group_encoded_text(result)
                                 add_log_message(f"Encoded: {grouped_result}")
+                                # Update web display with final grouped result
+                                current_encoded_text[0] = grouped_result
                             else:
-                                # Decode mode: use MSG directly since decoded result matches it exactly
-                                formatted_decoded = self.controller.format_message_for_display(msg_obj['MSG'])
+                                # Decode mode: restore spaces and use formatted version
+                                # Ensure result has no spaces before restoring (in case device added any)
+                                result_no_spaces = result.replace(' ', '').upper()
+                                restored_decoded = restore_spaces(result_no_spaces, msg_obj['MSG'])
+                                formatted_decoded = self.controller.format_message_for_display(restored_decoded)
                                 add_log_message(f"Decoded: {formatted_decoded}")
+                                # Update web display with final restored decoded result (with proper spacing)
+                                current_encoded_text[0] = restored_decoded
                         else:
                             # Verification failed - pause museum mode
                             add_log_message(f"Verification failed - pausing museum mode (Enigma may have been touched)")

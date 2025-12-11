@@ -39,6 +39,7 @@ class EnigmaController:
             'lock_rotor': True,
             'lock_ring': True,
             'disable_power_off': True,
+            'use_models_json': False,
             'brightness': 3,
             'volume': 0,
             'screen_saver': 0,
@@ -63,6 +64,7 @@ class EnigmaController:
         self.lock_rotor = loaded_config['lock_rotor']
         self.lock_ring = loaded_config['lock_ring']
         self.disable_power_off = loaded_config['disable_power_off']
+        self.use_models_json = loaded_config.get('use_models_json', False)
         self.brightness = loaded_config['brightness']
         self.volume = loaded_config['volume']
         self.screen_saver = loaded_config['screen_saver']
@@ -111,6 +113,7 @@ class EnigmaController:
             'lock_rotor': self.lock_rotor,
             'lock_ring': self.lock_ring,
             'disable_power_off': self.disable_power_off,
+            'use_models_json': self.use_models_json,
             'brightness': self.brightness,
             'volume': self.volume,
             'screen_saver': self.screen_saver,
@@ -140,6 +143,7 @@ class EnigmaController:
             'lock_rotor': self.lock_rotor,
             'lock_ring': self.lock_ring,
             'disable_power_off': self.disable_power_off,
+            'use_models_json': getattr(self, 'use_models_json', False),
             'brightness': self.brightness,
             'volume': self.volume,
             'screen_saver': self.screen_saver,
@@ -165,6 +169,7 @@ class EnigmaController:
         self.lock_rotor = loaded_config['lock_rotor']
         self.lock_ring = loaded_config['lock_ring']
         self.disable_power_off = loaded_config['disable_power_off']
+        self.use_models_json = loaded_config.get('use_models_json', False)
         self.brightness = loaded_config['brightness']
         self.volume = loaded_config['volume']
         self.screen_saver = loaded_config['screen_saver']
@@ -189,6 +194,7 @@ class EnigmaController:
             'lock_rotor': self.lock_rotor,
             'lock_ring': self.lock_ring,
             'disable_power_off': self.disable_power_off,
+            'use_models_json': getattr(self, 'use_models_json', False),
             'brightness': self.brightness,
             'volume': self.volume,
             'screen_saver': self.screen_saver,

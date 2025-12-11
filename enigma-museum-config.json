@@ -1,10 +1,10 @@
 {
   "config": {
-    "mode": "M3",
-    "rotor_set": "B I V II",
-    "ring_settings": "D G F",
-    "ring_position": "A B C D",
-    "pegboard": "FV PQ"
+    "mode": "N",
+    "rotor_set": "N II V III",
+    "ring_settings": "05 10 15",
+    "ring_position": "10 15 20",
+    "pegboard": "AB CD EF GH IJ"
   },
   "function_mode": "Decode - EN",
   "museum_delay": 60,
@@ -18,8 +18,9 @@
   "lock_rotor": true,
   "lock_ring": true,
   "disable_power_off": true,
+  "use_models_json": true,
   "brightness": 3,
   "volume": 0,
   "screen_saver": 0,
-  "device": "/dev/tty.usbmodem207139584B471"
+  "device": "/dev/ttyACM0"
 }
