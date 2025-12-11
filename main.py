@@ -99,11 +99,11 @@ def main():
     print("=" * 60)
     print("Enigma Museum Controller")
     print("=" * 60)
-    print("⚠️  FIRMWARE REQUIREMENT: Enigma Touch firmware version 1.20 or higher")
+    print("⚠️  FIRMWARE REQUIREMENT: Enigma Touch firmware version 4.20 or higher")
     print("   is required to use this software.")
     print("")
     print("   Note: Automatic firmware version checking will be available")
-    print("   in Enigma Touch firmware version 1.21.")
+    print("   in Enigma Touch firmware version 4.21.")
     print("=" * 60)
     print("")
     

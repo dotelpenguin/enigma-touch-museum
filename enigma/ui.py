@@ -466,6 +466,7 @@ class EnigmaMuseumUI(UIBase):
         options = [
             ("1", "Generate Coded Messages - EN"),
             ("2", "Generate Coded Messages - DE"),
+            ("3", "Validate Models.json"),
             ("B", "Back")
         ]
         
@@ -489,11 +490,348 @@ class EnigmaMuseumUI(UIBase):
                     self.handle_config_option('10')  # Generate EN
                 elif options[selected][0] == '2':
                     self.handle_config_option('11')  # Generate DE
-            elif key >= ord('1') and key <= ord('2'):
+                elif options[selected][0] == '3':
+                    self.handle_config_option('23')  # Validate Models.json
+            elif key >= ord('1') and key <= ord('3'):
                 if chr(key) == '1':
                     self.handle_config_option('10')  # Generate EN
                 elif chr(key) == '2':
                     self.handle_config_option('11')  # Generate DE
+                elif chr(key) == '3':
+                    self.handle_config_option('23')  # Validate Models.json
+    
+    def draw_validation_progress(self, current_idx: int, total: int, name: str, status: str, valid_count: int, invalid_count: int, results: list):
+        """Draw validation progress in the left window"""
+        if not self.left_win:
+            return
+        
+        try:
+            self.left_win.clear()
+            max_y, max_x = self.left_win.getmaxyx()
+            
+            # Title
+            title = "Validate Models.json"
+            title_x = (max_x - len(title)) // 2
+            if title_x >= 0:
+                self.left_win.addstr(0, title_x, title, curses.A_BOLD | curses.A_UNDERLINE)
+            
+            # Progress summary
+            progress_line = f"Progress: {current_idx}/{total} ({valid_count} valid, {invalid_count} invalid)"
+            y = 2
+            if y < max_y:
+                self.left_win.addstr(y, 0, progress_line[:max_x], curses.A_BOLD)
+            
+            # Current test
+            y = 4
+            if y < max_y:
+                current_line = f"Testing [{current_idx}/{total}]: {name[:max_x-20]}"
+                self.left_win.addstr(y, 0, current_line[:max_x], curses.A_BOLD)
+            
+            # Status
+            y = 5
+            if y < max_y:
+                status_attr = curses.A_BOLD
+                if status == "VALID":
+                    if curses.has_colors():
+                        status_attr |= curses.color_pair(self.COLOR_MATCH)
+                    status_text = "✓ VALID"
+                elif status == "INVALID":
+                    if curses.has_colors():
+                        status_attr |= curses.color_pair(self.COLOR_MISMATCH)
+                    status_text = "✗ INVALID"
+                else:
+                    status_text = status
+                self.left_win.addstr(y, 0, status_text[:max_x], status_attr)
+            
+            # Results list
+            y = 7
+            if y < max_y:
+                header = "Results:"
+                self.left_win.addstr(y, 0, header, curses.A_BOLD)
+                y += 1
+            
+            # Display results (most recent first, scrollable)
+            available_lines = max_y - y - 1
+            results_to_show = results[-available_lines:] if len(results) > available_lines else results
+            
+            for result in results_to_show:
+                if y >= max_y - 1:
+                    break
+                idx = result['index']
+                name_short = result['name'][:max_x-15]
+                is_valid = result['valid']
+                
+                result_line = f"[{idx:2d}] {name_short}"
+                result_attr = curses.A_NORMAL
+                if is_valid:
+                    if curses.has_colors():
+                        result_attr = curses.color_pair(self.COLOR_MATCH) | curses.A_BOLD
+                    result_line += " ✓"
+                else:
+                    if curses.has_colors():
+                        result_attr = curses.color_pair(self.COLOR_MISMATCH) | curses.A_BOLD
+                    result_line += " ✗"
+                
+                # Truncate to fit
+                result_line = result_line[:max_x]
+                self.left_win.addstr(y, 0, result_line, result_attr)
+                y += 1
+            
+            self.left_win.refresh()
+        except:
+            pass
+    
+    def prompt_continue_on_error(self, error_msg: str, error_details: str) -> bool:
+        """Prompt user to continue or quit when an error is found
+        
+        Args:
+            error_msg: Main error message
+            error_details: Detailed error information
+            
+        Returns:
+            True if user wants to continue, False if they want to quit
+        """
+        if not self.left_win:
+            return True  # Default to continue if no window
+        
+        try:
+            max_y, max_x = self.left_win.getmaxyx()
+            
+            # Clear and show error prompt
+            self.left_win.clear()
+            
+            # Title
+            title = "ERROR FOUND"
+            title_x = (max_x - len(title)) // 2
+            if title_x >= 0:
+                title_attr = curses.A_BOLD | curses.A_UNDERLINE
+                if curses.has_colors():
+                    title_attr |= curses.color_pair(self.COLOR_MISMATCH)
+                self.left_win.addstr(0, title_x, title, title_attr)
+            
+            # Error message
+            y = 2
+            if y < max_y:
+                msg_line = error_msg[:max_x]
+                msg_attr = curses.A_BOLD
+                if curses.has_colors():
+                    msg_attr |= curses.color_pair(self.COLOR_MISMATCH)
+                self.left_win.addstr(y, 0, msg_line, msg_attr)
+                y += 1
+            
+            # Error details
+            if y < max_y:
+                details_line = error_details[:max_x]
+                details_attr = curses.A_NORMAL
+                if curses.has_colors():
+                    details_attr = curses.color_pair(self.COLOR_MISMATCH)
+                self.left_win.addstr(y, 0, details_line[:max_x], details_attr)
+                y += 2
+            
+            # Prompt
+            if y < max_y:
+                prompt = "Continue validation? (C)ontinue / (Q)uit"
+                self.left_win.addstr(y, 0, prompt[:max_x], curses.A_BOLD)
+                y += 1
+            
+            # Instructions
+            if y < max_y:
+                instructions = "Press C to continue, Q to quit"
+                self.left_win.addstr(y, 0, instructions[:max_x])
+            
+            self.left_win.refresh()
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            
+            # Wait for user input
+            while True:
+                key = self.stdscr.getch()
+                if key == ord('c') or key == ord('C'):
+                    return True  # Continue
+                elif key == ord('q') or key == ord('Q'):
+                    return False  # Quit
+                elif key == ord('\n') or key == ord('\r'):
+                    # Enter key - default to continue
+                    return True
+                elif key == 27:  # ESC key - quit
+                    return False
+        
+        except:
+            # On error, default to continue
+            return True
+    
+    def validate_models_json(self, debug_callback=None):
+        """Validate all configurations in models.json by attempting to set them on the Enigma device"""
+        models_file = os.path.join(SCRIPT_DIR, 'models.json')
+        
+        if not os.path.exists(models_file):
+            if debug_callback:
+                debug_callback(f"ERROR: models.json not found at {models_file}", color_type=7)
+            self.show_message(2, 0, f"ERROR: models.json not found!")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            return
+        
+        # Check if device is connected
+        if not self.controller.is_connected():
+            if debug_callback:
+                debug_callback("ERROR: Device not connected. Please connect to Enigma device first.", color_type=7)
+            self.show_message(2, 0, "ERROR: Device not connected!")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            return
+        
+        # Load models.json
+        try:
+            with open(models_file, 'r') as f:
+                models = json.load(f)
+        except json.JSONDecodeError as e:
+            if debug_callback:
+                debug_callback(f"ERROR: Invalid JSON in models.json: {e}", color_type=7)
+            self.show_message(2, 0, f"ERROR: Invalid JSON in models.json!")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            return
+        except Exception as e:
+            if debug_callback:
+                debug_callback(f"ERROR: Failed to read models.json: {e}", color_type=7)
+            self.show_message(2, 0, f"ERROR: Failed to read models.json!")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            return
+        
+        if not isinstance(models, list):
+            if debug_callback:
+                debug_callback("ERROR: models.json must contain a JSON array", color_type=7)
+            self.show_message(2, 0, "ERROR: models.json must be an array!")
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            return
+        
+        if debug_callback:
+            debug_callback(f"Validating {len(models)} configurations from models.json...")
+        
+        # Setup screen for validation display
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        invalid_configs = []
+        valid_count = 0
+        results = []  # List of {index, name, valid, errors}
+        
+        # Test each configuration
+        for idx, model_config in enumerate(models, 1):
+            name = model_config.get('name', f'Configuration {idx}')
+            model = model_config.get('MODEL', '')
+            rotor = model_config.get('ROTOR', '')
+            ringset = model_config.get('RINGSET', '')
+            ringpos = model_config.get('RINGPOS', '')
+            plug = model_config.get('PLUG', '')
+            
+            if debug_callback:
+                debug_callback(f"[{idx}/{len(models)}] Testing: {name}")
+                debug_callback(f"  MODEL: {model}, ROTOR: {rotor}, RINGSET: {ringset}, RINGPOS: {ringpos}, PLUG: {plug}")
+            
+            # Update progress display (showing "Testing...")
+            self.draw_validation_progress(idx, len(models), name, "Testing...", valid_count, len(invalid_configs), results)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            
+            errors = []
+            
+            # Test MODEL
+            if model:
+                if not self.controller.set_mode(model, debug_callback=debug_callback):
+                    errors.append(f"MODEL ({model})")
+                time.sleep(0.2)
+            
+            # Test ROTOR
+            if rotor:
+                if not self.controller.set_rotor_set(rotor, debug_callback=debug_callback):
+                    errors.append(f"ROTOR ({rotor})")
+                time.sleep(0.2)
+            
+            # Test RINGSET
+            if ringset:
+                if not self.controller.set_ring_settings(ringset, debug_callback=debug_callback):
+                    errors.append(f"RINGSET ({ringset})")
+                time.sleep(0.2)
+            
+            # Test RINGPOS
+            if ringpos:
+                if not self.controller.set_ring_position(ringpos, debug_callback=debug_callback):
+                    errors.append(f"RINGPOS ({ringpos})")
+                time.sleep(0.2)
+            
+            # Test PLUG (plugboard)
+            if plug is not None:  # Empty string is valid (clears plugboard)
+                if not self.controller.set_pegboard(plug, debug_callback=debug_callback):
+                    errors.append(f"PLUG ({plug if plug else 'clear'})")
+                time.sleep(0.2)
+            
+            # Record result
+            is_valid = len(errors) == 0
+            if is_valid:
+                valid_count += 1
+                if debug_callback:
+                    debug_callback(f"  ✓ VALID", color_type=6)
+            else:
+                invalid_configs.append({
+                    'index': idx,
+                    'name': name,
+                    'errors': errors
+                })
+                if debug_callback:
+                    debug_callback(f"  ❌ INVALID: {', '.join(errors)}", color_type=7)
+                
+                # Pause and ask user if they want to continue
+                error_msg = f"Error found in [{idx}] {name}"
+                error_details = f"Errors: {', '.join(errors)}"
+                if not self.prompt_continue_on_error(error_msg, error_details):
+                    # User chose to quit
+                    if debug_callback:
+                        debug_callback("Validation cancelled by user")
+                    break
+            
+            results.append({
+                'index': idx,
+                'name': name,
+                'valid': is_valid,
+                'errors': errors
+            })
+            
+            # Update progress display with result
+            status = "VALID" if is_valid else "INVALID"
+            self.draw_validation_progress(idx, len(models), name, status, valid_count, len(invalid_configs), results)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        # Display final results
+        if debug_callback:
+            debug_callback("")
+            debug_callback("=" * 60)
+            if invalid_configs:
+                debug_callback("INVALID CONFIGURATIONS:", color_type=7)
+                debug_callback("=" * 60)
+                for invalid in invalid_configs:
+                    error_msg = f"[{invalid['index']}] {invalid['name']}: {', '.join(invalid['errors'])}"
+                    debug_callback(error_msg, color_type=7)
+            else:
+                debug_callback("ALL CONFIGURATIONS VALID!", color_type=6)
+                debug_callback("=" * 60)
+            debug_callback("")  # Add blank line at end to prevent last item from being cut off
+        
+        # Final summary in left window
+        self.draw_validation_progress(len(models), len(models), "Complete", "", valid_count, len(invalid_configs), results)
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        time.sleep(3)
     
     def handle_config_option_enigma(self, option: str):
         """Handle Enigma Options section"""
@@ -951,6 +1289,10 @@ class EnigmaMuseumUI(UIBase):
                 self.draw_debug_panel()
                 self.refresh_all_panels()
                 time.sleep(1)
+        
+        elif option == '23':
+            # Validate Models.json
+            self.validate_models_json(debug_callback=debug_callback)
     
     def generate_coded_messages(self, language: str):
         """Generate coded messages from english.msg or german.msg"""

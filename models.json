@@ -1,0 +1,182 @@
+[
+  {
+    "name": "Enigma I - Army Standard",
+    "description": "First military version (Army), with plugboard. The only Enigma with numeric rotor labels.",
+    "MODEL": "I",
+    "ROTOR": "B III IV I",
+    "RINGSET": "21 15 16",
+    "RINGPOS": "04 24 06",
+    "PLUG": "AV BS CG DL FU HZ IN KM OW RX"
+  },
+  {
+    "name": "Enigma M3 - Navy Standard",
+    "description": "Navy Enigma, 3 rotors, plugboard.",
+    "MODEL": "M3",
+    "ROTOR": "B I V II",
+    "RINGSET": "D G F",
+    "RINGPOS": "V G H",
+    "PLUG": "FV PQ"
+  },
+  {
+    "name": "Enigma M4 - Submarine",
+    "description": "Navy (submarine) Enigma, 4 rotors, plugboard.",
+    "MODEL": "M4",
+    "ROTOR": "B beta IV II VII",
+    "RINGSET": "D X E Z",
+    "RINGPOS": "A B C D",
+    "PLUG": "AB CD EF GH IJ KL MN OP QR ST UV WX YZ"
+  },
+  {
+    "name": "Enigma D - Early Variant",
+    "description": "Early variant, stepping notches on the rotors, not on the rings.",
+    "MODEL": "D",
+    "ROTOR": "K II I III",
+    "RINGSET": "D A B B",
+    "RINGPOS": "K G T K",
+    "PLUG": ""
+  },
+  {
+    "name": "Enigma K - Commercial",
+    "description": "Commercial version, 3 rotors, reflector settable but not stepping, no plugboard.",
+    "MODEL": "K",
+    "ROTOR": "K III II I",
+    "RINGSET": "F G R T",
+    "RINGPOS": "L A S T",
+    "PLUG": ""
+  },
+  {
+    "name": "Enigma KD - Intelligence Service",
+    "description": "Model K with rewirable reflector, used by Mil Amt intelligence service.",
+    "MODEL": "KD",
+    "ROTOR": "D I III II",
+    "RINGSET": "A B C",
+    "RINGPOS": "H I J",
+    "PLUG": ""
+  },
+  {
+    "name": "Enigma G - Counter Machine",
+    "description": "Cogwheel mechanism instead of levers to step rotors and reflector. Frequent turnovers, manual back/forth via crank.",
+    "MODEL": "G",
+    "ROTOR": "K I II III",
+    "RINGSET": "A B C V",
+    "RINGPOS": "K L M F",
+    "PLUG": ""
+  },
+  {
+    "name": "Enigma T - Tirpitz",
+    "description": "Model K variant for Japanese forces. Choice of 8 rotors, 5 turnover positions each.",
+    "MODEL": "T",
+    "ROTOR": "T V VII VIII",
+    "RINGSET": "E F G V",
+    "RINGPOS": "N O P W",
+    "PLUG": ""
+  },
+  {
+    "name": "Enigma N - Norway",
+    "description": "Model I with modified rotor wiring, captured machines used by Norwegian Security Police after 1945.",
+    "MODEL": "N",
+    "ROTOR": "N II V III",
+    "RINGSET": "05 10 15",
+    "RINGPOS": "10 15 20",
+    "PLUG": "AB CD EF GH IJ"
+  },
+  {
+    "name": "Enigma M3 - Alternative Configuration",
+    "description": "Alternative Navy Enigma configuration with different rotor arrangement.",
+    "MODEL": "M3",
+    "ROTOR": "C II IV VI",
+    "RINGSET": "A B C",
+    "RINGPOS": "Q R S",
+    "PLUG": "AC BD EG FH"
+  },
+  {
+    "name": "Enigma I - Rotor Set II V III",
+    "description": "Enigma I with rotors II, V, III and reflector B.",
+    "MODEL": "I",
+    "ROTOR": "B II V III",
+    "RINGSET": "05 12 18",
+    "RINGPOS": "01 05 10",
+    "PLUG": "AB CD EF GH IJ KL"
+  },
+  {
+    "name": "Enigma I - Rotor Set IV V I",
+    "description": "Enigma I with rotors IV, V, I and reflector C.",
+    "MODEL": "I",
+    "ROTOR": "C IV V I",
+    "RINGSET": "10 20 15",
+    "RINGPOS": "15 20 25",
+    "PLUG": "MN OP QR ST UV"
+  },
+  {
+    "name": "Enigma I - Rotor Set V IV II",
+    "description": "Enigma I with rotors V, IV, II and reflector B.",
+    "MODEL": "I",
+    "ROTOR": "B V IV II",
+    "RINGSET": "08 14 22",
+    "RINGPOS": "12 18 24",
+    "PLUG": "WX YZ AC BD EF"
+  },
+  {
+    "name": "Enigma I - Rotor Set III V IV",
+    "description": "Enigma I with rotors III, V, IV and reflector A.",
+    "MODEL": "I",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "GH IJ KL MN OP QR"
+  },
+  {
+    "name": "Enigma I - Rotor Set IV I V",
+    "description": "Enigma I with rotors IV, I, V and reflector B.",
+    "MODEL": "I",
+    "ROTOR": "B IV I V",
+    "RINGSET": "13 19 25",
+    "RINGPOS": "02 08 14",
+    "PLUG": "ST UV WX YZ AB CD"
+  },
+  {
+    "name": "Enigma M3 - Rotor Set III V VI",
+    "description": "Enigma M3 with rotors III, V, VI and reflector B.",
+    "MODEL": "M3",
+    "ROTOR": "B III V VI",
+    "RINGSET": "E K P",
+    "RINGPOS": "A E I",
+    "PLUG": "AB CD EF GH"
+  },
+  {
+    "name": "Enigma M3 - Rotor Set II VI VIII",
+    "description": "Enigma M3 with rotors II, VI, VIII and reflector C.",
+    "MODEL": "M3",
+    "ROTOR": "C II VI VIII",
+    "RINGSET": "M Q T",
+    "RINGPOS": "B F J",
+    "PLUG": "IJ KL MN OP QR"
+  },
+  {
+    "name": "Enigma M3 - Rotor Set IV I III",
+    "description": "Enigma M3 with rotors IV, I, III and reflector B.",
+    "MODEL": "M3",
+    "ROTOR": "B IV I III",
+    "RINGSET": "H L R",
+    "RINGPOS": "C G K",
+    "PLUG": "ST UV WX YZ AC"
+  },
+  {
+    "name": "Enigma M3 - Rotor Set V II IV",
+    "description": "Enigma M3 with rotors V, II, IV and reflector B.",
+    "MODEL": "M3",
+    "ROTOR": "B V II IV",
+    "RINGSET": "N S W",
+    "RINGPOS": "D H L",
+    "PLUG": "BD EG FH IK JL"
+  },
+  {
+    "name": "Enigma M3 - Rotor Set VII III I",
+    "description": "Enigma M3 with rotors VII, III, I and reflector C.",
+    "MODEL": "M3",
+    "ROTOR": "C VII III I",
+    "RINGSET": "O U X",
+    "RINGPOS": "E I M",
+    "PLUG": "MO PR QS TU VW"
+  }
+]

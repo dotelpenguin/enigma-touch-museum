@@ -136,6 +136,7 @@ class MuseumWebServer:
             def generate_status_html(self, data):
                 """Generate HTML page with museum mode status information"""
                 function_mode = data.get('function_mode', 'N/A')
+                is_interactive_mode = (function_mode == 'Interactive')
                 delay = data.get('delay', 60)
                 log_messages = data.get('log_messages', [])
                 always_send = data.get('always_send', False)
@@ -443,7 +444,7 @@ class MuseumWebServer:
         .machine-display {{ background: rgba(0, 0, 0, 0.6); border: 2px solid #ffd700; border-radius: 10px; padding: min(1.5vh, 15px); margin: min(1vh, 10px) 0; box-shadow: 0 4px 16px rgba(0,0,0,0.5); flex-shrink: 0; max-height: 25vh; overflow: hidden; }}
         .config-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: min(1vw, 10px); margin: min(1vh, 10px) 0; }}
         .config-item {{ background: rgba(255, 255, 255, 0.1); padding: min(1vh, 10px); border-radius: 6px; border: 1px solid rgba(255, 215, 0, 0.3); }}
-        .config-label {{ font-size: min(1.1vw, 11px); color: #ffd700; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: 0.3vh; font-weight: bold; }}
+        .config-label {{ font-size: min(1.5vw, 15px); color: #ffd700; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
         .config-value {{ font-size: min(2vw, 20px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; }}
         .message-container {{ display: flex; flex-direction: row; gap: min(1vw, 10px); margin: min(1vh, 10px) 0; flex-grow: 1; min-height: 0; max-height: 50vh; }}
         .message-section {{ margin: min(1vh, 10px) 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; max-height: 50vh; }}
@@ -456,7 +457,7 @@ class MuseumWebServer:
         .message-text {{ font-size: min(2.4vw, 24px); color: #fff; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; line-height: 1.4; overflow-y: auto; overflow-x: hidden; flex-grow: 1; min-height: 0; }}
         .char-highlight {{ background-color: #ffd700; color: #000; font-weight: bold; padding: 2px 4px; border-radius: 3px; }}
         .encoded-text {{ font-size: min(2.2vw, 22px); color: #0f0; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; margin-top: min(1vh, 10px); padding-top: min(1vh, 10px); border-top: 1px solid rgba(0, 255, 0, 0.3); flex-shrink: 0; overflow-y: auto; overflow-x: hidden; max-height: 20vh; }}
-        .rotor-display {{ display: flex; justify-content: center; gap: min(1vw, 10px); margin: min(1vh, 10px) 0; flex-wrap: wrap; }}
+        .rotor-display {{ display: flex; justify-content: center; gap: min(2vw, 30px); margin: min(1vh, 10px) 0; flex-wrap: wrap; }}
         .rotor-box {{ background: rgba(255, 215, 0, 0.2); border: 2px solid #ffd700; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #ffd700; min-width: 60px; }}
         .model-box {{ background: rgba(128, 100, 128, 0.3); border: 2px solid #806480; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #c0a0c0; min-width: 60px; }}
         .ring-settings-box {{ background: rgba(100, 120, 150, 0.3); border: 2px solid #647896; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #90a8c8; min-width: 60px; }}
@@ -479,14 +480,13 @@ class MuseumWebServer:
         </div>
         
         <div class="machine-display">
-            <div class="config-label" style="margin-bottom: 10px;">Configuration</div>
             <div class="rotor-display">
-                <div style="display: flex; flex-direction: column; align-items: center;">
-                    <div class="config-label" style="margin-bottom: 0.3vh;">Model</div>
+                <div class="config-section" style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="config-label">Model</div>
                     <div class="model-box">{html_module.escape(mode)}</div>
                 </div>
-                <div style="display: flex; flex-direction: column; align-items: center;">
-                    <div class="config-label" style="margin-bottom: 0.3vh;">Rotors</div>
+                <div class="config-section" style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="config-label">Rotors</div>
                     <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
 """
                 rotor_parts = rotor_display.split()
@@ -495,8 +495,8 @@ class MuseumWebServer:
                 
                 html += f"""                    </div>
                 </div>
-                <div style="display: flex; flex-direction: column; align-items: center;">
-                    <div class="config-label" style="margin-bottom: 0.3vh;">Ring Settings</div>
+                <div class="config-section" style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="config-label">Ring Settings</div>
                     <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
 """
                 ring_settings_parts = ring_settings.split()
@@ -505,8 +505,8 @@ class MuseumWebServer:
                 
                 html += f"""                    </div>
                 </div>
-                <div style="display: flex; flex-direction: column; align-items: center;">
-                    <div class="config-label" style="margin-bottom: 0.3vh;">Ring Position</div>
+                <div class="config-section" style="display: flex; flex-direction: column; align-items: center;">
+                    <div class="config-label">Ring Position</div>
                     <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
 """
                 ring_position_parts = ring_position.split()
