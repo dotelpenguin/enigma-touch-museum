@@ -252,27 +252,36 @@ class EnigmaMuseumUI(UIBase):
             ("2", "Configuration"),
             ("3", "Query All Settings"),
             ("4", "Museum Mode"),
-            ("5", "Set All Settings"),
-            ("6", f"Debug: {'true' if self.debug_enabled else 'false'}"),
+            ("5", "Set Enigma Config"),
+            ("6", "Set Kiosk/Lock Config"),
+            ("7", f"Debug: {'true' if self.debug_enabled else 'false'}"),
+            ("8", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}"),
             ("Q", "Quit")
         ]
         
         selected = 0
         while True:
             # Update debug status in options
-            options[5] = ("6", f"Debug: {'true' if self.debug_enabled else 'false'}")
+            options[6] = ("7", f"Debug: {'true' if self.debug_enabled else 'false'}")
+            options[7] = ("8", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}")
             self.show_menu("Enigma Museum Controller", options, selected)
             key = self.stdscr.getch()
             
             if key == ord('q') or key == ord('Q'):
                 return 'quit'
-            elif key == ord('6'):
+            elif key == ord('7'):
                 # Toggle debug
                 self.debug_enabled = not self.debug_enabled
                 if not self.debug_enabled:
                     self.debug_output = []  # Clear debug output when disabled
                 self.create_subwindows()  # Recreate subwindows
                 self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
+                continue
+            elif key == ord('8'):
+                # Toggle raw debug
+                self.controller.raw_debug_enabled = not self.controller.raw_debug_enabled
+                self.controller.save_config()
+                self.add_debug_output(f"Raw Debug {'enabled' if self.controller.raw_debug_enabled else 'disabled'}")
                 continue
             elif key == curses.KEY_UP:
                 selected = (selected - 1) % len(options)
@@ -281,7 +290,7 @@ class EnigmaMuseumUI(UIBase):
             elif key == ord('\n') or key == ord('\r'):
                 if options[selected][0] == 'Q':
                     return 'quit'
-                elif options[selected][0] == '6':
+                elif options[selected][0] == '7':
                     # Toggle debug
                     self.debug_enabled = not self.debug_enabled
                     if not self.debug_enabled:
@@ -289,8 +298,14 @@ class EnigmaMuseumUI(UIBase):
                     self.create_subwindows()  # Recreate subwindows
                     self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
                     continue
+                elif options[selected][0] == '8':
+                    # Toggle raw debug
+                    self.controller.raw_debug_enabled = not self.controller.raw_debug_enabled
+                    self.controller.save_config()
+                    self.add_debug_output(f"Raw Debug {'enabled' if self.controller.raw_debug_enabled else 'disabled'}")
+                    continue
                 return options[selected][0]
-            elif key >= ord('1') and key <= ord('5'):
+            elif key >= ord('1') and key <= ord('8'):
                 return chr(key)
     
     def config_menu(self, exit_after: bool = False):
@@ -1646,11 +1661,18 @@ class EnigmaMuseumUI(UIBase):
             if debug_callback:
                 debug_callback(f"Sending configuration before message {i+1}...")
             
-            # Check each config setting for errors
+            # Wake up device first
+            self.controller.wakeup_device(debug_callback=debug_callback)
+            
+            # Apply Enigma settings (mode, rotors, rings, pegboard)
+            # Note: Kiosk/lock settings are NOT sent automatically - use menu option 6 to set them
+            if debug_callback:
+                debug_callback("Applying Enigma settings...")
             config_errors = []
             if not self.controller.set_mode(message_settings['MODEL'], debug_callback=debug_callback):
                 config_errors.append("mode")
             time.sleep(0.2)
+            
             if not self.controller.set_rotor_set(message_settings['ROTOR'], debug_callback=debug_callback):
                 config_errors.append("rotor_set")
             time.sleep(0.2)
@@ -1699,12 +1721,19 @@ class EnigmaMuseumUI(UIBase):
                 return False  # Don't cancel
             
             # generating_messages flag is already set, so delays will be skipped
-            success = self.controller.send_message(message, progress_callback, debug_callback, position_update_callback)
+            # Use Message Interactive mode (expects lowercase) for generating coded files
+            success = self.controller.send_message(message, progress_callback, debug_callback, position_update_callback, expect_lowercase_response=True)
             
             if success and encoded_chars:
                 encoded_result = ''.join(encoded_chars)
                 # Ensure we have a valid string before creating message object
                 if encoded_result and isinstance(encoded_result, str):
+                    # Get the current ring position from controller (may have been updated during encoding)
+                    # This ensures we capture all positions (3 or 4) based on the actual model used
+                    current_ring_pos = self.controller.config.get('ring_position', message_settings['RINGPOS'])
+                    if debug_callback:
+                        debug_callback(f"Using ring position: {current_ring_pos} (from controller config)")
+                    
                     # Create message object with all metadata
                     # Use message_settings which contains either the random model settings
                     # or the current_settings depending on use_models_json
@@ -1713,7 +1742,7 @@ class EnigmaMuseumUI(UIBase):
                         'MODEL': message_settings['MODEL'],
                         'ROTOR': message_settings['ROTOR'],
                         'RINGSET': message_settings['RINGSET'],
-                        'RINGPOS': message_settings['RINGPOS'],
+                        'RINGPOS': current_ring_pos,  # Use current position from controller (handles 3 or 4 positions correctly)
                         'PLUG': message_settings['PLUG'],
                         'GROUP': message_settings['GROUP'],
                         'CODED': encoded_result
@@ -2007,8 +2036,8 @@ class EnigmaMuseumUI(UIBase):
         self.refresh_all_panels()
         self.stdscr.getch()
     
-    def set_all_settings_screen(self):
-        """Set all settings from saved config file"""
+    def set_enigma_config_screen(self):
+        """Set Enigma configuration settings from saved config file"""
         self.setup_screen()
         self.draw_settings_panel()
         
@@ -2016,7 +2045,7 @@ class EnigmaMuseumUI(UIBase):
         # Preserve device to avoid changing it during operation
         self.controller.load_config(preserve_device=True)
         
-        self.show_message(0, 0, "Setting all configurations from saved config...", curses.A_BOLD)
+        self.show_message(0, 0, "Setting Enigma configuration from saved config...", curses.A_BOLD)
         self.draw_debug_panel()
         self.refresh_all_panels()
         
@@ -2024,6 +2053,9 @@ class EnigmaMuseumUI(UIBase):
             self.add_debug_output(msg, color_type=color_type)
             self.draw_debug_panel()
             self.refresh_all_panels()
+        
+        # Wake up device first
+        self.controller.wakeup_device(debug_callback=debug_callback)
         
         # Get saved config values (from file, not in-memory)
         saved = self.controller.get_saved_config()
@@ -2046,8 +2078,50 @@ class EnigmaMuseumUI(UIBase):
         time.sleep(0.2)
         self.controller.return_to_encode_mode(debug_callback=debug_callback)
         
+        self.setup_screen()
+        self.draw_settings_panel()  # Update settings display
+        
+        if config_errors:
+            error_msg = f"Configuration errors detected: {', '.join(config_errors)}"
+            self.show_message(0, 0, error_msg, curses.A_BOLD | curses.A_REVERSE)
+            self.show_message(1, 0, "Switching to configuration menu...", curses.A_BOLD)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            time.sleep(2)
+            self.config_menu()
+            return
+        else:
+            self.show_message(0, 0, "Enigma configuration set successfully!", curses.A_BOLD)
+        
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        self.show_message(2, 0, "Press any key to continue...")
+        self.refresh_all_panels()
+        self.stdscr.getch()
+    
+    def set_kiosk_lock_config_screen(self):
+        """Set Kiosk/Lock configuration settings from saved config file"""
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        # Reload config from file to ensure we use saved defaults, not current state
+        # Preserve device to avoid changing it during operation
+        self.controller.load_config(preserve_device=True)
+        
+        self.show_message(0, 0, "Setting Kiosk/Lock configuration from saved config...", curses.A_BOLD)
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        # Wake up device first
+        self.controller.wakeup_device(debug_callback=debug_callback)
+        
         # Apply kiosk/demo settings (locks, UI, timeouts)
-        time.sleep(0.2)
+        config_errors = []
         if not self.controller.apply_kiosk_settings(debug_callback=debug_callback):
             config_errors.append("kiosk_settings")
         
@@ -2064,7 +2138,7 @@ class EnigmaMuseumUI(UIBase):
             self.config_menu()
             return
         else:
-            self.show_message(0, 0, "All settings configured successfully!", curses.A_BOLD)
+            self.show_message(0, 0, "Kiosk/Lock configuration set successfully!", curses.A_BOLD)
         
         self.draw_debug_panel()
         
@@ -2299,22 +2373,8 @@ class EnigmaMuseumUI(UIBase):
                     # The message is still added to log_messages
                     pass
         
-        # Apply kiosk and lock settings when entering museum mode (only once at start)
-        def debug_callback_init(msg, color_type=None):
-            self.add_debug_output(msg, color_type=color_type)
-            self.draw_debug_panel()
-            self.refresh_all_panels()
-        
-        if self.controller.is_connected():
-            # Add log messages without redrawing (screen not ready yet)
-            add_log_message("Applying kiosk and lock settings...", redraw=False)
-            if not self.controller.apply_kiosk_settings(debug_callback=debug_callback_init):
-                add_log_message("Warning: Some kiosk settings failed to apply", redraw=False)
-            else:
-                add_log_message("Kiosk settings applied successfully", redraw=False)
-            self.draw_settings_panel()  # Refresh settings panel
-            self.draw_debug_panel()
-            self.refresh_all_panels()
+        # Note: Kiosk/lock settings are NOT applied automatically in museum mode
+        # Use menu option 6 "Set Kiosk/Lock Config" to set them manually
         
         # Get saved config for reference
         saved = self.controller.get_saved_config()
@@ -3079,7 +3139,9 @@ class EnigmaMuseumUI(UIBase):
                 elif choice == '4':
                     self.museum_mode_screen()
                 elif choice == '5':
-                    self.set_all_settings_screen()
+                    self.set_enigma_config_screen()
+                elif choice == '6':
+                    self.set_kiosk_lock_config_screen()
         
         finally:
             self.destroy_subwindows()

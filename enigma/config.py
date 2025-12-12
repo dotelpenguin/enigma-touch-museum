@@ -96,6 +96,7 @@ class ConfigManager:
                 'timeout_battery': config_data.get('timeout_battery', 15),
                 'timeout_plugged': config_data.get('timeout_plugged', 0),
                 'timeout_setup_modes': config_data.get('timeout_setup_modes', 0),
+                'raw_debug_enabled': normalize_boolean(config_data.get('raw_debug_enabled', False)),
                 'device': config_data['device']
             }
             with open(self.config_file, 'w') as f:

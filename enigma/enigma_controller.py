@@ -47,6 +47,7 @@ class EnigmaController:
             'timeout_battery': 15,
             'timeout_plugged': 0,
             'timeout_setup_modes': 0,
+            'raw_debug_enabled': False,
             'device': device
         }
         
@@ -75,6 +76,7 @@ class EnigmaController:
         self.timeout_battery = loaded_config.get('timeout_battery', 15)
         self.timeout_plugged = loaded_config.get('timeout_plugged', 0)
         self.timeout_setup_modes = loaded_config.get('timeout_setup_modes', 0)
+        self.raw_debug_enabled = loaded_config.get('raw_debug_enabled', False)
         self.device = loaded_config['device']
         self.config_file = CONFIG_FILE
         
@@ -127,6 +129,7 @@ class EnigmaController:
             'timeout_battery': getattr(self, 'timeout_battery', 15),
             'timeout_plugged': getattr(self, 'timeout_plugged', 0),
             'timeout_setup_modes': getattr(self, 'timeout_setup_modes', 0),
+            'raw_debug_enabled': getattr(self, 'raw_debug_enabled', False),
             'device': self.device
         }
         return self.config_manager.save_config(config_data, preserve_ring_position=preserve_ring_position)
@@ -217,6 +220,7 @@ class EnigmaController:
             'timeout_battery': getattr(self, 'timeout_battery', 15),
             'timeout_plugged': getattr(self, 'timeout_plugged', 0),
             'timeout_setup_modes': getattr(self, 'timeout_setup_modes', 0),
+            'raw_debug_enabled': getattr(self, 'raw_debug_enabled', False),
             'device': self.device
         }
         return self.config_manager.get_saved_config(current_config)
@@ -250,7 +254,17 @@ class EnigmaController:
         if timeout is None:
             from .constants import CMD_TIMEOUT
             timeout = CMD_TIMEOUT
-        return self.serial_conn.send_command(command, timeout=timeout, debug_callback=debug_callback)
+        response = self.serial_conn.send_command(command, timeout=timeout, debug_callback=debug_callback)
+        
+        # Log raw response if raw debug is enabled
+        if debug_callback and self.raw_debug_enabled and response:
+            # Get raw bytes from serial connection if available
+            # Note: send_command returns decoded string, so we need to capture raw bytes differently
+            # For now, we'll log the response string with indication it's from send_command
+            if debug_callback:
+                debug_callback(f"[RAW] send_command response (decoded): {repr(response)}")
+        
+        return response
     
     @property
     def ser(self):
@@ -667,7 +681,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!MO {mode}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_mode command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_mode full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -686,7 +704,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!RO {rotor_set}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_rotor_set command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_rotor_set full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -705,7 +727,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!RI {ring_settings}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_ring_settings command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_ring_settings full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -724,7 +750,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!RP {ring_position}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_ring_position command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_ring_position full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -753,7 +783,11 @@ class EnigmaController:
         else:
             cmd = f"!PB {pegboard}\r\n".encode('ascii')
             display_value = pegboard
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_pegboard command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_pegboard full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -780,7 +814,11 @@ class EnigmaController:
         time.sleep(0.05)
         value = 1 if lock else 0
         cmd = f"!LM {value}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_lock_model command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_lock_model full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -804,7 +842,11 @@ class EnigmaController:
         time.sleep(0.05)
         value = 1 if lock else 0
         cmd = f"!LW {value}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_lock_rotor command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_lock_rotor full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -828,7 +870,11 @@ class EnigmaController:
         time.sleep(0.05)
         value = 1 if lock else 0
         cmd = f"!LR {value}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_lock_ring command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_lock_ring full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -849,7 +895,11 @@ class EnigmaController:
             return False
         value = 1 if lock else 0
         cmd = f"!LP {value}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_lock_power_off command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_lock_power_off full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -876,7 +926,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!MB {level}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_brightness command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_brightness full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -900,7 +954,11 @@ class EnigmaController:
                 debug_callback(f"ERROR: Volume level must be 0-3 (got {level})", color_type=7)
             return False
         cmd = f"!MV {level}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_volume command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_volume full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -928,7 +986,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!ML {format}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_logging_format command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_logging_format full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -954,7 +1016,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!TB {minutes}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_timeout_battery command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_timeout_battery full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -981,7 +1047,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!TP {minutes}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_timeout_plugged command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_timeout_plugged full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -1008,7 +1078,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!TS {minutes}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_timeout_screen_saver command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_timeout_screen_saver full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -1035,7 +1109,11 @@ class EnigmaController:
         self.ser.flush()
         time.sleep(0.05)
         cmd = f"!TM {seconds}\r\n".encode('ascii')
+        if debug_callback and self.raw_debug_enabled:
+            debug_callback(f"[RAW] set_timeout_setup_modes command bytes: {repr(cmd)}")
         response = self.send_command(cmd, debug_callback=debug_callback)
+        if debug_callback and self.raw_debug_enabled and response:
+            debug_callback(f"[RAW] set_timeout_setup_modes full response: {repr(response)}")
         has_error, error_message = self._has_error_response(response)
         if has_error:
             if debug_callback:
@@ -1139,6 +1217,65 @@ class EnigmaController:
             debug_callback("All kiosk settings applied successfully")
         return True
     
+    def wakeup_device(self, debug_callback=None) -> bool:
+        """Wake up the device by sending line return, 'A', and line return
+        
+        This helps ensure the device is ready to receive commands.
+        
+        Args:
+            debug_callback: Optional callback for debug messages
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.ser or not self.ser.is_open:
+            return False
+        
+        if debug_callback:
+            debug_callback("Waking up device...")
+        
+        try:
+            # Send: \r\n, A, \r\n
+            wakeup_parts = [b'\r\n', b'A', b'\r\n']
+            
+            for i, part in enumerate(wakeup_parts):
+                if debug_callback and self.raw_debug_enabled:
+                    part_hex = ' '.join(f'{b:02x}' for b in part)
+                    debug_callback(f"[RAW] wakeup part {i+1} bytes (hex): {part_hex}")
+                    debug_callback(f"[RAW] wakeup part {i+1} bytes (repr): {repr(part)}")
+                
+                self.ser.write(part)
+                self.ser.flush()
+                time.sleep(0.1)
+            
+            # Read any response from device
+            time.sleep(0.2)  # Give device time to process
+            response = b''
+            if self.ser.in_waiting > 0:
+                response = self.ser.read(self.ser.in_waiting)
+                if debug_callback and self.raw_debug_enabled and response:
+                    raw_hex = ' '.join(f'{b:02x}' for b in response)
+                    debug_callback(f"[RAW] wakeup response bytes (hex): {raw_hex}")
+                    debug_callback(f"[RAW] wakeup response bytes (repr): {repr(response)}")
+                    debug_callback(f"[RAW] wakeup response length: {len(response)} bytes")
+                    try:
+                        decoded = response.decode('ascii', errors='replace')
+                        debug_callback(f"[RAW] wakeup response (decoded): {repr(decoded)}")
+                    except:
+                        pass
+            
+            if debug_callback:
+                if response:
+                    debug_callback(f"Device wakeup sent, received {len(response)} bytes")
+                else:
+                    debug_callback("Device wakeup sent")
+            
+            return True
+        except Exception as e:
+            if debug_callback:
+                debug_callback(f"Error during wakeup: {e}", color_type=7)
+            return False
+    
     def return_to_encode_mode(self, debug_callback=None) -> bool:
         """Return to encode mode"""
         response = self.send_command(b'?MO\r\n', timeout=1.0, debug_callback=debug_callback)
@@ -1171,8 +1308,9 @@ class EnigmaController:
                 # This applies even if currently in 'Interactive' mode - we want lowercase for UI messages
                 self.function_mode = 'Message Interactive'
         elif expect_lowercase_response:
-            # Explicitly set to Message Interactive mode
-            self.function_mode = 'Message Interactive'
+            # Explicitly set to Message Interactive mode (expects lowercase)
+            if not (self.function_mode.startswith('Encode') or self.function_mode.startswith('Decode')):
+                self.function_mode = 'Message Interactive'
         
         # Notify UI if mode changed at start
         if self.function_mode != initial_mode and mode_update_callback:
@@ -1183,11 +1321,19 @@ class EnigmaController:
         if self.always_send_config:
             if debug_callback:
                 debug_callback("Sending configuration before message...")
+            
+            # Wake up device first
+            self.wakeup_device(debug_callback=debug_callback)
+            
             # Load config but preserve always_send_config and function_mode to prevent them from being overwritten
             # We want to keep 'Message Interactive' mode for manual messages
             self.load_config(preserve_device=True, preserve_always_send_config=True, preserve_function_mode=True)
             saved = self.get_saved_config()
             
+            # Apply Enigma settings (mode, rotors, rings, pegboard)
+            # Note: Kiosk/lock settings are NOT sent automatically - use menu option 6 to set them
+            if debug_callback:
+                debug_callback("Applying Enigma settings...")
             config_errors = []
             if not self.set_mode(saved['config']['mode'], debug_callback=debug_callback):
                 config_errors.append("mode")
@@ -1212,13 +1358,6 @@ class EnigmaController:
                 if config_error_callback:
                     config_error_callback(config_errors)
                 return False
-            
-            # Apply kiosk/demo settings (locks, UI, timeouts)
-            time.sleep(0.2)
-            if not self.apply_kiosk_settings(debug_callback=debug_callback):
-                # Log error but don't fail message sending - kiosk settings are optional
-                if debug_callback:
-                    debug_callback("Warning: Some kiosk settings failed to apply", color_type=3)
             
             self.return_to_encode_mode(debug_callback=debug_callback)
             time.sleep(0.5)
@@ -1318,6 +1457,16 @@ class EnigmaController:
                         if self.ser.in_waiting > 0:
                             response += self.ser.read(self.ser.in_waiting)
                     
+                    # Log raw payload for debugging (if enabled)
+                    if debug_callback and response and self.raw_debug_enabled:
+                        # Show raw bytes in hex and repr format
+                        raw_hex = ' '.join(f'{b:02x}' for b in response)
+                        raw_repr = repr(response)
+                        debug_callback(f"[RAW] Response bytes (hex): {raw_hex}")
+                        debug_callback(f"[RAW] Response bytes (repr): {raw_repr}")
+                        # Also show length
+                        debug_callback(f"[RAW] Response length: {len(response)} bytes")
+                    
                     if response and found_positions:
                         resp_text = None
                         parts = []
@@ -1334,8 +1483,12 @@ class EnigmaController:
                         current_positions = None
                         encoded_char_original = None
                         
-                        # Get rotor count based on current model
+                        # Get rotor count based on current model (recalculate each time to ensure it's up to date)
                         rotor_count = self._get_rotor_count()
+                        if debug_callback:
+                            current_model = self.config.get('mode', 'I')
+                            debug_callback(f"Using rotor_count: {rotor_count} for model: {current_model}")
+                            debug_callback(f"Function mode: {self.function_mode}, expect_lowercase: {expect_lowercase}")
                         
                         try:
                             resp_text = response.decode('ascii', errors='replace')
@@ -1367,6 +1520,13 @@ class EnigmaController:
                                             # Uppercase detected - switch to Interactive mode (uppercase)
                                             # When switching to Interactive mode, initialize display values to None
                                             # so they show as "-" until we receive actual Interactive mode input
+                                            if debug_callback:
+                                                debug_callback(f"Uppercase detected in Message Interactive mode!", color_type=7)
+                                                debug_callback(f"  part1: '{part1}' (isupper: {part1.isupper()})", color_type=7)
+                                                debug_callback(f"  part2: '{part2}' (isupper: {part2.isupper()})", color_type=7)
+                                                debug_callback(f"  part3: '{part3}'", color_type=7)
+                                                debug_callback(f"  Full parts list: {parts}", color_type=7)
+                                                debug_callback(f"  Raw response was: {repr(response)}", color_type=7)
                                             encoded_char_original = part2  # Use exact value from Enigma
                                             encoded_char = encoded_char_original.upper()  # Ensure uppercase for processing
                                             # Initialize to None so web display shows "-" until we receive Interactive mode input
@@ -1377,7 +1537,7 @@ class EnigmaController:
                                             if mode_update_callback:
                                                 mode_update_callback()
                                             if debug_callback:
-                                                debug_callback(f"Uppercase detected - switching to Interactive mode (uppercase)", color_type=7)
+                                                debug_callback(f"Switching to Interactive mode (uppercase)", color_type=7)
                                     else:
                                         # Interactive mode: expect uppercase
                                         if part1.isupper() and part2.isupper():
@@ -1390,20 +1550,27 @@ class EnigmaController:
                                             continue
                                     
                                     # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
+                                    # Verify we have enough parts for all positions
+                                    if j + 3 + rotor_count > len(parts):
+                                        if debug_callback:
+                                            debug_callback(f"Warning: Not enough parts for {rotor_count} positions. Have {len(parts)} parts, need at least {j + 3 + rotor_count}. Parts: {parts}")
                                     current_positions = self._parse_positions(parts, j + 3, rotor_count)
                                     if current_positions is None:
                                         if debug_callback:
-                                            debug_callback(f"Warning: Could not parse positions from response")
-                                    
-                                    if debug_callback:
-                                        debug_callback(f"Found: {part1} -> {encoded_char} (original case: {encoded_char_original})")
-                                        if current_positions:
+                                            # Show what we tried to parse for debugging
+                                            pos_parts = parts[j + 3:j + 3 + rotor_count] if j + 3 + rotor_count <= len(parts) else parts[j + 3:]
+                                            debug_callback(f"Warning: Could not parse positions from response. Parts: {pos_parts}, rotor_count: {rotor_count}, total parts: {len(parts)}")
+                                    else:
+                                        if debug_callback:
+                                            debug_callback(f"Found: {part1} -> {encoded_char} (original case: {encoded_char_original})")
                                             # Format preserving original format (letters or numbers)
                                             pos_str = self._format_positions(parts, j + 3, rotor_count, current_positions)
-                                            debug_callback(f"Positions: {pos_str}")
+                                            debug_callback(f"Positions: {pos_str} (parsed as: {current_positions}, count: {len(current_positions)}, expected: {rotor_count})")
+                                            if len(current_positions) != rotor_count:
+                                                debug_callback(f"ERROR: Position count mismatch! Got {len(current_positions)} positions but expected {rotor_count}", color_type=7)
                                     break
                             
-                            if encoded_char:
+                            if encoded_char and current_positions is not None:
                                 # Only update last_char if not already set by Interactive mode switch
                                 # (Interactive mode switch sets these to uppercase values from LOCAL INPUT above)
                                 # LOCAL INPUT FROM ENIGMA TAKES PRIORITY - don't overwrite with message character (char)
@@ -1425,13 +1592,22 @@ class EnigmaController:
                                 if previous_positions is not None and current_positions is not None:
                                     if current_positions == previous_positions:
                                         if debug_callback:
-                                            debug_callback(f"Positions unchanged ({current_positions}), continuing to read for update...")
+                                            # Show formatted positions for better debugging
+                                            prev_str = self._format_positions(parts, j + 3, rotor_count, previous_positions) if previous_positions else "None"
+                                            curr_str = self._format_positions(parts, j + 3, rotor_count, current_positions) if current_positions else "None"
+                                            debug_callback(f"Positions unchanged: {prev_str} == {curr_str} (as tuples: {previous_positions} == {current_positions}), continuing to read for update...")
                                         found_positions = False
                                         additional_wait = 0.3
                                         additional_start = time.time()
                                         while time.time() - additional_start < additional_wait:
                                             if self.ser.in_waiting > 0:
-                                                response += self.ser.read(self.ser.in_waiting)
+                                                additional_data = self.ser.read(self.ser.in_waiting)
+                                                response += additional_data
+                                                # Log raw additional data received (if enabled)
+                                                if debug_callback and additional_data and self.raw_debug_enabled:
+                                                    raw_hex = ' '.join(f'{b:02x}' for b in additional_data)
+                                                    debug_callback(f"[RAW] Additional data (hex): {raw_hex}")
+                                                    debug_callback(f"[RAW] Additional data (repr): {repr(additional_data)}")
                                                 resp_text = response.decode('ascii', errors='replace')
                                                 resp_text = resp_text.replace('\r', ' ').replace('\n', ' ')
                                                 resp_text = ' '.join(resp_text.split()).strip()
@@ -1453,6 +1629,13 @@ class EnigmaController:
                                                             elif part_k1.isupper() or part_k2.isupper():
                                                                 # Uppercase detected - switch to Interactive mode (uppercase)
                                                                 # Initialize display values to None so they show as "-" until Interactive mode input is received
+                                                                if debug_callback:
+                                                                    debug_callback(f"Uppercase detected in Message Interactive mode (additional read)!", color_type=7)
+                                                                    debug_callback(f"  part_k1: '{part_k1}' (isupper: {part_k1.isupper()})", color_type=7)
+                                                                    debug_callback(f"  part_k2: '{part_k2}' (isupper: {part_k2.isupper()})", color_type=7)
+                                                                    debug_callback(f"  part_k3: '{part_k3}'", color_type=7)
+                                                                    debug_callback(f"  Full parts list: {parts}", color_type=7)
+                                                                    debug_callback(f"  Full response: {repr(response)}", color_type=7)
                                                                 self.last_char_original = None
                                                                 self.last_char_received = None
                                                                 self.function_mode = 'Interactive'
@@ -1460,7 +1643,7 @@ class EnigmaController:
                                                                 if mode_update_callback:
                                                                     mode_update_callback()
                                                                 if debug_callback:
-                                                                    debug_callback(f"Uppercase detected - switching to Interactive mode (uppercase)", color_type=7)
+                                                                    debug_callback(f"Switching to Interactive mode (uppercase)", color_type=7)
                                                                 pattern_matches = True
                                                         else:
                                                             # Interactive mode: expect uppercase
