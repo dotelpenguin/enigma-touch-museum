@@ -1,10 +1,10 @@
 {
   "config": {
-    "mode": "N",
-    "rotor_set": "N II V III",
-    "ring_settings": "05 10 15",
-    "ring_position": "D F E F",
-    "pegboard": "AB CD EF GH IJ",
+    "mode": "M3",
+    "rotor_set": "B IV I III",
+    "ring_settings": "H L R",
+    "ring_position": "N V G",
+    "pegboard": "ST UV WX YZ AC",
     "lock_model": true,
     "lock_rotor": true,
     "lock_ring": true,
@@ -17,7 +17,7 @@
     "screen_saver": 0,
     "timeout_setup_modes": 0
   },
-  "function_mode": "Interactive",
+  "function_mode": "Decode - EN",
   "museum_delay": 60,
   "always_send_config": true,
   "word_group_size": 5,
@@ -37,5 +37,5 @@
   "timeout_plugged": 0,
   "timeout_setup_modes": 0,
   "raw_debug_enabled": false,
-  "device": "/dev/tty.usbmodem207A39584B471"
+  "device": "/dev/ttyACM0"
 }

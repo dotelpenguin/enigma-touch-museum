@@ -1539,6 +1539,11 @@ class EnigmaMuseumUI(UIBase):
             self.draw_settings_panel()
             self.refresh_all_panels()
         
+        # Save original always_send_config value - we'll disable it during message generation
+        # to prevent sending default config settings that would overwrite message-specific settings
+        original_always_send_config = self.controller.always_send_config
+        self.controller.always_send_config = False
+        
         # Set flag to skip delays during message generation
         self.controller.generating_messages = True
         if debug_callback:
@@ -1572,6 +1577,8 @@ class EnigmaMuseumUI(UIBase):
             self.config_menu()
             # Clear generation flag before returning
             self.controller.generating_messages = False
+            # Restore original always_send_config value
+            self.controller.always_send_config = original_always_send_config
             return
         
         # Process each message
@@ -1735,6 +1742,9 @@ class EnigmaMuseumUI(UIBase):
                 self.stdscr.getch()
                 self.config_menu()
                 # After returning from config menu, stop generation
+                # Clear generation flag and restore always_send_config before breaking
+                self.controller.generating_messages = False
+                self.controller.always_send_config = original_always_send_config
                 break
             
             self.controller.return_to_encode_mode(debug_callback=debug_callback)
@@ -1758,11 +1768,11 @@ class EnigmaMuseumUI(UIBase):
                 encoded_result = ''.join(encoded_chars)
                 # Ensure we have a valid string before creating message object
                 if encoded_result and isinstance(encoded_result, str):
-                    # Get the current ring position from controller (may have been updated during encoding)
-                    # This ensures we capture all positions (3 or 4) based on the actual model used
-                    current_ring_pos = self.controller.config.get('ring_position', message_settings['RINGPOS'])
+                    # Use the initial ring position from message_settings (set before encoding started)
+                    # This is the starting position used for encoding, not the final position after encoding
+                    initial_ring_pos = message_settings['RINGPOS']
                     if debug_callback:
-                        debug_callback(f"Using ring position: {current_ring_pos} (from controller config)")
+                        debug_callback(f"Using initial ring position: {initial_ring_pos} (from message settings)")
                     
                     # Create message object with all metadata
                     # Use message_settings which contains either the random model settings
@@ -1772,7 +1782,7 @@ class EnigmaMuseumUI(UIBase):
                         'MODEL': message_settings['MODEL'],
                         'ROTOR': message_settings['ROTOR'],
                         'RINGSET': message_settings['RINGSET'],
-                        'RINGPOS': current_ring_pos,  # Use current position from controller (handles 3 or 4 positions correctly)
+                        'RINGPOS': initial_ring_pos,  # Use initial position (starting position used for encoding)
                         'PLUG': message_settings['PLUG'],
                         'GROUP': message_settings['GROUP'],
                         'CODED': encoded_result
@@ -1797,6 +1807,9 @@ class EnigmaMuseumUI(UIBase):
         
         # Clear generation flag
         self.controller.generating_messages = False
+        
+        # Restore original always_send_config value
+        self.controller.always_send_config = original_always_send_config
         if debug_callback:
             debug_callback(f"Message generation complete: delays restored")
         
