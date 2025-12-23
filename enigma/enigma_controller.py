@@ -1545,8 +1545,6 @@ class EnigmaController:
         
         encoded_chars = []
         char_count = 0
-        previous_positions = None
-        previous_counter = None
         
         def update_ring_position(new_positions, parts=None, start_idx=None):
             """Helper to update ring position in config and notify UI
@@ -1779,203 +1777,24 @@ class EnigmaController:
                                     # Note: We don't set last_char_original here because it should have been set
                                     # by the Interactive mode switch above with the LOCAL INPUT (part1)
                                 
-                                if previous_positions is not None and current_positions is not None:
-                                    # Check if positions changed OR counter incremented
-                                    # Use helper function to ensure proper comparison for 3 and 4 rotor models
-                                    positions_changed = self._positions_changed(previous_positions, current_positions, rotor_count, debug_callback)
-                                    counter_incremented = False
-                                    
-                                    # If positions unchanged, check if counter has incremented
-                                    if not positions_changed and current_counter is not None and previous_counter is not None:
-                                        if current_counter > previous_counter:
-                                            counter_incremented = True
-                                            if debug_callback:
-                                                debug_callback(f"Positions unchanged but counter incremented: {previous_counter} -> {current_counter}, accepting encoding")
-                                    
-                                    if not positions_changed and not counter_incremented:
-                                        if debug_callback:
-                                            # Show formatted positions for better debugging
-                                            prev_str = self._format_positions(parts, j + 3, rotor_count, previous_positions) if previous_positions else "None"
-                                            curr_str = self._format_positions(parts, j + 3, rotor_count, current_positions) if current_positions else "None"
-                                            counter_info = ""
-                                            if previous_counter is not None:
-                                                counter_info = f" (previous counter: {previous_counter}"
-                                                if current_counter is not None:
-                                                    counter_info += f", current counter: {current_counter})"
-                                                else:
-                                                    counter_info += ", no counter in current response)"
-                                            debug_callback(f"Positions unchanged: {prev_str} == {curr_str} (as tuples: {previous_positions} == {current_positions}){counter_info}, continuing to read for update...")
-                                        found_positions = False
-                                        additional_wait = 0.3
-                                        additional_start = time.time()
-                                        while time.time() - additional_start < additional_wait:
-                                            if self.ser.in_waiting > 0:
-                                                additional_data = self.ser.read(self.ser.in_waiting)
-                                                response += additional_data
-                                                # Log raw additional data received (if enabled)
-                                                if debug_callback and additional_data and self.raw_debug_enabled:
-                                                    raw_hex = ' '.join(f'{b:02x}' for b in additional_data)
-                                                    debug_callback(f"[RAW] Additional data (hex): {raw_hex}")
-                                                    debug_callback(f"[RAW] Additional data (repr): {repr(additional_data)}")
-                                                resp_text = response.decode('ascii', errors='replace')
-                                                resp_text = resp_text.replace('\r', ' ').replace('\n', ' ')
-                                                resp_text = ' '.join(resp_text.split()).strip()
-                                                parts = resp_text.split()
-                                                for k in range(len(parts) - 2):
-                                                    part_k1 = parts[k]
-                                                    part_k2 = parts[k+1]
-                                                    part_k3 = parts[k+2]
-                                                    
-                                                    # Check if we have enough parts for positions (2 + rotor_count)
-                                                    if (len(part_k1) == 1 and part_k1.isalpha() and
-                                                        len(part_k2) == 1 and part_k2.isalpha() and
-                                                        part_k3.lower() == 'positions' and k + 2 + rotor_count <= len(parts)):
-                                                        pattern_matches = False
-                                                        if expect_lowercase:
-                                                            # Museum mode or Message Interactive mode: expect lowercase
-                                                            if part_k1.islower() and part_k2.islower():
-                                                                pattern_matches = True
-                                                            elif part_k1.isupper() or part_k2.isupper():
-                                                                # Uppercase detected - switch to Interactive mode (uppercase)
-                                                                # Initialize display values to None so they show as "-" until Interactive mode input is received
-                                                                if debug_callback:
-                                                                    debug_callback(f"Uppercase detected in Message Interactive mode (additional read)!", color_type=7)
-                                                                    debug_callback(f"  part_k1: '{part_k1}' (isupper: {part_k1.isupper()})", color_type=7)
-                                                                    debug_callback(f"  part_k2: '{part_k2}' (isupper: {part_k2.isupper()})", color_type=7)
-                                                                    debug_callback(f"  part_k3: '{part_k3}'", color_type=7)
-                                                                    debug_callback(f"  Full parts list: {parts}", color_type=7)
-                                                                    debug_callback(f"  Full response: {repr(response)}", color_type=7)
-                                                                self.last_char_original = None
-                                                                self.last_char_received = None
-                                                                self.function_mode = 'Interactive'
-                                                                self.save_config(preserve_always_send_config=True)
-                                                                if mode_update_callback:
-                                                                    mode_update_callback()
-                                                                if debug_callback:
-                                                                    debug_callback(f"Switching to Interactive mode (uppercase)", color_type=7)
-                                                                pattern_matches = True
-                                                        else:
-                                                            # Interactive mode: expect uppercase
-                                                            if part_k1.isupper() and part_k2.isupper():
-                                                                pattern_matches = True
-                                                        
-                                                        if pattern_matches:
-                                                            # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
-                                                            new_positions = self._parse_positions(parts, k + 3, rotor_count)
-                                                            
-                                                            # Check for counter in additional data
-                                                            new_counter = None
-                                                            counter_idx = k + 3 + rotor_count
-                                                            if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
-                                                                if counter_idx + 1 < len(parts):
-                                                                    try:
-                                                                        new_counter = int(parts[counter_idx + 1])
-                                                                    except ValueError:
-                                                                        pass
-                                                            
-                                                            # Accept if positions changed OR counter incremented
-                                                            # Use helper function to ensure proper comparison for 3 and 4 rotor models
-                                                            positions_changed = new_positions is not None and self._positions_changed(previous_positions, new_positions, rotor_count, debug_callback)
-                                                            counter_incremented = False
-                                                            if new_counter is not None and previous_counter is not None:
-                                                                if new_counter > previous_counter:
-                                                                    counter_incremented = True
-                                                            
-                                                            if positions_changed or counter_incremented:
-                                                                if positions_changed:
-                                                                    current_positions = new_positions
-                                                                encoded_char_original = part_k2
-                                                                encoded_char = encoded_char_original.upper()
-                                                                if new_counter is not None:
-                                                                    current_counter = new_counter
-                                                                if debug_callback:
-                                                                    if positions_changed:
-                                                                        # Format preserving original format (letters or numbers)
-                                                                        pos_str_prev = self._format_positions(parts, k + 3, rotor_count, previous_positions) if previous_positions else "None"
-                                                                        pos_str_new = self._format_positions(parts, k + 3, rotor_count, new_positions)
-                                                                        debug_callback(f"Found updated positions: {pos_str_prev} -> {pos_str_new}")
-                                                                    if counter_incremented:
-                                                                        debug_callback(f"Found counter increment: {previous_counter} -> {new_counter}")
-                                                                break
-                                                # Break if positions changed OR counter incremented
-                                                # Use helper function to ensure proper comparison for 3 and 4 rotor models
-                                                pos_changed = self._positions_changed(previous_positions, current_positions, rotor_count, debug_callback) if current_positions is not None else False
-                                                counter_inc = current_counter is not None and previous_counter is not None and current_counter > previous_counter
-                                                if pos_changed or counter_inc:
-                                                    break
-                                            time.sleep(0.05)
-                                        
-                                        # Accept encoding if positions changed OR counter incremented
-                                        # Use helper function to ensure proper comparison for 3 and 4 rotor models
-                                        positions_changed = self._positions_changed(previous_positions, current_positions, rotor_count, debug_callback) if current_positions is not None else False
-                                        counter_incremented = False
-                                        if current_counter is not None and previous_counter is not None:
-                                            if current_counter > previous_counter:
-                                                counter_incremented = True
-                                        
-                                        if positions_changed or counter_incremented:
-                                            encoded_chars.append(encoded_char)
-                                            if positions_changed:
-                                                previous_positions = current_positions
-                                                # Preserve original format (letters or numbers) when updating
-                                                update_ring_position(current_positions, parts, j + 3)
-                                            if counter_incremented:
-                                                previous_counter = current_counter
-                                                if debug_callback:
-                                                    debug_callback(f"Accepted encoding due to counter increment: {previous_counter - 1 if previous_counter else 'unknown'} -> {current_counter}")
-                                            success = True
-                                            if callback:
-                                                if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
-                                                    if debug_callback:
-                                                        debug_callback("Message sending stopped by callback")
-                                                    return False
-                                        else:
-                                            if debug_callback:
-                                                debug_callback(f"Still no position update or counter increment after waiting")
-                                            success = False
-                                    else:
-                                        # Positions changed or counter incremented - accept encoding
-                                        if debug_callback:
-                                            # Use helper function to check if positions changed
-                                            pos_changed = self._positions_changed(previous_positions, current_positions, rotor_count, debug_callback) if current_positions is not None else False
-                                            if pos_changed:
-                                                debug_callback(f"Positions updated: {previous_positions} -> {current_positions}")
-                                            if current_counter is not None and previous_counter is not None and current_counter > previous_counter:
-                                                debug_callback(f"Counter incremented: {previous_counter} -> {current_counter}")
-                                        encoded_chars.append(encoded_char)
-                                        previous_positions = current_positions
-                                        previous_counter = current_counter
-                                        # Preserve original format (letters or numbers) when updating
-                                        update_ring_position(current_positions, parts, j + 3)
-                                        success = True
-                                        if callback:
-                                            if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
-                                                if debug_callback:
-                                                    debug_callback("Message sending stopped by callback")
-                                                return False
-                                elif current_positions is not None:
-                                    # First character - just record positions and counter
-                                    encoded_chars.append(encoded_char)
-                                    previous_positions = current_positions
-                                    previous_counter = current_counter
+                                # Accept encoding - record positions and counter if available, but don't require them
+                                encoded_chars.append(encoded_char)
+                                
+                                # Record ring positions if available
+                                if current_positions is not None:
                                     # Preserve original format (letters or numbers) when updating
                                     update_ring_position(current_positions, parts, j + 3)
-                                    success = True
-                                    if callback:
-                                        if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
-                                            if debug_callback:
-                                                debug_callback("Message sending stopped by callback")
-                                            return False
-                                else:
                                     if debug_callback:
-                                        debug_callback(f"Warning: Could not extract positions from response")
-                                    encoded_chars.append(encoded_char)
-                                    success = True
-                                    if callback:
-                                        if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
-                                            if debug_callback:
-                                                debug_callback("Message sending stopped by callback")
-                                            return False
+                                        pos_str = self._format_positions(parts, j + 3, rotor_count, current_positions)
+                                        debug_callback(f"Recorded positions: {pos_str}")
+                                
+                                # Counter is already logged above if present
+                                success = True
+                                if callback:
+                                    if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
+                                        if debug_callback:
+                                            debug_callback("Message sending stopped by callback")
+                                        return False
                             else:
                                 if debug_callback:
                                     debug_callback(f"Warning: Could not parse encoded character")
