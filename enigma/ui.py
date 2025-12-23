@@ -2718,6 +2718,17 @@ class EnigmaMuseumUI(UIBase):
                                                         # Format preserving original format (letters or numbers)
                                                         pos_str = self.controller._format_positions(parts, j + 3, rotor_count, positions)
                                                         pos_info = f" Positions {pos_str}"
+                                                        
+                                                        # Check for optional Counter field after positions
+                                                        counter_idx = j + 3 + rotor_count
+                                                        if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
+                                                            if counter_idx + 1 < len(parts):
+                                                                try:
+                                                                    counter_value = int(parts[counter_idx + 1])
+                                                                    pos_info += f" Counter {counter_value}"
+                                                                except ValueError:
+                                                                    pass
+                                                        
                                                         # Update ring position
                                                         self.controller.config['ring_position'] = pos_str
                                                 debug_callback(f"<<< {original_char} {encoded_char}{pos_info}")

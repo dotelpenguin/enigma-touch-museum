@@ -77,6 +77,116 @@ def _parse_positions(parts: list, start_idx: int, rotor_count: int) -> Optional[
         return None
 
 
+def _filter_config_summary(response: bytes, debug_callback=None) -> bytes:
+    """Filter out config summary lines and return only the last encoding result
+    
+    When the Enigma device resets or cycles mode, it sends a full config summary
+    before the actual encoding result. This function filters out those config lines
+    and returns only the last line containing the actual encoding result.
+    
+    Args:
+        response: Raw response bytes from device
+        debug_callback: Optional callback for debug messages
+        
+    Returns:
+        Filtered response bytes containing only the last encoding result
+    """
+    if not response:
+        return response
+    
+    try:
+        # Decode response to work with lines
+        decoded = response.decode('ascii', errors='replace')
+        
+        # Split by newlines to preserve line structure
+        lines = decoded.split('\n')
+        
+        # Remove carriage returns and strip whitespace from each line
+        cleaned_lines = [line.replace('\r', '').strip() for line in lines if line.strip()]
+        
+        if not cleaned_lines:
+            return response
+        
+        # Identify config summary lines and encoding result lines
+        config_lines = []
+        encoding_lines = []
+        
+        for i, line in enumerate(cleaned_lines):
+            line_upper = line.upper()
+            parts = line.split()
+            
+            if not parts:
+                continue
+            
+            # Check if line matches encoding pattern: two single chars + "Positions"
+            # This check must come FIRST to avoid misidentifying encoding lines as config
+            is_encoding_line = False
+            if len(parts) >= 3:
+                part1 = parts[0]
+                part2 = parts[1]
+                part3 = parts[2]
+                
+                # Pattern: two single alphabetic characters followed by "Positions"
+                if (len(part1) == 1 and part1.isalpha() and
+                    len(part2) == 1 and part2.isalpha() and
+                    part3.upper() == 'POSITIONS'):
+                    is_encoding_line = True
+            
+            # Check if line is a config summary line (only if not encoding line)
+            is_config_line = False
+            if not is_encoding_line:
+                if line_upper.startswith('ENIGMA'):
+                    is_config_line = True
+                elif line_upper.startswith('REFLECTOR'):
+                    is_config_line = True
+                elif line_upper.startswith('ROTORS'):
+                    is_config_line = True
+                elif line_upper.startswith('RINGS'):
+                    is_config_line = True
+                elif len(parts) >= 1 and parts[0].upper() == 'POSITIONS':
+                    # Config line: "Positions D C N G" (Positions is first word)
+                    # Encoding line already handled above: "d q   Positions D C N H"
+                    is_config_line = True
+            
+            if is_config_line:
+                config_lines.append((i, line))
+            elif is_encoding_line:
+                encoding_lines.append((i, line))
+        
+        # If we found config lines, filter them out
+        if config_lines:
+            if debug_callback:
+                debug_callback("Config summary detected in response, filtering...")
+                for idx, config_line in config_lines:
+                    debug_callback(f"Ignoring config line: {config_line}")
+                debug_callback(f"Filtered out {len(config_lines)} config summary line(s), using last encoding result")
+            
+            # If we have encoding lines, use the last one
+            if encoding_lines:
+                last_encoding_line = encoding_lines[-1][1]
+                if debug_callback:
+                    debug_callback(f"Using encoding result line: {last_encoding_line}")
+                
+                # Return only the last encoding line as bytes
+                filtered_bytes = last_encoding_line.encode('ascii', errors='replace')
+                return filtered_bytes
+            else:
+                # No encoding pattern found after filtering
+                if debug_callback:
+                    debug_callback("Warning: No encoding pattern found after filtering config summary", color_type=7)
+                # Return original response as fallback
+                return response
+        else:
+            # No config summary detected, return original response
+            return response
+            
+    except Exception as e:
+        # If filtering fails, return original response
+        if debug_callback:
+            debug_callback(f"Error filtering config summary: {e}, using original response", color_type=7)
+        return response
+
+
 class SerialConnection:
     """Handles low-level serial communication with Enigma device"""
     
@@ -193,6 +303,9 @@ class SerialConnection:
                     # OR if buffer is getting large (might indicate complete response)
                     buffer_has_positions = b'Positions' in buffer or b'positions' in buffer
                     if time_since_data >= processing_timeout or buffer_has_positions or len(buffer) > 200:
+                        # Filter out config summary if present
+                        buffer = _filter_config_summary(buffer, debug_callback=self.monitoring_debug_callback)
+                        
                         # Try to parse as character encoding response
                         try:
                             resp_text = buffer.decode('ascii', errors='replace')
@@ -223,6 +336,17 @@ class SerialConnection:
                                         if positions:
                                             pos_str = ' '.join(f"{p:02d}" for p in positions)
                                             pos_info = f" Positions {pos_str}"
+                                            
+                                            # Check for optional Counter field after positions
+                                            counter_idx = j + 3 + rotor_count
+                                            if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
+                                                if counter_idx + 1 < len(parts):
+                                                    try:
+                                                        counter_value = int(parts[counter_idx + 1])
+                                                        pos_info += f" Counter {counter_value}"
+                                                    except ValueError:
+                                                        pass
+                                        
                                         self.monitoring_debug_callback(f">>> '{original_char}'")
                                         self.monitoring_debug_callback(f"<<< {original_char} {encoded_char}{pos_info}")
                                     
