@@ -1502,6 +1502,7 @@ class EnigmaController:
         encoded_chars = []
         char_count = 0
         previous_positions = None
+        previous_counter = None
         
         def update_ring_position(new_positions, parts=None, start_idx=None):
             """Helper to update ring position in config and notify UI
@@ -1696,6 +1697,9 @@ class EnigmaController:
                                                 if debug_callback:
                                                     debug_callback(f"Warning: Could not parse counter value: {parts[counter_idx + 1]}")
                                     
+                                    # Store counter_value for later comparison (even if None)
+                                    current_counter = counter_value
+                                    
                                     if current_positions is None:
                                         if debug_callback:
                                             # Show what we tried to parse for debugging
@@ -1732,12 +1736,30 @@ class EnigmaController:
                                     # by the Interactive mode switch above with the LOCAL INPUT (part1)
                                 
                                 if previous_positions is not None and current_positions is not None:
-                                    if current_positions == previous_positions:
+                                    # Check if positions changed OR counter incremented
+                                    positions_changed = current_positions != previous_positions
+                                    counter_incremented = False
+                                    
+                                    # If positions unchanged, check if counter has incremented
+                                    if not positions_changed and current_counter is not None and previous_counter is not None:
+                                        if current_counter > previous_counter:
+                                            counter_incremented = True
+                                            if debug_callback:
+                                                debug_callback(f"Positions unchanged but counter incremented: {previous_counter} -> {current_counter}, accepting encoding")
+                                    
+                                    if not positions_changed and not counter_incremented:
                                         if debug_callback:
                                             # Show formatted positions for better debugging
                                             prev_str = self._format_positions(parts, j + 3, rotor_count, previous_positions) if previous_positions else "None"
                                             curr_str = self._format_positions(parts, j + 3, rotor_count, current_positions) if current_positions else "None"
-                                            debug_callback(f"Positions unchanged: {prev_str} == {curr_str} (as tuples: {previous_positions} == {current_positions}), continuing to read for update...")
+                                            counter_info = ""
+                                            if previous_counter is not None:
+                                                counter_info = f" (previous counter: {previous_counter}"
+                                                if current_counter is not None:
+                                                    counter_info += f", current counter: {current_counter})"
+                                                else:
+                                                    counter_info += ", no counter in current response)"
+                                            debug_callback(f"Positions unchanged: {prev_str} == {curr_str} (as tuples: {previous_positions} == {current_positions}){counter_info}, continuing to read for update...")
                                         found_positions = False
                                         additional_wait = 0.3
                                         additional_start = time.time()
@@ -1795,25 +1817,62 @@ class EnigmaController:
                                                         if pattern_matches:
                                                             # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
                                                             new_positions = self._parse_positions(parts, k + 3, rotor_count)
-                                                            if new_positions is not None and new_positions != previous_positions:
-                                                                current_positions = new_positions
+                                                            
+                                                            # Check for counter in additional data
+                                                            new_counter = None
+                                                            counter_idx = k + 3 + rotor_count
+                                                            if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
+                                                                if counter_idx + 1 < len(parts):
+                                                                    try:
+                                                                        new_counter = int(parts[counter_idx + 1])
+                                                                    except ValueError:
+                                                                        pass
+                                                            
+                                                            # Accept if positions changed OR counter incremented
+                                                            positions_changed = new_positions is not None and new_positions != previous_positions
+                                                            counter_incremented = False
+                                                            if new_counter is not None and previous_counter is not None:
+                                                                if new_counter > previous_counter:
+                                                                    counter_incremented = True
+                                                            
+                                                            if positions_changed or counter_incremented:
+                                                                if positions_changed:
+                                                                    current_positions = new_positions
                                                                 encoded_char_original = part_k2
                                                                 encoded_char = encoded_char_original.upper()
+                                                                if new_counter is not None:
+                                                                    current_counter = new_counter
                                                                 if debug_callback:
-                                                                    # Format preserving original format (letters or numbers)
-                                                                    pos_str_prev = self._format_positions(parts, k + 3, rotor_count, previous_positions) if previous_positions else "None"
-                                                                    pos_str_new = self._format_positions(parts, k + 3, rotor_count, new_positions)
-                                                                    debug_callback(f"Found updated positions: {pos_str_prev} -> {pos_str_new}")
+                                                                    if positions_changed:
+                                                                        # Format preserving original format (letters or numbers)
+                                                                        pos_str_prev = self._format_positions(parts, k + 3, rotor_count, previous_positions) if previous_positions else "None"
+                                                                        pos_str_new = self._format_positions(parts, k + 3, rotor_count, new_positions)
+                                                                        debug_callback(f"Found updated positions: {pos_str_prev} -> {pos_str_new}")
+                                                                    if counter_incremented:
+                                                                        debug_callback(f"Found counter increment: {previous_counter} -> {new_counter}")
                                                                 break
-                                                if current_positions != previous_positions:
+                                                # Break if positions changed OR counter incremented
+                                                if current_positions != previous_positions or (current_counter is not None and previous_counter is not None and current_counter > previous_counter):
                                                     break
                                             time.sleep(0.05)
                                         
-                                        if current_positions != previous_positions:
+                                        # Accept encoding if positions changed OR counter incremented
+                                        positions_changed = current_positions != previous_positions
+                                        counter_incremented = False
+                                        if current_counter is not None and previous_counter is not None:
+                                            if current_counter > previous_counter:
+                                                counter_incremented = True
+                                        
+                                        if positions_changed or counter_incremented:
                                             encoded_chars.append(encoded_char)
-                                            previous_positions = current_positions
-                                            # Preserve original format (letters or numbers) when updating
-                                            update_ring_position(current_positions, parts, j + 3)
+                                            if positions_changed:
+                                                previous_positions = current_positions
+                                                # Preserve original format (letters or numbers) when updating
+                                                update_ring_position(current_positions, parts, j + 3)
+                                            if counter_incremented:
+                                                previous_counter = current_counter
+                                                if debug_callback:
+                                                    debug_callback(f"Accepted encoding due to counter increment: {previous_counter - 1 if previous_counter else 'unknown'} -> {current_counter}")
                                             success = True
                                             if callback:
                                                 if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
@@ -1822,13 +1881,18 @@ class EnigmaController:
                                                     return False
                                         else:
                                             if debug_callback:
-                                                debug_callback(f"Still no position update after waiting")
+                                                debug_callback(f"Still no position update or counter increment after waiting")
                                             success = False
                                     else:
+                                        # Positions changed or counter incremented - accept encoding
                                         if debug_callback:
-                                            debug_callback(f"Positions updated: {previous_positions} -> {current_positions}")
+                                            if current_positions != previous_positions:
+                                                debug_callback(f"Positions updated: {previous_positions} -> {current_positions}")
+                                            if current_counter is not None and previous_counter is not None and current_counter > previous_counter:
+                                                debug_callback(f"Counter incremented: {previous_counter} -> {current_counter}")
                                         encoded_chars.append(encoded_char)
                                         previous_positions = current_positions
+                                        previous_counter = current_counter
                                         # Preserve original format (letters or numbers) when updating
                                         update_ring_position(current_positions, parts, j + 3)
                                         success = True
@@ -1838,8 +1902,10 @@ class EnigmaController:
                                                     debug_callback("Message sending stopped by callback")
                                                 return False
                                 elif current_positions is not None:
+                                    # First character - just record positions and counter
                                     encoded_chars.append(encoded_char)
                                     previous_positions = current_positions
+                                    previous_counter = current_counter
                                     # Preserve original format (letters or numbers) when updating
                                     update_ring_position(current_positions, parts, j + 3)
                                     success = True
