@@ -424,6 +424,50 @@ class EnigmaController:
         
         return ' '.join(formatted)
     
+    def _positions_changed(self, previous: Optional[Tuple[int, ...]], current: Optional[Tuple[int, ...]], rotor_count: int, debug_callback=None) -> bool:
+        """Check if positions have changed, ensuring both tuples are compared with correct rotor count
+        
+        This function ensures that all rotor_count elements are compared, not just the first 3.
+        For 4-rotor models (M4), all 4 positions must be compared.
+        For 3-rotor models, all 3 positions are compared.
+        
+        Args:
+            previous: Previous positions tuple (should have rotor_count elements)
+            current: Current positions tuple (should have rotor_count elements)
+            rotor_count: Expected number of rotors (3 or 4)
+            debug_callback: Optional callback for debug messages
+            
+        Returns:
+            True if positions changed, False if unchanged or if either is None
+        """
+        if previous is None or current is None:
+            return False
+        
+        prev_len = len(previous)
+        curr_len = len(current)
+        
+        # If lengths don't match rotor_count, log warning
+        if prev_len != rotor_count or curr_len != rotor_count:
+            if debug_callback:
+                debug_callback(f"Position length mismatch: previous={prev_len} elements, current={curr_len} elements, expected={rotor_count} rotors")
+                debug_callback(f"  Previous: {previous}, Current: {current}")
+        
+        # If lengths differ, positions have changed
+        if prev_len != curr_len:
+            return True
+        
+        # Compare all rotor_count elements element by element
+        # This ensures we check all 4 positions for M4 models, not just the first 3
+        for i in range(rotor_count):
+            if i >= prev_len or i >= curr_len:
+                # One tuple is shorter than rotor_count - this shouldn't happen if parsing is correct
+                return True
+            if previous[i] != current[i]:
+                return True
+        
+        # All rotor_count elements match
+        return False
+    
     def _filter_config_summary(self, response: bytes, debug_callback=None) -> bytes:
         """Filter out config summary lines and return only the last encoding result
         
@@ -1737,7 +1781,8 @@ class EnigmaController:
                                 
                                 if previous_positions is not None and current_positions is not None:
                                     # Check if positions changed OR counter incremented
-                                    positions_changed = current_positions != previous_positions
+                                    # Use helper function to ensure proper comparison for 3 and 4 rotor models
+                                    positions_changed = self._positions_changed(previous_positions, current_positions, rotor_count, debug_callback)
                                     counter_incremented = False
                                     
                                     # If positions unchanged, check if counter has incremented
@@ -1829,7 +1874,8 @@ class EnigmaController:
                                                                         pass
                                                             
                                                             # Accept if positions changed OR counter incremented
-                                                            positions_changed = new_positions is not None and new_positions != previous_positions
+                                                            # Use helper function to ensure proper comparison for 3 and 4 rotor models
+                                                            positions_changed = new_positions is not None and self._positions_changed(previous_positions, new_positions, rotor_count, debug_callback)
                                                             counter_incremented = False
                                                             if new_counter is not None and previous_counter is not None:
                                                                 if new_counter > previous_counter:
@@ -1852,12 +1898,16 @@ class EnigmaController:
                                                                         debug_callback(f"Found counter increment: {previous_counter} -> {new_counter}")
                                                                 break
                                                 # Break if positions changed OR counter incremented
-                                                if current_positions != previous_positions or (current_counter is not None and previous_counter is not None and current_counter > previous_counter):
+                                                # Use helper function to ensure proper comparison for 3 and 4 rotor models
+                                                pos_changed = self._positions_changed(previous_positions, current_positions, rotor_count, debug_callback) if current_positions is not None else False
+                                                counter_inc = current_counter is not None and previous_counter is not None and current_counter > previous_counter
+                                                if pos_changed or counter_inc:
                                                     break
                                             time.sleep(0.05)
                                         
                                         # Accept encoding if positions changed OR counter incremented
-                                        positions_changed = current_positions != previous_positions
+                                        # Use helper function to ensure proper comparison for 3 and 4 rotor models
+                                        positions_changed = self._positions_changed(previous_positions, current_positions, rotor_count, debug_callback) if current_positions is not None else False
                                         counter_incremented = False
                                         if current_counter is not None and previous_counter is not None:
                                             if current_counter > previous_counter:
@@ -1886,7 +1936,9 @@ class EnigmaController:
                                     else:
                                         # Positions changed or counter incremented - accept encoding
                                         if debug_callback:
-                                            if current_positions != previous_positions:
+                                            # Use helper function to check if positions changed
+                                            pos_changed = self._positions_changed(previous_positions, current_positions, rotor_count, debug_callback) if current_positions is not None else False
+                                            if pos_changed:
                                                 debug_callback(f"Positions updated: {previous_positions} -> {current_positions}")
                                             if current_counter is not None and previous_counter is not None and current_counter > previous_counter:
                                                 debug_callback(f"Counter incremented: {previous_counter} -> {current_counter}")
