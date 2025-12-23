@@ -1544,6 +1544,36 @@ class EnigmaMuseumUI(UIBase):
         if debug_callback:
             debug_callback(f"Message generation mode: delays will be skipped")
         
+        # Apply kiosk/lock settings and logging format once at the start
+        # This ensures the device is properly configured before generating messages
+        if debug_callback:
+            debug_callback("Applying kiosk/lock settings and logging format...")
+        self.controller.wakeup_device(debug_callback=debug_callback)
+        config_errors = []
+        if not self.controller.apply_kiosk_settings(debug_callback=debug_callback):
+            config_errors.append("kiosk_settings")
+        
+        if config_errors:
+            error_msg = f"Configuration errors detected: {', '.join(config_errors)}"
+            if debug_callback:
+                debug_callback(f"ERROR: {error_msg}", color_type=7)
+            self.setup_screen()
+            self.draw_settings_panel()
+            self.left_win.clear()
+            self.left_win.addstr(0, 0, "Configuration Error!", curses.A_BOLD | curses.A_REVERSE)
+            self.left_win.addstr(1, 0, error_msg)
+            self.left_win.addstr(2, 0, "")
+            self.left_win.addstr(3, 0, "Switching to configuration menu...")
+            self.left_win.addstr(4, 0, "Press any key to continue...")
+            self.left_win.refresh()
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            self.stdscr.getch()
+            self.config_menu()
+            # Clear generation flag before returning
+            self.controller.generating_messages = False
+            return
+        
         # Process each message
         
         for i in range(start_index, message_count):
@@ -2632,6 +2662,10 @@ class EnigmaMuseumUI(UIBase):
                                 time.sleep(0.1)
                                 if self.controller.ser.in_waiting > 0:
                                     response += self.controller.ser.read(self.controller.ser.in_waiting)
+                            
+                            # Filter out config summary if present
+                            if response:
+                                response = self.controller._filter_config_summary(response, debug_callback=debug_callback)
                             
                             # Parse response if we have data
                             if response and b'Positions' in response:
