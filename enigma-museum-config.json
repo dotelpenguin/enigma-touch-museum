@@ -1,10 +1,10 @@
 {
   "config": {
-    "mode": "G",
-    "rotor_set": "K I II III",
-    "ring_settings": "A D A G",
+    "mode": "N",
+    "rotor_set": "N II V III",
+    "ring_settings": "05 10 15",
     "ring_position": "D F E F",
-    "pegboard": "AF PQ",
+    "pegboard": "AB CD EF GH IJ",
     "lock_model": true,
     "lock_rotor": true,
     "lock_ring": true,
@@ -37,5 +37,5 @@
   "timeout_plugged": 0,
   "timeout_setup_modes": 0,
   "raw_debug_enabled": false,
-  "device": "/dev/tty.usbmodem207139584B471"
+  "device": "/dev/tty.usbmodem207A39584B471"
 }
