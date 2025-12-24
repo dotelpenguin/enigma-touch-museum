@@ -41,6 +41,7 @@ if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
     echo "  - Install pyserial library"
     echo "  - Add user to dialout group for serial device access"
     echo "  - Create startup script (start-enigma-museum.sh)"
+    echo "  - Configure default museum mode (Encode/Decode - EN/DE)"
     echo "  - Optionally enable console auto-login (recommended for kiosk)"
     echo "  - Optionally add auto-start to ~/.bashrc"
     echo ""
@@ -352,11 +353,11 @@ show_installation_checklist() {
     echo "  [✓] Install Python 3 and pip3 (if not already installed)"
     echo "  [✓] Install pyserial library (via apt python3-serial or pip3)"
     echo "  [✓] Add user to dialout group (for serial device access)"
-    echo "  [✓] Set executable permissions on enigma-museum.py"
+    echo "  [✓] Set executable permissions on main.py"
     echo "  [✓] Create startup script (start-enigma-museum.sh)"
     echo ""
     echo -e "${YELLOW}Configuration Steps (you will be prompted):${NC}"
-    echo "  [ ] Select default museum mode (EN/DE, coded or on-the-fly)"
+    echo "  [ ] Select default museum mode (Encode/Decode - EN/DE)"
     echo "  [ ] Enable console auto-login (recommended for kiosk mode)"
     echo "  [ ] Add startup script to ~/.bashrc (for auto-start on login)"
     echo ""
@@ -365,6 +366,7 @@ show_installation_checklist() {
     echo "  - If key pressed: offers Config mode, Shell, or Museum mode"
     echo "  - If no input: automatically starts Museum mode (using selected default)"
     echo "  - Auto-restarts if application exits (kiosk mode)"
+    echo "  - Supports --debug flag for serial communication debugging"
     echo ""
     echo -e "${YELLOW}System Requirements:${NC}"
     echo "  - Raspberry Pi OS Lite (console-only) recommended"
@@ -450,22 +452,20 @@ fi
 
 # Function to verify and fix serial device permissions
 verify_serial_permissions() {
+    # Temporarily disable exit on error for this function
+    set +e
+    
     echo ""
     echo -e "${YELLOW}Verifying serial device permissions...${NC}"
     
     # Check if user is actually in dialout group in current session
-    if id -nG | grep -q "\bdialout\b"; then
+    if id -nG 2>/dev/null | grep -q "\bdialout\b"; then
         echo -e "${GREEN}✓ User is in dialout group (current session)${NC}"
     else
-        echo -e "${RED}✗ User is NOT in dialout group in current session${NC}"
-        echo -e "${YELLOW}You need to log out and back in, or run: newgrp dialout${NC}"
+        echo -e "${YELLOW}⚠ User is NOT in dialout group in current session${NC}"
+        echo -e "${YELLOW}Note: Group membership was added, but requires logout/login to take effect${NC}"
+        echo -e "${YELLOW}You can continue installation, but may need to log out/in later for device access${NC}"
         echo ""
-        read -p "Try to activate dialout group in current session? (y/n): " activate_group
-        if [[ "${activate_group,,}" == "y" ]]; then
-            echo "Running: newgrp dialout"
-            echo -e "${YELLOW}Note: This will start a new shell. Type 'exit' to return.${NC}"
-            newgrp dialout
-        fi
     fi
     
     # Check for common serial devices
@@ -478,21 +478,22 @@ verify_serial_permissions() {
         echo "Found serial devices:"
         for device in $SERIAL_DEVICES; do
             if [ -e "$device" ]; then
-                perms=$(stat -c "%a %U:%G" "$device" 2>/dev/null)
+                # Use portable stat command (try GNU format first, fall back to POSIX)
+                perms=$(stat -c "%a %U:%G" "$device" 2>/dev/null || stat -f "%OLp %Su:%Sg" "$device" 2>/dev/null || echo "unknown")
                 echo "  $device - $perms"
                 
                 # Check if user can read/write
                 if [ -r "$device" ] && [ -w "$device" ]; then
                     echo -e "    ${GREEN}✓ Readable and writable${NC}"
                 else
-                    echo -e "    ${RED}✗ Permission denied${NC}"
+                    echo -e "    ${YELLOW}⚠ Permission denied (this is normal if device just connected)${NC}"
                     echo -e "    ${YELLOW}Attempting to fix permissions...${NC}"
                     sudo chmod 666 "$device" 2>/dev/null
                     if [ $? -eq 0 ]; then
                         echo -e "    ${GREEN}✓ Permissions fixed (temporary)${NC}"
                         echo -e "    ${YELLOW}Note: Permissions may reset after device reconnect${NC}"
                     else
-                        echo -e "    ${RED}✗ Could not fix permissions${NC}"
+                        echo -e "    ${YELLOW}⚠ Could not fix permissions (may need udev rule)${NC}"
                     fi
                 fi
             fi
@@ -506,34 +507,37 @@ verify_serial_permissions() {
     
     if [ -f "$UDEV_RULE" ]; then
         echo "Udev rule already exists: $UDEV_RULE"
-        read -p "Replace existing udev rule? (y/n): " replace_udev
-        if [[ "${replace_udev,,}" != "y" ]]; then
-            echo "Keeping existing udev rule"
-            return
-        fi
+        echo -e "${YELLOW}Keeping existing udev rule (use --uninstall to remove)${NC}"
+        create_udev="n"
+    else
+        echo -e "${YELLOW}Create udev rule to set serial device permissions?${NC}"
+        echo -e "${YELLOW}This will allow dialout group to access USB serial devices${NC}"
+        read -t 10 -p "Create udev rule? (y/n) [default: y]: " create_udev || create_udev="y"
     fi
     
-    read -p "Create udev rule to set serial device permissions? (y/n): " create_udev
-    if [[ "${create_udev,,}" == "y" ]]; then
-        sudo tee "$UDEV_RULE" > /dev/null << 'UDEV_EOF'
+    if [[ "${create_udev:-y}" == "y" ]]; then
+        if sudo tee "$UDEV_RULE" > /dev/null << 'UDEV_EOF'
 # Enigma Museum Controller - Serial device permissions
 # Allow dialout group to access USB serial devices
 SUBSYSTEM=="tty", ATTRS{idVendor}=="*", ATTRS{idProduct}=="*", MODE="0666", GROUP="dialout"
 UDEV_EOF
-        
-        if [ $? -eq 0 ]; then
+        then
             echo -e "${GREEN}Udev rule created${NC}"
             echo "Reloading udev rules..."
-            sudo udevadm control --reload-rules
-            sudo udevadm trigger
+            sudo udevadm control --reload-rules 2>/dev/null || true
+            sudo udevadm trigger 2>/dev/null || true
             echo -e "${GREEN}Udev rules reloaded${NC}"
             echo -e "${YELLOW}Note: You may need to reconnect the device for changes to take effect${NC}"
         else
-            echo -e "${RED}Error: Could not create udev rule${NC}"
+            echo -e "${YELLOW}Warning: Could not create udev rule (may need sudo)${NC}"
+            echo "You can create it manually later if needed"
         fi
     else
         echo "Skipping udev rule creation"
     fi
+    
+    # Re-enable exit on error
+    set -e
 }
 
 # Verify serial permissions
@@ -541,41 +545,41 @@ verify_serial_permissions
 
 # Make the main script executable
 echo -e "${YELLOW}[5/8] Setting permissions...${NC}"
-chmod +x "$SCRIPT_DIR/enigma-museum.py"
+chmod +x "$SCRIPT_DIR/main.py"
 
 # Prompt for default museum mode
 echo -e "${YELLOW}[6/8] Configuring default museum mode...${NC}"
 echo ""
-echo "Select the default museum mode message set:"
-echo "  [1] Museum EN - English messages (encoded on-the-fly)"
-echo "  [2] Museum DE - German messages (encoded on-the-fly)"
-echo "  [3] Museum EN (Coded) - English pre-coded messages"
-echo "  [4] Museum DE (Coded) - German pre-coded messages"
+echo "Select the default museum mode:"
+echo "  [1] Encode - EN (English encode mode)"
+echo "  [2] Decode - EN (English decode mode)"
+echo "  [3] Encode - DE (German encode mode)"
+echo "  [4] Decode - DE (German decode mode)"
 echo ""
 read -p "Enter choice (1-4) [default: 1]: " museum_mode_choice
 
 # Set default museum mode based on choice
 case "${museum_mode_choice:-1}" in
     1)
-        DEFAULT_MUSEUM_MODE="--museum-en"
-        MUSEUM_MODE_NAME="Museum EN"
+        DEFAULT_MUSEUM_MODE="--museum-en-encode"
+        MUSEUM_MODE_NAME="Encode - EN"
         ;;
     2)
-        DEFAULT_MUSEUM_MODE="--museum-de"
-        MUSEUM_MODE_NAME="Museum DE"
+        DEFAULT_MUSEUM_MODE="--museum-en-decode"
+        MUSEUM_MODE_NAME="Decode - EN"
         ;;
     3)
-        DEFAULT_MUSEUM_MODE="--museum-en-coded"
-        MUSEUM_MODE_NAME="Museum EN (Coded)"
+        DEFAULT_MUSEUM_MODE="--museum-de-encode"
+        MUSEUM_MODE_NAME="Encode - DE"
         ;;
     4)
-        DEFAULT_MUSEUM_MODE="--museum-de-coded"
-        MUSEUM_MODE_NAME="Museum DE (Coded)"
+        DEFAULT_MUSEUM_MODE="--museum-de-decode"
+        MUSEUM_MODE_NAME="Decode - DE"
         ;;
     *)
-        echo -e "${YELLOW}Invalid choice, using default: Museum EN${NC}"
-        DEFAULT_MUSEUM_MODE="--museum-en"
-        MUSEUM_MODE_NAME="Museum EN"
+        echo -e "${YELLOW}Invalid choice, using default: Encode - EN${NC}"
+        DEFAULT_MUSEUM_MODE="--museum-en-encode"
+        MUSEUM_MODE_NAME="Encode - EN"
         ;;
 esac
 
@@ -594,7 +598,7 @@ cat > "$STARTUP_SCRIPT" << EOF
 
 # Get the directory where this script is located
 SCRIPT_DIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
-APP_SCRIPT="\$SCRIPT_DIR/enigma-museum.py"
+APP_SCRIPT="\$SCRIPT_DIR/main.py"
 DEFAULT_MODE="$DEFAULT_MUSEUM_MODE"
 
 # Function to wait for input with timeout
@@ -607,8 +611,13 @@ wait_for_input() {
     echo "=========================================="
     echo "Enigma Museum Controller"
     echo "=========================================="
-    echo "Press any key within \${timeout} seconds to enter config mode or quit to shell"
-    echo "Otherwise, museum mode will start automatically..."
+    echo "Press a key within \${timeout} seconds to choose an option:"
+    echo "  [C] Config mode - Open configuration menu"
+    echo "  [S] Shell - Exit to shell"
+    echo "  [M] Museum mode - Start museum mode"
+    echo "  [D] Debug mode - Start museum mode with debug output"
+    echo ""
+    echo "If no key is pressed, museum mode will start automatically..."
     echo ""
     
     # Use read with timeout (non-blocking)
@@ -619,13 +628,25 @@ wait_for_input() {
         # User pressed a key - clear the input buffer
         while read -t 0.1 -n 1 -s dummy 2>/dev/null; do :; done
         
-        echo ""
-        echo "Options:"
-        echo "  [C]onfig mode - Open configuration menu"
-        echo "  [S]hell - Exit to shell"
-        echo "  [M]useum mode - Start museum mode anyway"
-        echo ""
-        read -p "Enter choice (C/S/M): " choice
+        # Convert input to lowercase for case-insensitive matching
+        choice="\${input,,}"
+        
+        # If user pressed C, S, M, or D directly, use it; otherwise show menu
+        if [[ "\$choice" == "c" ]] || [[ "\$choice" == "s" ]] || [[ "\$choice" == "m" ]] || [[ "\$choice" == "d" ]]; then
+            # User pressed a valid key directly, use it
+            :
+        else
+            # Show menu for other keys
+            echo ""
+            echo "Options:"
+            echo "  [C]onfig mode - Open configuration menu"
+            echo "  [S]hell - Exit to shell"
+            echo "  [M]useum mode - Start museum mode"
+            echo "  [D]ebug mode - Start museum mode with debug output"
+            echo ""
+            read -p "Enter choice (C/S/M/D): " choice
+            choice="\${choice,,}"
+        fi
         
         case "\${choice,,}" in
             c)
@@ -640,6 +661,11 @@ wait_for_input() {
             m)
                 echo "Starting museum mode..."
                 python3 "\$APP_SCRIPT" \$DEFAULT_MODE
+                return 0  # Continue loop (restart)
+                ;;
+            d)
+                echo "Starting museum mode with debug..."
+                python3 "\$APP_SCRIPT" \$DEFAULT_MODE --debug
                 return 0  # Continue loop (restart)
                 ;;
             *)
@@ -723,10 +749,10 @@ echo "  1. If you were added to dialout group, you MUST log out and back in"
 echo "     (or run: newgrp dialout) for group membership to take effect"
 if command -v raspi-config &> /dev/null || [ -f "/etc/systemd/system/getty@tty1.service.d/autologin.conf" ]; then
     echo "  2. If auto-login was enabled, reboot for it to take effect: sudo reboot"
-    echo "  3. Test the application: python3 $SCRIPT_DIR/enigma-museum.py --config"
+    echo "  3. Test the application: python3 $SCRIPT_DIR/main.py --config"
     echo "  4. Or run the startup script: $STARTUP_SCRIPT"
 else
-    echo "  2. Test the application: python3 $SCRIPT_DIR/enigma-museum.py --config"
+    echo "  2. Test the application: python3 $SCRIPT_DIR/main.py --config"
     echo "  3. Or run the startup script: $STARTUP_SCRIPT"
 fi
 echo ""
@@ -742,6 +768,21 @@ echo -e "${YELLOW}Important Notes:${NC}"
 echo "  - This application is designed for Raspberry Pi OS Lite (console-only)"
 echo "  - For kiosk mode, enable console auto-login and add startup to ~/.bashrc"
 echo "  - The application will auto-restart if it exits (kiosk mode)"
+echo ""
+echo -e "${YELLOW}Command-Line Options:${NC}"
+echo "  --config, -c              Open configuration menu without connecting"
+echo "  --museum-en-encode        Start in Encode - EN mode (English encode)"
+echo "  --museum-en-decode        Start in Decode - EN mode (English decode)"
+echo "  --museum-de-encode        Start in Encode - DE mode (German encode)"
+echo "  --museum-de-decode        Start in Decode - DE mode (German decode)"
+echo "  --debug                   Enable debug output panel"
+echo "  DEVICE                    Serial device path (e.g., /dev/ttyACM0)"
+echo ""
+echo "Examples:"
+echo "  python3 main.py --config"
+echo "  python3 main.py --museum-en-encode"
+echo "  python3 main.py --museum-de-decode /dev/ttyUSB0"
+echo "  python3 main.py --debug /dev/ttyACM0"
 echo ""
 echo "To remove auto-start, run: ./install.sh --uninstall"
 echo ""

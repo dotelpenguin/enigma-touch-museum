@@ -2,7 +2,15 @@
 
 A Python-based control system for Enigma cipher machines, featuring a curses-based terminal interface and web server for museum displays.
 
-> **⚠️ Early Work in Progress:** This project is in very early development stages. Features may be incomplete, documentation may be lacking, and the codebase is subject to significant changes. Use at your own risk and expect bugs and breaking changes.
+> **⚠️ WORK IN PROGRESS:** This project is actively under development. Features may be incomplete, documentation may be lacking, and the codebase is subject to significant changes. Use at your own risk and expect bugs and breaking changes.
+>
+> **⚠️ FIRMWARE REQUIREMENT:** This software requires **Enigma Touch firmware version 4.20 or higher**. Earlier firmware versions are not supported and may not work correctly.
+>
+> **⚠️ CRITICAL WARNING - DEVICE LOCKOUT:** You can inadvertently lock yourself out of the Enigma Touch device by disabling the local buttons (kiosk/lock settings). If you disable local buttons and lose access to this application, you will be unable to unlock the device using the physical buttons. **To unlock a locked device, you must either:**
+> - Use this application to re-enable the local buttons, OR
+> - Re-flash the Enigma Touch firmware
+>
+> **Always ensure you have a way to access this application before disabling local buttons on your Enigma Touch device.**
 
 ## History
 
@@ -44,6 +52,11 @@ The interactive curses-based terminal interface provides full control over the E
 
 ![Main Menu](images/interactive-main.png)
 
+
+#### Message Mode
+Encode/Decode messages using Enigma Touch
+![Send Msg Menu](images/interactive-message.png)
+
 #### Configuration Menu
 Access all Enigma settings and application configuration through the intuitive menu system:
 
@@ -71,7 +84,7 @@ Detailed status view showing all device information and current settings:
 - Python 3.x
 - [pyserial](https://pypi.org/project/pyserial/) (for serial communication)
 - Enigma Touch device connected via USB serial interface
-- Enigma Touch firmware 1.12+ (limited testing on different firmware versions)
+- **Enigma Touch firmware 4.20 or higher** (required - earlier versions are not supported)
 
 ### Python Dependencies
 
@@ -126,14 +139,14 @@ The installation script will:
 - Optionally add auto-start to `~/.bashrc`
 
 **During installation, you will be prompted to:**
-- Select a default museum mode (EN/DE, coded or on-the-fly)
+- Select a default museum mode (Encode/Decode - EN/DE)
 - Enable console auto-login (recommended for kiosk mode)
 - Add startup script to `~/.bashrc` (for auto-start on login)
 
 **After installation:**
 1. If you were added to the dialout group, **log out and back in** (or run `newgrp dialout`)
 2. If auto-login was enabled, **reboot** for it to take effect: `sudo reboot`
-3. Test the application: `python3 enigma-museum.py --config` (If not set to autostart)
+3. Test the application: `python3 main.py --config` (If not set to autostart)
 
 **Startup Script Behavior:**
 - On boot/login, the script waits 5 seconds for user input
@@ -231,7 +244,22 @@ sudo usermod -a -G dialout $USER
 
 The application uses `enigma-museum-config.json` for persistent configuration. See [ENIGMA_PROTOCOL_DOCUMENTATION.md](ENIGMA_PROTOCOL_DOCUMENTATION.md) for detailed protocol information. 
 
-**Note**: Currently there is no sanity checking on config settings, future TODO idem. 
+**⚠️ IMPORTANT - Kiosk/Lock Settings Warning:**
+
+The kiosk/lock settings allow you to disable local buttons on the Enigma Touch device. **Use extreme caution when enabling these settings:**
+
+- **Lock Model**: Prevents changing the Enigma model via physical buttons
+- **Lock Rotor**: Prevents changing rotor settings via physical buttons  
+- **Lock Ring**: Prevents changing ring settings via physical buttons
+- **Disable Power Off**: Prevents powering off via physical buttons
+
+**If you disable local buttons and lose access to this application, you will be locked out of your device.** The only ways to unlock are:
+1. Use this application to re-enable the local buttons (Menu → Set Kiosk/Lock Config)
+2. Re-flash the Enigma Touch firmware
+
+**Always ensure you have reliable access to this application before enabling kiosk/lock settings.**
+
+**Note**: Configuration settings are validated when sent to the Enigma device. Invalid settings (e.g., duplicate mappings, invalid options, rotor used twice) will be detected and the user will be prompted to fix them. The application will automatically switch to the configuration menu if errors are detected when sending config to the device. 
 
 You can configure:
 
@@ -247,7 +275,7 @@ You can configure:
 If the device is not connected, use the `--config` option to configure settings:
 
 ```bash
-python3 enigma-museum.py --config
+python3 main.py --config
 ```
 
 ## Usage
@@ -255,16 +283,16 @@ python3 enigma-museum.py --config
 ### Basic Usage
 
 ```bash
-python3 enigma-museum.py [OPTIONS] [DEVICE]
+python3 main.py [OPTIONS] [DEVICE]
 ```
 
 ### Command-Line Options
 
 - `--config`, `-c`: Open configuration menu without connecting to device
-- `--museum-en`: Start directly in Museum EN mode (English messages)
-- `--museum-de`: Start directly in Museum DE mode (German messages)
-- `--museum-en-coded`: Start in Museum EN mode with pre-coded messages
-- `--museum-de-coded`: Start in Museum DE mode with pre-coded messages
+- `--museum-en-encode`: Start directly in Encode - EN mode (English encode)
+- `--museum-en-decode`: Start directly in Decode - EN mode (English decode)
+- `--museum-de-encode`: Start directly in Encode - DE mode (German encode)
+- `--museum-de-decode`: Start directly in Decode - DE mode (German decode)
 - `--debug`: Enable debug output panel (shows serial communication)
 - `--help`, `-h`: Show help message and exit
 
@@ -272,36 +300,46 @@ python3 enigma-museum.py [OPTIONS] [DEVICE]
 
 ```bash
 # Start with default device
-python3 enigma-museum.py
+python3 main.py
 
 # Configure settings without connecting
-python3 enigma-museum.py --config
+python3 main.py --config
 
-# Start directly in Museum EN mode
-python3 enigma-museum.py --museum-en
+# Start directly in Encode - EN mode
+python3 main.py --museum-en-encode
 
 # Start with specific device and debug enabled
-python3 enigma-museum.py --debug /dev/ttyACM0
+python3 main.py --debug /dev/ttyACM0
 
-# Start Museum DE mode with pre-coded messages
-python3 enigma-museum.py --museum-de-coded
+# Start Decode - DE mode
+python3 main.py --museum-de-decode
+
+# Start Encode - DE mode with specific device
+python3 main.py --museum-de-encode /dev/ttyUSB0
 ```
 
 ## Main Menu Options
 
 1. **Send Message**: Manually send and encode a message
-2. **Museum Mode**: Start automated museum demonstration
-3. **Configuration**: Access configuration menu
-4. **Query Settings**: Query current device settings
-5. **Set All Config**: Set all configurations from saved config
-6. **Debug**: Toggle debug output panel
+2. **Configuration**: Access configuration menu
+3. **Query All Settings**: Query current device settings
+4. **Museum Mode**: Start automated museum demonstration
+5. **Set Enigma Config**: Set Enigma configuration settings (mode, rotors, rings, pegboard)
+6. **Set Kiosk/Lock Config**: Set kiosk/lock settings (⚠️ use with caution - see lockout warning above)
+7. **Debug**: Toggle debug output panel
+8. **Raw Debug**: Toggle raw debug output (shows raw serial bytes)
+Q. **Quit**: Exit the application
 
 ## Museum Modes
 
-- **Museum EN**: English messages, encoded on-the-fly
-- **Museum DE**: German messages, encoded on-the-fly
-- **Museum EN (Coded)**: English messages, using pre-coded messages
-- **Museum DE (Coded)**: German messages, using pre-coded messages
+The museum mode menu offers four options (numbered 1-4):
+
+1. **Encode - EN**: English messages, encode mode (sends original messages, verifies encoded results)
+2. **Decode - EN**: English messages, decode mode (sends coded messages, verifies decoded results)
+3. **Encode - DE**: German messages, encode mode (sends original messages, verifies encoded results)
+4. **Decode - DE**: German messages, decode mode (sends coded messages, verifies decoded results)
+
+All modes use JSON files with pre-generated messages (`english-encoded.json` or `german-encoded.json`). These files must be generated first using the Configuration menu (options 10 or 11).
 
 **Important:** German messages and translations were generated using AI and may contain inaccuracies or errors. Review and contributions from native German speakers are needed.
 
@@ -324,6 +362,8 @@ The web server provides real-time updates for museum displays:
 3. Configure the port (default: 8080)
 4. Access at `http://<your-ip>:<port>/message` for kiosk view
 
+**Note:** The web server runs in the background and updates automatically. The terminal interface remains available for configuration and control.
+
 ## Configuration Menu
 
 Access via Main Menu → Configuration:
@@ -345,10 +385,12 @@ Access via Main Menu → Configuration:
 
 ## Message Files
 
-- `english.msg`: English messages for museum mode
-- `german.msg`: German messages for museum mode
-- `english-coded.msg`: Pre-coded English messages (generated)
-- `german-coded.msg`: Pre-coded German messages (generated)
+- `english.msg`: Source English messages for museum mode
+- `german.msg`: Source German messages for museum mode
+- `english-encoded.json`: Generated English messages with encoding metadata (JSON format)
+- `german-encoded.json`: Generated German messages with encoding metadata (JSON format)
+
+**Note:** The JSON files (`*-encoded.json`) are generated from the source message files (`.msg`) using the Configuration menu options 10 (Generate Coded Messages - EN) or 11 (Generate Coded Messages - DE). These JSON files contain the original messages along with their encoded/decoded results and configuration settings.
 
 **Note on German Translations:** The German messages and translations in this project were generated using AI translation tools and are likely inaccurate or may contain errors. These translations need review and cleanup by native German speakers. Contributions to improve the German translations are welcome - please see the [Contributing](#contributing) section.
 
@@ -367,6 +409,16 @@ When character delay is 2000ms or greater, the current character being encoded i
 ### Ring Position Protection
 
 Ring position updates during encoding are not saved to the config file. Only explicit changes via the configuration menu are persisted.
+
+### Configuration Error Handling
+
+The application includes comprehensive error detection and handling:
+
+- **Automatic Error Detection**: All Enigma device error responses are automatically detected using pattern matching
+- **Error Types**: Detects all error types including invalid options, duplicate mappings, rotor conflicts, and more
+- **Automatic Recovery**: When configuration errors are detected, the application automatically switches to the configuration menu
+- **Input Validation**: Input lines are automatically cleared on error to allow clean re-entry
+- **User Notification**: Error messages are displayed in the debug output with color coding (red for errors)
 
 ## Troubleshooting
 
@@ -392,29 +444,69 @@ Ring position updates during encoding are not saved to the config file. Only exp
 
 ### Messages Not Encoding
 
-1. Enable debug mode (`--debug` or menu option 6)
-2. Check serial communication in debug panel
-3. Verify device is in encode mode
-4. Check message contains only A-Z characters (spaces and special characters are filtered)
+1. **Verify firmware version**: Ensure your Enigma Touch has firmware 4.20 or higher
+2. Verify Enigma touch is using the proper logging method. (Line returns enabled, either 4,5 mode)
+3. Enable debug mode (`--debug` or menu option 7)
+4. Check serial communication in debug panel
+5. Verify device is in encode mode
+6. Check message contains only A-Z characters (spaces and special characters are filtered)
+7. Check for configuration errors - if config errors are detected, the application will automatically switch to the config menu
+
+### Device Locked Out (Kiosk/Lock Settings)
+
+If you've disabled local buttons and can't access the device:
+
+1. **First, try to unlock using this application:**
+   - Run the application: `python3 main.py`
+   - Go to Main Menu → Option 6: "Set Kiosk/Lock Config"
+   - Disable the lock settings (set lock_model, lock_rotor, lock_ring, and disable_power_off to false)
+   - This will restore local button access
+
+2. **If you cannot access this application:**
+   - You will need to re-flash the Enigma Touch firmware
+   - See the [official Enigma Touch documentation](https://obsolescence.dev/enigma-touch.html) for firmware flashing instructions
+
+**Prevention:** Always ensure you have reliable access to this application before enabling kiosk/lock settings. Consider testing the unlock procedure before enabling locks in a production environment.
+
+### Configuration Errors
+
+If you receive configuration errors when sending settings to the Enigma device:
+
+1. The application will automatically detect errors matching the pattern: `^` + line return + `*** ` + error message
+2. Common errors include:
+   - `*** Invalid option`: Invalid configuration value
+   - `*** Duplicate mapping`: Duplicate pegboard or rotor mappings
+   - `*** Rotor used twice`: Same rotor used multiple times in rotor set
+3. When an error is detected:
+   - Error message is displayed in debug output
+   - Application automatically switches to configuration menu
+   - Input line is cleared for clean re-entry
+   - You must fix the configuration before continuing
 
 ## TODO
 
 Future enhancements and improvements for the Enigma Museum Controller:
 
 - [ ] Full German Translation (requires German speaker)
-- [ ] Break Python into modules, and cleanup code. 
-- [ ] Verify Enigma Touch is correctly configured and connected
-- [ ] Error checking and linting for config settings (no validation currently)
 - [ ] Pre-built Raspberry Pi image for easier kiosk deployment
-- [ ] Bi-directional communication from Enigma to Kiosk Controller
-- [ ] New message format allowing display of properly decoded messages with original spacing (also for simulation mode)
 - [ ] Advanced web interface with JavaScript/WebSockets (better than refresh)
 - [ ] Simulation Mode (when Enigma Touch is not connected)
 - [ ] Enhance web interface with additional display options
 - [ ] Add support for multiple simultaneous device connections (Interactive Encoding/Decoding)
 - [ ] Add remote control API endpoints
-- [ ] Improve error handling and recovery mechanisms
 - [ ] Add unit tests and integration tests
+- [ ] WebHost Display flickers due to refresh
+- [ ] Implement Counter for Models using Counters
+- [ ] Remove more internal Logic. We should rely more on the Enigma Touch for the source of truth
+- [ ] Make non AI garbage slides
+
+
+
+
+## Known Issues
+
+- Only ONE WebPage can be connected at a time due to limitations of the Python Library.
+
 
 ## License
 

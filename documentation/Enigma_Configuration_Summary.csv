@@ -1,0 +1,21 @@
+Category,Option,Description
+Model,I,Army Enigma
+Model,M3,Navy 3-rotor
+Model,M4,Navy 4-rotor
+Model,D,Early variant
+Model,K,Commercial
+Model,KD,Commercial w/ rewirable reflector
+Model,KR,Railway version
+Model,KS,Swiss version
+Model,N,Norway postwar variant
+Model,T,Tirpitz model
+Model,G-series,G1/G2/G3 series
+Model,X,Custom model
+Rotor,Rotors I–VIII,Standard rotors depending on model
+Rotor,Reflectors B/C/etc.,Reflector choices
+Rotor,Greek rotors beta/gamma,Thin rotors (M4)
+Rotor,No duplicates allowed,Rotors cannot repeat
+Ring Settings,A–Z,Ring setting letters
+Ring Positions,A–Z per rotor,Ring alignment per rotor
+Plugboard,0–13 letter pairings,Plugboard connections
+Pegboard/Reflector,Rewirable reflector wiring,Reflector wiring for UKW-D
