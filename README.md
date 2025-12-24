@@ -52,6 +52,11 @@ The interactive curses-based terminal interface provides full control over the E
 
 ![Main Menu](images/interactive-main.png)
 
+
+#### Message Mode
+Encode/Decode messages using Enigma Touch
+![Send Msg Menu](images/interactive-message.png)
+
 #### Configuration Menu
 Access all Enigma settings and application configuration through the intuitive menu system:
 
@@ -493,6 +498,7 @@ Future enhancements and improvements for the Enigma Museum Controller:
 - [ ] WebHost Display flickers due to refresh
 - [ ] Implement Counter for Models using Counters
 - [ ] Remove more internal Logic. We should rely more on the Enigma Touch for the source of truth
+- [ ] Make non AI garbage slides
 
 
 
