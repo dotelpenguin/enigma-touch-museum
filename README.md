@@ -2,7 +2,15 @@
 
 A Python-based control system for Enigma cipher machines, featuring a curses-based terminal interface and web server for museum displays.
 
-> **⚠️ Early Work in Progress:** This project is in very early development stages. Features may be incomplete, documentation may be lacking, and the codebase is subject to significant changes. Use at your own risk and expect bugs and breaking changes.
+> **⚠️ WORK IN PROGRESS:** This project is actively under development. Features may be incomplete, documentation may be lacking, and the codebase is subject to significant changes. Use at your own risk and expect bugs and breaking changes.
+>
+> **⚠️ FIRMWARE REQUIREMENT:** This software requires **Enigma Touch firmware version 4.20 or higher**. Earlier firmware versions are not supported and may not work correctly.
+>
+> **⚠️ CRITICAL WARNING - DEVICE LOCKOUT:** You can inadvertently lock yourself out of the Enigma Touch device by disabling the local buttons (kiosk/lock settings). If you disable local buttons and lose access to this application, you will be unable to unlock the device using the physical buttons. **To unlock a locked device, you must either:**
+> - Use this application to re-enable the local buttons, OR
+> - Re-flash the Enigma Touch firmware
+>
+> **Always ensure you have a way to access this application before disabling local buttons on your Enigma Touch device.**
 
 ## History
 
@@ -71,7 +79,7 @@ Detailed status view showing all device information and current settings:
 - Python 3.x
 - [pyserial](https://pypi.org/project/pyserial/) (for serial communication)
 - Enigma Touch device connected via USB serial interface
-- Enigma Touch firmware 1.12+ (limited testing on different firmware versions)
+- **Enigma Touch firmware 4.20 or higher** (required - earlier versions are not supported)
 
 ### Python Dependencies
 
@@ -231,6 +239,21 @@ sudo usermod -a -G dialout $USER
 
 The application uses `enigma-museum-config.json` for persistent configuration. See [ENIGMA_PROTOCOL_DOCUMENTATION.md](ENIGMA_PROTOCOL_DOCUMENTATION.md) for detailed protocol information. 
 
+**⚠️ IMPORTANT - Kiosk/Lock Settings Warning:**
+
+The kiosk/lock settings allow you to disable local buttons on the Enigma Touch device. **Use extreme caution when enabling these settings:**
+
+- **Lock Model**: Prevents changing the Enigma model via physical buttons
+- **Lock Rotor**: Prevents changing rotor settings via physical buttons  
+- **Lock Ring**: Prevents changing ring settings via physical buttons
+- **Disable Power Off**: Prevents powering off via physical buttons
+
+**If you disable local buttons and lose access to this application, you will be locked out of your device.** The only ways to unlock are:
+1. Use this application to re-enable the local buttons (Menu → Set Kiosk/Lock Config)
+2. Re-flash the Enigma Touch firmware
+
+**Always ensure you have reliable access to this application before enabling kiosk/lock settings.**
+
 **Note**: Configuration settings are validated when sent to the Enigma device. Invalid settings (e.g., duplicate mappings, invalid options, rotor used twice) will be detected and the user will be prompted to fix them. The application will automatically switch to the configuration menu if errors are detected when sending config to the device. 
 
 You can configure:
@@ -293,11 +316,14 @@ python3 main.py --museum-de-encode /dev/ttyUSB0
 ## Main Menu Options
 
 1. **Send Message**: Manually send and encode a message
-2. **Museum Mode**: Start automated museum demonstration
-3. **Configuration**: Access configuration menu
-4. **Query Settings**: Query current device settings
-5. **Set All Config**: Set all configurations from saved config
-6. **Debug**: Toggle debug output panel
+2. **Configuration**: Access configuration menu
+3. **Query All Settings**: Query current device settings
+4. **Museum Mode**: Start automated museum demonstration
+5. **Set Enigma Config**: Set Enigma configuration settings (mode, rotors, rings, pegboard)
+6. **Set Kiosk/Lock Config**: Set kiosk/lock settings (⚠️ use with caution - see lockout warning above)
+7. **Debug**: Toggle debug output panel
+8. **Raw Debug**: Toggle raw debug output (shows raw serial bytes)
+Q. **Quit**: Exit the application
 
 ## Museum Modes
 
@@ -330,6 +356,8 @@ The web server provides real-time updates for museum displays:
 2. Enable the web server
 3. Configure the port (default: 8080)
 4. Access at `http://<your-ip>:<port>/message` for kiosk view
+
+**Note:** The web server runs in the background and updates automatically. The terminal interface remains available for configuration and control.
 
 ## Configuration Menu
 
@@ -411,12 +439,29 @@ The application includes comprehensive error detection and handling:
 
 ### Messages Not Encoding
 
-1. Verify Enigma touch is using the proper logging method. (Line returns enabled, either 4,5 mode)
-2. Enable debug mode (`--debug` or menu option 6)
-3. Check serial communication in debug panel
-4. Verify device is in encode mode
-5. Check message contains only A-Z characters (spaces and special characters are filtered)
-6. Check for configuration errors - if config errors are detected, the application will automatically switch to the config menu
+1. **Verify firmware version**: Ensure your Enigma Touch has firmware 4.20 or higher
+2. Verify Enigma touch is using the proper logging method. (Line returns enabled, either 4,5 mode)
+3. Enable debug mode (`--debug` or menu option 7)
+4. Check serial communication in debug panel
+5. Verify device is in encode mode
+6. Check message contains only A-Z characters (spaces and special characters are filtered)
+7. Check for configuration errors - if config errors are detected, the application will automatically switch to the config menu
+
+### Device Locked Out (Kiosk/Lock Settings)
+
+If you've disabled local buttons and can't access the device:
+
+1. **First, try to unlock using this application:**
+   - Run the application: `python3 main.py`
+   - Go to Main Menu → Option 6: "Set Kiosk/Lock Config"
+   - Disable the lock settings (set lock_model, lock_rotor, lock_ring, and disable_power_off to false)
+   - This will restore local button access
+
+2. **If you cannot access this application:**
+   - You will need to re-flash the Enigma Touch firmware
+   - See the [official Enigma Touch documentation](https://obsolescence.dev/enigma-touch.html) for firmware flashing instructions
+
+**Prevention:** Always ensure you have reliable access to this application before enabling kiosk/lock settings. Consider testing the unlock procedure before enabling locks in a production environment.
 
 ### Configuration Errors
 
@@ -438,23 +483,18 @@ If you receive configuration errors when sending settings to the Enigma device:
 Future enhancements and improvements for the Enigma Museum Controller:
 
 - [ ] Full German Translation (requires German speaker)
-- [X] Add option to generate random Model, Ring/Rotor settings when generating messages
-- [ ] Configure to Set and Lock Attact settings once firmware supports them
-- [X] Break Python into modules, and cleanup code
-- [X] Verify Enigma Touch is correctly configured and connected
 - [ ] Pre-built Raspberry Pi image for easier kiosk deployment
 - [ ] Advanced web interface with JavaScript/WebSockets (better than refresh)
-- [X] Slideshow for messages. Image slides every X characters. Common folder, or numbered folder for each message
 - [ ] Simulation Mode (when Enigma Touch is not connected)
 - [ ] Enhance web interface with additional display options
 - [ ] Add support for multiple simultaneous device connections (Interactive Encoding/Decoding)
 - [ ] Add remote control API endpoints
-- [X] Improve error handling and recovery mechanisms
 - [ ] Add unit tests and integration tests
 - [ ] WebHost Display flickers due to refresh
-- [ ] Logic not handling 4 Rotor configs
-- [ ] Logic issues with Lettered Rotors
-- [ ] New Function to Configure Enigma Touch over USB for Museum Mode. Config to set andrestore on exit
+- [ ] Implement Counter for Models using Counters
+- [ ] Remove more internal Logic. We should rely more on the Enigma Touch for the source of truth
+
+
 
 
 ## Known Issues
