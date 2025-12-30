@@ -92,14 +92,20 @@ class EnigmaController:
         self.monitoring_debug_callback = None
         self.monitoring_ui_refresh_callback = None
         self.monitoring_keypress_callback = None
+        
+        # Firmware version (detected after connection)
+        self.firmware_version: Optional[float] = None
     
-    def save_config(self, preserve_ring_position=True, preserve_always_send_config=True):
+    def save_config(self, preserve_ring_position=True, preserve_always_send_config=True, preserve_cipher_config=False):
         """Save current configuration to file
         
         Args:
             preserve_ring_position: If True, don't overwrite ring_position from file
             preserve_always_send_config: If True, load always_send_config from file instead of using current value.
                                        Defaults to True to prevent always_send_config from being overwritten.
+            preserve_cipher_config: If True, don't overwrite cipher config (mode, rotor_set, ring_settings, pegboard)
+                                   from file. Defaults to False. Set to True in museum mode to prevent saving
+                                   temporary cipher config changes.
         """
         # If preserving always_send_config, load it from file (default behavior)
         if preserve_always_send_config:
@@ -108,8 +114,15 @@ class EnigmaController:
         else:
             always_send_config_value = self.always_send_config
         
+        # Build config_data in the format expected by ConfigManager.save_config
+        # The config object contains cipher settings, and device/raw_debug_enabled/use_models_json
+        config_obj = self.config.copy()
+        config_obj['device'] = self.device
+        config_obj['raw_debug_enabled'] = getattr(self, 'raw_debug_enabled', False)
+        config_obj['use_models_json'] = self.use_models_json
+        
         config_data = {
-            'config': self.config,
+            'config': config_obj,
             'function_mode': self.function_mode,
             'museum_delay': self.museum_delay,
             'always_send_config': always_send_config_value,
@@ -122,17 +135,17 @@ class EnigmaController:
             'lock_rotor': self.lock_rotor,
             'lock_ring': self.lock_ring,
             'disable_power_off': self.disable_power_off,
-            'use_models_json': self.use_models_json,
             'brightness': self.brightness,
             'volume': self.volume,
             'screen_saver': self.screen_saver,
             'timeout_battery': getattr(self, 'timeout_battery', 15),
             'timeout_plugged': getattr(self, 'timeout_plugged', 0),
             'timeout_setup_modes': getattr(self, 'timeout_setup_modes', 0),
+            'device': self.device,
             'raw_debug_enabled': getattr(self, 'raw_debug_enabled', False),
-            'device': self.device
+            'use_models_json': self.use_models_json
         }
-        return self.config_manager.save_config(config_data, preserve_ring_position=preserve_ring_position)
+        return self.config_manager.save_config(config_data, preserve_ring_position=preserve_ring_position, preserve_cipher_config=preserve_cipher_config)
     
     def load_config(self, preserve_device: bool = False, preserve_always_send_config: bool = False, preserve_function_mode: bool = False):
         """Load configuration from file
@@ -236,6 +249,121 @@ class EnigmaController:
     def is_connected(self) -> bool:
         """Check if serial connection is open and accessible"""
         return self.serial_conn.is_connected()
+    
+    def check_firmware_version(self, debug_callback=None) -> bool:
+        """Check firmware version of the Enigma Touch device
+        
+        Sends ?FW command to query firmware version. If the command is not supported
+        (firmware < 4.21), falls back to ?LM command to detect 4.20 or exit with error.
+        
+        Args:
+            debug_callback: Optional callback for debug messages
+            
+        Returns:
+            True if firmware version was successfully detected, False otherwise
+            
+        Raises:
+            SystemExit: If firmware version is below 4.20 (minimum required)
+        """
+        import sys
+        
+        if not self.is_connected():
+            if debug_callback:
+                debug_callback("ERROR: Not connected to device", color_type=7)
+            return False
+        
+        # Send initial line return
+        if debug_callback:
+            debug_callback("Checking firmware version...")
+        
+        # Send line return, then ?FW command
+        self.ser.write(b'\r\n')
+        self.ser.flush()
+        time.sleep(0.1)
+        
+        response = self.send_command(b'?FW\r\n', debug_callback=debug_callback)
+        
+        if response is None:
+            if debug_callback:
+                debug_callback("ERROR: No response from device", color_type=7)
+            return False
+        
+        # Check if response contains "Firmware" followed by digits
+        # Try to match both "Firmware 421" and "Firmware 4.21" formats
+        firmware_match = re.search(r'Firmware\s+(\d+(?:\.\d+)?)', response, re.IGNORECASE)
+        if firmware_match:
+            # Extract version number (e.g., "421" -> 4.21, "420" -> 4.20, "4.21" -> 4.21)
+            version_str = firmware_match.group(1)
+            try:
+                # If version contains a decimal point, parse directly
+                if '.' in version_str:
+                    self.firmware_version = float(version_str)
+                else:
+                    # Convert "421" to 4.21, "420" to 4.20, etc.
+                    if len(version_str) >= 3:
+                        major = int(version_str[0])
+                        minor = int(version_str[1:])
+                        self.firmware_version = float(f"{major}.{minor:02d}")
+                    elif len(version_str) == 2:
+                        # Handle "42" -> 4.20
+                        major = int(version_str[0])
+                        minor = int(version_str[1]) * 10
+                        self.firmware_version = float(f"{major}.{minor:02d}")
+                    else:
+                        # Single digit, assume it's major version
+                        self.firmware_version = float(version_str)
+                
+                if debug_callback:
+                    debug_callback(f"Detected firmware version: {self.firmware_version}")
+                
+                return True
+            except (ValueError, IndexError):
+                if debug_callback:
+                    debug_callback(f"ERROR: Could not parse firmware version from: {version_str}", color_type=7)
+                return False
+        
+        # Check if response contains "*** Invalid command"
+        if '*** Invalid command' in response or 'Invalid command' in response:
+            if debug_callback:
+                debug_callback("?FW command not supported, trying ?LM command...")
+            
+            # Send ?LM command to check for 4.20
+            response_lm = self.send_command(b'?LM\r\n', debug_callback=debug_callback)
+            
+            if response_lm is None:
+                if debug_callback:
+                    debug_callback("ERROR: No response from ?LM command", color_type=7)
+                return False
+            
+            # Check if response contains "Lock model setup"
+            if 'Lock model setup' in response_lm or 'lock model setup' in response_lm.lower():
+                # Firmware is 4.20
+                self.firmware_version = 4.20
+                
+                warning_msg = "WARNING: Firmware version 4.20 detected. Firmware 4.21 is recommended."
+                print(warning_msg)
+                if debug_callback:
+                    debug_callback(warning_msg, color_type=7)
+                
+                return True
+            
+            # If ?LM also returns invalid command, firmware is too old
+            if '*** Invalid command' in response_lm or 'Invalid command' in response_lm:
+                error_msg = (
+                    "ERROR: Firmware version is too old.\n"
+                    "Firmware 4.20 is the minimum required version.\n"
+                    "Firmware 4.21 is recommended.\n"
+                    "Please update your Enigma Touch firmware."
+                )
+                print(error_msg)
+                if debug_callback:
+                    debug_callback(error_msg, color_type=7)
+                sys.exit(1)
+        
+        # Unknown response format
+        if debug_callback:
+            debug_callback(f"ERROR: Unexpected response format: {response}", color_type=7)
+        return False
     
     def start_monitoring(self):
         """Start background thread to monitor Enigma input (no-op, monitoring was removed)"""
@@ -695,12 +823,12 @@ class EnigmaController:
         """Query current volume level
         
         Returns:
-            Volume level (0-3) or None on error
+            Volume level (0-6) or None on error
         """
         response = self.send_command(b'\r\n?MV\r\n', debug_callback=debug_callback)
         if response:
-            # Look for a number 0-3 in the response
-            match = re.search(r'\b([0-3])\b', response)
+            # Look for a number 0-6 in the response
+            match = re.search(r'\b([0-6])\b', response)
             if match:
                 return int(match.group(1))
         return None
@@ -1110,13 +1238,13 @@ class EnigmaController:
         """Set volume level
         
         Args:
-            level: Volume level (0-3)
+            level: Volume level (0-6)
         """
         if not self.ser or not self.ser.is_open:
             return False
-        if not (0 <= level <= 3):
+        if not (0 <= level <= 6):
             if debug_callback:
-                debug_callback(f"ERROR: Volume level must be 0-3 (got {level})", color_type=7)
+                debug_callback(f"ERROR: Volume level must be 0-6 (got {level})", color_type=7)
             return False
         cmd = f"!MV {level}\r\n".encode('ascii')
         if debug_callback and self.raw_debug_enabled:

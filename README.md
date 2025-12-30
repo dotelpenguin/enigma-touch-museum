@@ -4,7 +4,7 @@ A Python-based control system for Enigma cipher machines, featuring a curses-bas
 
 > **⚠️ WORK IN PROGRESS:** This project is actively under development. Features may be incomplete, documentation may be lacking, and the codebase is subject to significant changes. Use at your own risk and expect bugs and breaking changes.
 >
-> **⚠️ FIRMWARE REQUIREMENT:** This software requires **Enigma Touch firmware version 4.20 or higher**. Earlier firmware versions are not supported and may not work correctly.
+> **⚠️ FIRMWARE REQUIREMENT:** This software requires **Enigma Touch firmware version 4.20 or higher**. Earlier firmware versions are not supported and may not work correctly. The application automatically checks firmware version on connection and will display a warning if firmware 4.21 is recommended or exit with an error if the firmware is too old.
 >
 > **⚠️ CRITICAL WARNING - DEVICE LOCKOUT:** You can inadvertently lock yourself out of the Enigma Touch device by disabling the local buttons (kiosk/lock settings). If you disable local buttons and lose access to this application, you will be unable to unlock the device using the physical buttons. **To unlock a locked device, you must either:**
 > - Use this application to re-enable the local buttons, OR
@@ -84,7 +84,7 @@ Detailed status view showing all device information and current settings:
 - Python 3.x
 - [pyserial](https://pypi.org/project/pyserial/) (for serial communication)
 - Enigma Touch device connected via USB serial interface
-- **Enigma Touch firmware 4.20 or higher** (required - earlier versions are not supported)
+- **Enigma Touch firmware 4.20 or higher** (required - earlier versions are not supported). Firmware version is automatically checked on connection.
 
 ### Python Dependencies
 
@@ -254,8 +254,9 @@ The kiosk/lock settings allow you to disable local buttons on the Enigma Touch d
 - **Disable Power Off**: Prevents powering off via physical buttons
 
 **If you disable local buttons and lose access to this application, you will be locked out of your device.** The only ways to unlock are:
-1. Use this application to re-enable the local buttons (Menu → Set Kiosk/Lock Config)
-2. Re-flash the Enigma Touch firmware
+1. Use this application to re-enable the local buttons (Menu → Send Enigma Lock Config)
+2. Use Factory Reset (Menu → Factory Reset Enigma) - resets all settings including locks
+3. Re-flash the Enigma Touch firmware
 
 **Always ensure you have reliable access to this application before enabling kiosk/lock settings.**
 
@@ -324,10 +325,11 @@ python3 main.py --museum-de-encode /dev/ttyUSB0
 2. **Configuration**: Access configuration menu
 3. **Query All Settings**: Query current device settings
 4. **Museum Mode**: Start automated museum demonstration
-5. **Set Enigma Config**: Set Enigma configuration settings (mode, rotors, rings, pegboard)
-6. **Set Kiosk/Lock Config**: Set kiosk/lock settings (⚠️ use with caution - see lockout warning above)
-7. **Debug**: Toggle debug output panel
-8. **Raw Debug**: Toggle raw debug output (shows raw serial bytes)
+5. **Send Enigma Config**: Send Enigma configuration settings to device (mode, rotors, rings, pegboard)
+6. **Send Enigma Lock Config**: Send kiosk/lock settings to device (⚠️ use with caution - see lockout warning above)
+7. **Factory Reset Enigma**: Factory reset the Enigma Touch device (⚠️ resets all settings to factory defaults)
+8. **Debug**: Toggle debug output panel
+9. **Raw Debug**: Toggle raw debug output (shows raw serial bytes)
 Q. **Quit**: Exit the application
 
 ## Museum Modes
@@ -368,20 +370,39 @@ The web server provides real-time updates for museum displays:
 
 Access via Main Menu → Configuration:
 
-1. Set Mode (I, II, III, M3, M4)
-2. Set Rotor Set (e.g., "A III IV I")
-3. Set Ring Settings (e.g., "01 01 01")
-4. Set Ring Position (e.g., "20 6 10")
-5. Set Pegboard (e.g., "VF PQ" or leave empty for clear)
-6. Set Museum Delay (seconds between messages)
+The configuration menu is organized into sub-menus:
+
+### Enigma Cipher Options
+1. Set Device (serial device path)
+2. Set Mode (I, II, III, M3, M4)
+3. Set Rotor Set (e.g., "A III IV I")
+4. Set Rings (e.g., "01 01 01")
+5. Set Ring Position (e.g., "20 6 10")
+6. Set Plugboard (e.g., "VF PQ" or leave empty for clear)
 7. Always Send Config Before Message (toggle)
-8. Set Word Group Size (4 or 5 characters)
-9. Set Character Delay (milliseconds between characters)
-10. Generate Coded Messages - EN
-11. Generate Coded Messages - DE
-12. Set Device (serial device path)
-13. Set Web Server Port
-14. Web Server Enable/Disable
+
+### WebPage Options
+1. Set Word Group (4 or 5 characters)
+2. Set Character Delay (milliseconds between characters)
+3. Web Server Enable/Disable
+4. Set Web Server Port
+5. Enable Slides
+
+### Enigma Touch Device Options
+1. Set Museum Delay (seconds between messages)
+2. Lock Model (toggle)
+3. Lock Rotor/Wheel (toggle)
+4. Lock Ring (toggle)
+5. Disable Auto-PowerOff (toggle)
+6. Set Brightness (1-5)
+7. Set Volume (0-6)
+8. Set Screen Saver (0-99 minutes)
+
+### Utilities
+1. Generate Coded Messages - EN
+2. Generate Coded Messages - DE
+3. Validate Models.json
+4. (Additional utility options)
 
 ## Message Files
 
@@ -444,7 +465,7 @@ The application includes comprehensive error detection and handling:
 
 ### Messages Not Encoding
 
-1. **Verify firmware version**: Ensure your Enigma Touch has firmware 4.20 or higher
+1. **Verify firmware version**: The application automatically checks firmware version on connection. Ensure your Enigma Touch has firmware 4.20 or higher (4.21 is recommended)
 2. Verify Enigma touch is using the proper logging method. (Line returns enabled, either 4,5 mode)
 3. Enable debug mode (`--debug` or menu option 7)
 4. Check serial communication in debug panel
@@ -458,7 +479,7 @@ If you've disabled local buttons and can't access the device:
 
 1. **First, try to unlock using this application:**
    - Run the application: `python3 main.py`
-   - Go to Main Menu → Option 6: "Set Kiosk/Lock Config"
+   - Go to Main Menu → Option 6: "Send Enigma Lock Config"
    - Disable the lock settings (set lock_model, lock_rotor, lock_ring, and disable_power_off to false)
    - This will restore local button access
 
