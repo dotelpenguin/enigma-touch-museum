@@ -96,13 +96,16 @@ class EnigmaController:
         # Firmware version (detected after connection)
         self.firmware_version: Optional[float] = None
     
-    def save_config(self, preserve_ring_position=True, preserve_always_send_config=True):
+    def save_config(self, preserve_ring_position=True, preserve_always_send_config=True, preserve_cipher_config=False):
         """Save current configuration to file
         
         Args:
             preserve_ring_position: If True, don't overwrite ring_position from file
             preserve_always_send_config: If True, load always_send_config from file instead of using current value.
                                        Defaults to True to prevent always_send_config from being overwritten.
+            preserve_cipher_config: If True, don't overwrite cipher config (mode, rotor_set, ring_settings, pegboard)
+                                   from file. Defaults to False. Set to True in museum mode to prevent saving
+                                   temporary cipher config changes.
         """
         # If preserving always_send_config, load it from file (default behavior)
         if preserve_always_send_config:
@@ -111,8 +114,15 @@ class EnigmaController:
         else:
             always_send_config_value = self.always_send_config
         
+        # Build config_data in the format expected by ConfigManager.save_config
+        # The config object contains cipher settings, and device/raw_debug_enabled/use_models_json
+        config_obj = self.config.copy()
+        config_obj['device'] = self.device
+        config_obj['raw_debug_enabled'] = getattr(self, 'raw_debug_enabled', False)
+        config_obj['use_models_json'] = self.use_models_json
+        
         config_data = {
-            'config': self.config,
+            'config': config_obj,
             'function_mode': self.function_mode,
             'museum_delay': self.museum_delay,
             'always_send_config': always_send_config_value,
@@ -125,17 +135,17 @@ class EnigmaController:
             'lock_rotor': self.lock_rotor,
             'lock_ring': self.lock_ring,
             'disable_power_off': self.disable_power_off,
-            'use_models_json': self.use_models_json,
             'brightness': self.brightness,
             'volume': self.volume,
             'screen_saver': self.screen_saver,
             'timeout_battery': getattr(self, 'timeout_battery', 15),
             'timeout_plugged': getattr(self, 'timeout_plugged', 0),
             'timeout_setup_modes': getattr(self, 'timeout_setup_modes', 0),
+            'device': self.device,
             'raw_debug_enabled': getattr(self, 'raw_debug_enabled', False),
-            'device': self.device
+            'use_models_json': self.use_models_json
         }
-        return self.config_manager.save_config(config_data, preserve_ring_position=preserve_ring_position)
+        return self.config_manager.save_config(config_data, preserve_ring_position=preserve_ring_position, preserve_cipher_config=preserve_cipher_config)
     
     def load_config(self, preserve_device: bool = False, preserve_always_send_config: bool = False, preserve_function_mode: bool = False):
         """Load configuration from file

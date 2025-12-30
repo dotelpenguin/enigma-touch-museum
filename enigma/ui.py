@@ -2345,8 +2345,8 @@ class EnigmaMuseumUI(UIBase):
         
         # Set function mode first so it's displayed in the top panel
         self.controller.function_mode = mode_name
-        # Save function mode to config file
-        self.controller.save_config()
+        # Save function mode to config file, but preserve cipher config (museum mode changes cipher settings per message)
+        self.controller.save_config(preserve_cipher_config=True)
         
         # Load JSON file with message objects
         try:
@@ -2870,7 +2870,7 @@ class EnigmaMuseumUI(UIBase):
                     museum_paused[0] = False
                     # Restore function mode to museum mode name
                     self.controller.function_mode = mode_name
-                    self.controller.save_config()
+                    self.controller.save_config(preserve_cipher_config=True)
                     # Update UI to show the function mode change
                     self.draw_settings_panel()
                     self.refresh_all_panels()
@@ -3029,8 +3029,8 @@ class EnigmaMuseumUI(UIBase):
                                 # Initialize display values to None so they show as "-" until Interactive mode input is received
                                 self.controller.last_char_original = None
                                 self.controller.last_char_received = None
-                                # Save the mode change to config file
-                                self.controller.save_config()
+                                # Save the mode change to config file, but preserve cipher config (museum mode changes are temporary)
+                                self.controller.save_config(preserve_cipher_config=True)
                                 # Update UI to show the mode change
                                 self.draw_settings_panel()
                                 self.refresh_all_panels()
@@ -3074,8 +3074,8 @@ class EnigmaMuseumUI(UIBase):
                                     # Initialize display values to None so they show as "-" until Interactive mode input is received
                                     self.controller.last_char_original = None
                                     self.controller.last_char_received = None
-                                    # Save the mode change to config file
-                                    self.controller.save_config()
+                                    # Save the mode change to config file, but preserve cipher config (museum mode changes are temporary)
+                                    self.controller.save_config(preserve_cipher_config=True)
                                     # Update UI to show the mode change
                                     self.draw_settings_panel()
                                     self.refresh_all_panels()
