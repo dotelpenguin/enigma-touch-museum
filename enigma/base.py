@@ -162,7 +162,11 @@ class UIBase:
             self.top_win.clear()
             max_y, max_x = self.top_win.getmaxyx()
             
-            title = f"Enigma Museum Controller  {VERSION}"
+            # Build title with firmware version if available
+            firmware_info = ""
+            if self.controller.firmware_version is not None:
+                firmware_info = f"  (FW {self.controller.firmware_version:.2f})"
+            title = f"Enigma Museum Controller  {VERSION}{firmware_info}"
             title_x = (max_x - len(title)) // 2
             if title_x >= 0:
                 try:

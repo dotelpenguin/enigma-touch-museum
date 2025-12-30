@@ -95,18 +95,6 @@ def main():
             device = arg
         i += 1
     
-    # Display firmware version requirement notice
-    print("=" * 60)
-    print("Enigma Museum Controller")
-    print("=" * 60)
-    print("⚠️  FIRMWARE REQUIREMENT: Enigma Touch firmware version 4.20 or higher")
-    print("   is required to use this software.")
-    print("")
-    print("   Note: Automatic firmware version checking will be available")
-    print("   in Enigma Touch firmware version 4.21.")
-    print("=" * 60)
-    print("")
-    
     # If no device specified on command line, load from config file
     if device is None:
         try:
@@ -143,6 +131,19 @@ def main():
         print("Make sure the device is connected and you have permission to access it.")
         print(f"\nTo change the device, run: {sys.argv[0]} --config")
         sys.exit(1)
+    
+    # Check firmware version
+    print("Checking firmware version...")
+    if not controller.check_firmware_version():
+        print("ERROR: Could not determine firmware version")
+        controller.disconnect()
+        sys.exit(1)
+    
+    # Report firmware version
+    if controller.firmware_version is not None:
+        print(f"Firmware version: {controller.firmware_version:.2f}")
+    else:
+        print("Firmware version: Unknown")
     
     print("Connected! Starting UI...")
     time.sleep(1)

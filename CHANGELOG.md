@@ -6,6 +6,23 @@ All notable changes in the `brainstorm` branch compared to `main` branch.
 
 ### Added
 
+#### Firmware Version Checking
+- **Automatic Firmware Detection**: Added automatic firmware version checking on device connection
+  - Queries device firmware version using `?FW` command (firmware 4.21+)
+  - Falls back to `?LM` command for firmware 4.20 detection
+  - Displays detected firmware version in console and TUI header
+  - Shows warning if firmware 4.20 detected (4.21 recommended)
+  - Exits with error if firmware is below 4.20 (minimum required)
+  - Firmware version stored as float (e.g., 4.21, 4.20)
+
+#### Factory Reset Feature
+- **Factory Reset Option**: Added factory reset functionality to main menu
+  - New menu option: "Factory Reset Enigma" (option 7)
+  - Sends `!RS` command to reset device to factory defaults
+  - Includes confirmation prompt to prevent accidental resets
+  - Displays success/error messages with scrolling text
+  - Can be used to unlock device if locked out by kiosk settings
+
 #### Error Handling & Validation
 - **Generalized Error Detection**: Implemented pattern-based error detection for all Enigma device responses
   - Detects errors matching pattern: `^` + line return + `*** ` + error message
@@ -89,6 +106,25 @@ All notable changes in the `brainstorm` branch compared to `main` branch.
   - USB accessory permission handling
 
 ### Changed
+
+#### Menu Organization
+- **Main Menu Updates**: Renamed menu options for clarity
+  - "Set Enigma Config" → "Send Enigma Config"
+  - "Set Kiosk/Lock Config" → "Send Enigma Lock Config"
+  - Added "Factory Reset Enigma" as option 7
+  - Debug options renumbered to 8 and 9
+- **Configuration Sub-Menus**: Renamed for better clarity
+  - "Enigma Options" → "Enigma Cipher Options"
+  - "Kiosk Options" → "Enigma Touch Device Options"
+
+#### Device Settings
+- **Volume Range**: Extended volume range from 0-3 to 0-6
+  - Updated validation in `set_volume()` method
+  - Updated UI prompts and displays
+  - Updated query parsing to accept 0-6 range
+
+#### Version
+- **Application Version**: Updated to v4.21.beta
 
 #### Code Structure
 - **Major Refactoring**: Significant code improvements and organization

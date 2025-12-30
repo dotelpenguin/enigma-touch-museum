@@ -1,10 +1,10 @@
 {
   "config": {
-    "mode": "I",
-    "rotor_set": "C IV V I",
-    "ring_settings": "10 20 15",
+    "mode": "M3",
+    "rotor_set": "B IV I III",
+    "ring_settings": "H L R",
     "ring_position": "20 6 10",
-    "pegboard": "MN OP QR ST UV",
+    "pegboard": "ST UV WX YZ AC",
     "lock_model": false,
     "lock_rotor": false,
     "lock_ring": false,
@@ -25,9 +25,9 @@
   "web_server_enabled": true,
   "web_server_port": 8080,
   "enable_slides": false,
-  "lock_model": false,
-  "lock_rotor": false,
-  "lock_ring": false,
+  "lock_model": true,
+  "lock_rotor": true,
+  "lock_ring": true,
   "disable_power_off": true,
   "use_models_json": true,
   "brightness": 3,
@@ -37,5 +37,5 @@
   "timeout_plugged": 0,
   "timeout_setup_modes": 0,
   "raw_debug_enabled": false,
-  "device": "/dev/tty.usbmodem207139584B471"
+  "device": "/dev/ttyACM0"
 }

@@ -336,14 +336,15 @@ The following commands control the UI settings. They are mainly meant for use wi
 **Command**: `\r\n!MV [LEVEL]\r\n`
 
 **Accepted Values**:
-- `0` through `3` - Volume level (0 = silent, 3 = maximum)
+- `0` through `6` - Volume level (0 = silent, 6 = maximum)
 
 **Query Command**: `\r\n?MV\r\n` - Returns current volume level
 
 **Examples**:
 ```
 \r\n!MV 0\r\n    # Set volume to silent
-\r\n!MV 2\r\n    # Set volume to level 2
+\r\n!MV 3\r\n    # Set volume to level 3
+\r\n!MV 6\r\n    # Set volume to maximum
 \r\n?MV\r\n      # Query current volume
 ```
 

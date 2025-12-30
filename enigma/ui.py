@@ -252,24 +252,25 @@ class EnigmaMuseumUI(UIBase):
             ("2", "Configuration"),
             ("3", "Query All Settings"),
             ("4", "Museum Mode"),
-            ("5", "Set Enigma Config"),
-            ("6", "Set Kiosk/Lock Config"),
-            ("7", f"Debug: {'true' if self.debug_enabled else 'false'}"),
-            ("8", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}"),
+            ("5", "Send Enigma Config"),
+            ("6", "Send Enigma Lock Config"),
+            ("7", "Factory Reset Enigma"),
+            ("8", f"Debug: {'true' if self.debug_enabled else 'false'}"),
+            ("9", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}"),
             ("Q", "Quit")
         ]
         
         selected = 0
         while True:
             # Update debug status in options
-            options[6] = ("7", f"Debug: {'true' if self.debug_enabled else 'false'}")
-            options[7] = ("8", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}")
+            options[7] = ("8", f"Debug: {'true' if self.debug_enabled else 'false'}")
+            options[8] = ("9", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}")
             self.show_menu("Enigma Museum Controller", options, selected)
             key = self.stdscr.getch()
             
             if key == ord('q') or key == ord('Q'):
                 return 'quit'
-            elif key == ord('7'):
+            elif key == ord('8'):
                 # Toggle debug
                 self.debug_enabled = not self.debug_enabled
                 if not self.debug_enabled:
@@ -277,7 +278,7 @@ class EnigmaMuseumUI(UIBase):
                 self.create_subwindows()  # Recreate subwindows
                 self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
                 continue
-            elif key == ord('8'):
+            elif key == ord('9'):
                 # Toggle raw debug
                 self.controller.raw_debug_enabled = not self.controller.raw_debug_enabled
                 self.controller.save_config()
@@ -290,7 +291,7 @@ class EnigmaMuseumUI(UIBase):
             elif key == ord('\n') or key == ord('\r'):
                 if options[selected][0] == 'Q':
                     return 'quit'
-                elif options[selected][0] == '7':
+                elif options[selected][0] == '8':
                     # Toggle debug
                     self.debug_enabled = not self.debug_enabled
                     if not self.debug_enabled:
@@ -298,14 +299,14 @@ class EnigmaMuseumUI(UIBase):
                     self.create_subwindows()  # Recreate subwindows
                     self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
                     continue
-                elif options[selected][0] == '8':
+                elif options[selected][0] == '9':
                     # Toggle raw debug
                     self.controller.raw_debug_enabled = not self.controller.raw_debug_enabled
                     self.controller.save_config()
                     self.add_debug_output(f"Raw Debug {'enabled' if self.controller.raw_debug_enabled else 'disabled'}")
                     continue
                 return options[selected][0]
-            elif key >= ord('1') and key <= ord('8'):
+            elif key >= ord('1') and key <= ord('9'):
                 return chr(key)
     
     def config_menu(self, exit_after: bool = False):
@@ -315,9 +316,9 @@ class EnigmaMuseumUI(UIBase):
             exit_after: If True, exit the application after leaving the menu
         """
         options = [
-            ("1", "Enigma Options"),
+            ("1", "Enigma Cipher Options"),
             ("2", "WebPage Options"),
-            ("3", "Kiosk Options"),
+            ("3", "Enigma Touch Device Options"),
             ("4", "Utilities"),
             ("B", "Back")
         ]
@@ -364,7 +365,7 @@ class EnigmaMuseumUI(UIBase):
                     self.config_menu_utilities()
     
     def config_menu_enigma(self):
-        """Enigma Options submenu"""
+        """Enigma Cipher Options submenu"""
         def get_options():
             saved = self.controller.get_saved_config()
             return [
@@ -381,7 +382,7 @@ class EnigmaMuseumUI(UIBase):
         options = get_options()
         selected = 0
         while True:
-            self.show_menu("Enigma Options", options, selected)
+            self.show_menu("Enigma Cipher Options", options, selected)
             key = self.stdscr.getch()
             
             if key == ord('b') or key == ord('B'):
@@ -438,7 +439,7 @@ class EnigmaMuseumUI(UIBase):
                 options = get_options()
     
     def config_menu_kiosk(self):
-        """Kiosk Options submenu"""
+        """Enigma Touch Device Options submenu"""
         def get_options():
             saved = self.controller.get_saved_config()
             return [
@@ -448,7 +449,7 @@ class EnigmaMuseumUI(UIBase):
                 ("4", f"Lock Ring: {str(saved.get('lock_ring', True)).lower()}"),
                 ("5", f"Disable Auto-PowerOff: {str(saved.get('disable_power_off', True)).lower()}"),
                 ("6", f"Set Brightness (current: {saved.get('brightness', 3)}, range: 1-5)"),
-                ("7", f"Set Volume (current: {saved.get('volume', 0)}, range: 0-3)"),
+                ("7", f"Set Volume (current: {saved.get('volume', 0)}, range: 0-6)"),
                 ("8", f"Set Screen Saver (current: {saved.get('screen_saver', 0)}, range: 0-99)"),
                 ("B", "Back")
             ]
@@ -456,7 +457,7 @@ class EnigmaMuseumUI(UIBase):
         options = get_options()
         selected = 0
         while True:
-            self.show_menu("Kiosk Options", options, selected)
+            self.show_menu("Enigma Touch Device Options", options, selected)
             key = self.stdscr.getch()
             
             if key == ord('b') or key == ord('B'):
@@ -858,7 +859,7 @@ class EnigmaMuseumUI(UIBase):
         time.sleep(3)
     
     def handle_config_option_enigma(self, option: str):
-        """Handle Enigma Options section"""
+        """Handle Enigma Cipher Options section"""
         # Map section options to original option numbers
         option_map = {
             '1': '12',  # Set Device
@@ -884,7 +885,7 @@ class EnigmaMuseumUI(UIBase):
         self.handle_config_option(option_map.get(option, option))
     
     def handle_config_option_kiosk(self, option: str):
-        """Handle Kiosk Options section"""
+        """Handle Enigma Touch Device Options section"""
         # Map section options to original option numbers
         option_map = {
             '1': '6',   # Set Museum Delay
@@ -1269,15 +1270,15 @@ class EnigmaMuseumUI(UIBase):
                 time.sleep(1)
         
         elif option == '21':
-            # Set volume (0-3)
-            self.show_message(0, 0, f"Set Volume (current: {saved.get('volume', 0)}, range: 0-3):")
+            # Set volume (0-6)
+            self.show_message(0, 0, f"Set Volume (current: {saved.get('volume', 0)}, range: 0-6):")
             self.draw_debug_panel()
             self.refresh_all_panels()
-            value = self.get_input(1, 0, "Volume (0-3): ", str(saved.get('volume', 0)))
+            value = self.get_input(1, 0, "Volume (0-6): ", str(saved.get('volume', 0)))
             try:
                 volume = int(value)
-                if volume < 0 or volume > 3:
-                    self.show_message(2, 0, "Invalid volume! Must be 0-3")
+                if volume < 0 or volume > 6:
+                    self.show_message(2, 0, "Invalid volume! Must be 0-6")
                 else:
                     self.controller.volume = volume
                     self.controller.save_config()  # Save config after change
@@ -2020,7 +2021,7 @@ class EnigmaMuseumUI(UIBase):
         self.show_message(y, 0, f"  Brightness: {brightness if brightness != 'N/A' else 'N/A'} (1-5)")
         y += 1
         volume = settings.get('volume', 'N/A')
-        self.show_message(y, 0, f"  Volume: {volume if volume != 'N/A' else 'N/A'} (0-3)")
+        self.show_message(y, 0, f"  Volume: {volume if volume != 'N/A' else 'N/A'} (0-6)")
         y += 1
         logging_format = settings.get('logging_format')
         if logging_format is not None:
@@ -2191,6 +2192,98 @@ class EnigmaMuseumUI(UIBase):
             self.show_message(max_y - 1, 0, "Press any key to continue...")
         
         self.refresh_all_panels()
+        self.stdscr.getch()
+    
+    def factory_reset_enigma_screen(self):
+        """Factory reset the Enigma Touch device"""
+        self.setup_screen()
+        self.draw_settings_panel()
+        
+        # Track current Y position for scrolling messages
+        current_y = 0
+        
+        if not self.controller.is_connected():
+            self.show_message(current_y, 0, "ERROR: Not connected to device", curses.A_BOLD | curses.color_pair(self.COLOR_MISMATCH))
+            current_y += 1
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            win = self.get_active_window()
+            if win:
+                max_y, max_x = win.getmaxyx()
+                self.show_message(max_y - 1, 0, "Press any key to continue...")
+            self.stdscr.getch()
+            return
+        
+        # Confirm factory reset
+        self.show_message(current_y, 0, "WARNING: This will factory reset the Enigma Touch device!", curses.A_BOLD | curses.color_pair(self.COLOR_MISMATCH))
+        current_y += 1
+        self.show_message(current_y, 0, "All settings will be reset to factory defaults.", curses.A_BOLD)
+        current_y += 1
+        self.show_message(current_y, 0, "Press Y to confirm, any other key to cancel:")
+        current_y += 1
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        key = self.stdscr.getch()
+        if key != ord('y') and key != ord('Y'):
+            # Clear and redraw for cancellation message
+            self.setup_screen()
+            self.draw_settings_panel()
+            current_y = 0
+            self.show_message(current_y, 0, "Factory reset cancelled.", curses.A_BOLD)
+            current_y += 1
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+            win = self.get_active_window()
+            if win:
+                max_y, max_x = win.getmaxyx()
+                self.show_message(max_y - 1, 0, "Press any key to continue...")
+            self.stdscr.getch()
+            return
+        
+        # Clear and redraw for sending command
+        self.setup_screen()
+        self.draw_settings_panel()
+        current_y = 0
+        
+        def debug_callback(msg, color_type=None):
+            self.add_debug_output(msg, color_type=color_type)
+            self.draw_debug_panel()
+            self.refresh_all_panels()
+        
+        # Send factory reset command
+        self.show_message(current_y, 0, "Sending factory reset command...", curses.A_BOLD)
+        current_y += 1
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        # Send line return, then !RS command with line return
+        self.controller.ser.write(b'\r\n')
+        self.controller.ser.flush()
+        time.sleep(0.1)
+        
+        response = self.controller.send_command(b'!RS\r\n', debug_callback=debug_callback)
+        
+        if response is None:
+            self.show_message(current_y, 0, "ERROR: No response from device", curses.A_BOLD | curses.color_pair(self.COLOR_MISMATCH))
+            current_y += 1
+        else:
+            has_error, error_message = self.controller._has_error_response(response)
+            if has_error:
+                self.show_message(current_y, 0, f"ERROR: {error_message}", curses.A_BOLD | curses.color_pair(self.COLOR_MISMATCH))
+                current_y += 1
+            else:
+                self.show_message(current_y, 0, "Factory reset command sent successfully!", curses.A_BOLD)
+                current_y += 1
+        
+        self.draw_debug_panel()
+        self.refresh_all_panels()
+        
+        win = self.get_active_window()
+        if win:
+            max_y, max_x = win.getmaxyx()
+            self.show_message(max_y - 1, 0, "Press any key to continue...")
+        
         self.stdscr.getch()
     
     def museum_mode_screen(self):
@@ -2417,7 +2510,7 @@ class EnigmaMuseumUI(UIBase):
                     pass
         
         # Note: Kiosk/lock settings are NOT applied automatically in museum mode
-        # Use menu option 6 "Set Kiosk/Lock Config" to set them manually
+        # Use menu option 6 "Send Enigma Lock Config" to set them manually
         
         # Get saved config for reference
         saved = self.controller.get_saved_config()
@@ -3200,6 +3293,8 @@ class EnigmaMuseumUI(UIBase):
                     self.set_enigma_config_screen()
                 elif choice == '6':
                     self.set_kiosk_lock_config_screen()
+                elif choice == '7':
+                    self.factory_reset_enigma_screen()
         
         finally:
             self.destroy_subwindows()
