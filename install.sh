@@ -793,6 +793,37 @@ else
     echo "Skipping bashrc setup. You can manually run: $STARTUP_SCRIPT"
 fi
 
+# Ask if user wants to configure Enigma Touch for museum mode
+echo ""
+echo -e "${YELLOW}Configure Enigma Touch for Museum mode?${NC}"
+echo -e "${RED}WARNING:${NC} This will lock the setting buttons on the Enigma Touch device."
+echo "To unlock, you will need to:"
+echo "  1. Use this application to re-enable local buttons (Menu → Send Enigma Lock Config)"
+echo "  2. Or use Factory Reset (Menu → Factory Reset Enigma) - resets all settings"
+echo "  3. Or re-flash the Enigma Touch firmware"
+echo ""
+read -p "Configure Enigma Touch for Museum mode? (y/n) [N]: " configure_museum
+configure_museum=${configure_museum:-n}
+configure_museum_lower=$(echo "$configure_museum" | tr '[:upper:]' '[:lower:]')
+
+if [[ "$configure_museum_lower" == "y" ]]; then
+    echo ""
+    echo -e "${YELLOW}Configuring Enigma Touch for Museum mode...${NC}"
+    echo "Make sure your Enigma Touch device is connected."
+    echo ""
+    
+    # Run the --send-lock-config command
+    if python3 "$SCRIPT_DIR/main.py" --send-lock-config; then
+        echo -e "${GREEN}Enigma Touch configured for Museum mode successfully!${NC}"
+    else
+        echo -e "${YELLOW}Warning: Could not configure Enigma Touch.${NC}"
+        echo "You can configure it later by running:"
+        echo "  python3 $SCRIPT_DIR/main.py --send-lock-config"
+    fi
+else
+    echo "Skipping Enigma Touch museum mode configuration."
+fi
+
 echo ""
 echo -e "${GREEN}=========================================="
 echo "Installation complete!"
