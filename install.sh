@@ -244,6 +244,35 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
     echo ""
     handle_pyserial
     echo ""
+    
+    # Offer factory reset to restore Enigma Touch
+    echo -e "${YELLOW}Factory Reset Enigma Touch?${NC}"
+    echo "This will restore the Enigma Touch device to factory defaults,"
+    echo "including unlocking all settings buttons."
+    echo ""
+    read -p "Factory reset Enigma Touch? (y/n) [N]: " factory_reset
+    factory_reset=${factory_reset:-n}
+    factory_reset_lower=$(echo "$factory_reset" | tr '[:upper:]' '[:lower:]')
+    
+    if [[ "$factory_reset_lower" == "y" ]]; then
+        echo ""
+        echo -e "${YELLOW}Preparing to factory reset Enigma Touch...${NC}"
+        echo "Make sure your Enigma Touch device is connected and ready."
+        echo ""
+        read -p "Press Enter when ready to continue..."
+        
+        if python3 "$SCRIPT_DIR/main.py" --factory-reset; then
+            echo -e "${GREEN}Enigma Touch factory reset completed successfully!${NC}"
+        else
+            echo -e "${YELLOW}Warning: Could not factory reset Enigma Touch.${NC}"
+            echo "You can factory reset it later by running:"
+            echo "  python3 $SCRIPT_DIR/main.py --factory-reset"
+        fi
+    else
+        echo "Skipping Enigma Touch factory reset."
+    fi
+    
+    echo ""
     echo -e "${GREEN}=========================================="
     echo "Uninstall complete!"
     echo "==========================================${NC}"
@@ -809,8 +838,9 @@ configure_museum_lower=$(echo "$configure_museum" | tr '[:upper:]' '[:lower:]')
 if [[ "$configure_museum_lower" == "y" ]]; then
     echo ""
     echo -e "${YELLOW}Configuring Enigma Touch for Museum mode...${NC}"
-    echo "Make sure your Enigma Touch device is connected."
+    echo "Make sure your Enigma Touch device is connected and ready."
     echo ""
+    read -p "Press Enter when ready to continue..."
     
     # Run the --send-lock-config command
     if python3 "$SCRIPT_DIR/main.py" --send-lock-config; then

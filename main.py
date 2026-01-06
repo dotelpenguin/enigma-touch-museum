@@ -181,7 +181,10 @@ def main():
     if factory_reset:
         print("\n⚠️  WARNING: This will factory reset the Enigma Touch device!")
         print("All settings will be reset to factory defaults.")
-        confirm = input("Continue? (y/n): ").strip().lower()
+        print("\nMake sure your Enigma Touch device is connected and ready.")
+        input("Press Enter when ready to continue...")
+        
+        confirm = input("Continue with factory reset? (y/n): ").strip().lower()
         
         if confirm != 'y':
             print("Factory reset cancelled.")
