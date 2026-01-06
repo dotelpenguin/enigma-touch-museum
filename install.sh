@@ -298,7 +298,8 @@ enable_console_autologin() {
     echo "For kiosk mode, it's recommended to enable console auto-login"
     echo "so the application starts automatically on boot."
     echo ""
-    read -p "Enable console auto-login? (y/n): " enable_autologin
+    read -p "Enable console auto-login? (y/n) [Y]: " enable_autologin
+    enable_autologin=${enable_autologin:-y}
     enable_autologin_lower=$(echo "$enable_autologin" | tr '[:upper:]' '[:lower:]')
     
     if [[ "$enable_autologin_lower" == "y" ]]; then
@@ -391,7 +392,8 @@ show_installation_checklist() {
     echo ""
     echo -e "${GREEN}==========================================${NC}"
     echo ""
-    read -p "Continue with installation? (y/n): " confirm_install
+    read -p "Continue with installation? (y/n) [N]: " confirm_install
+    confirm_install=${confirm_install:-n}
     
     # Convert to lowercase for comparison (portable method)
     confirm_install_lower=$(echo "$confirm_install" | tr '[:upper:]' '[:lower:]')
@@ -756,7 +758,8 @@ enable_console_autologin
 # Ask if user wants to add to bash profile
 echo ""
 echo -e "${YELLOW}Setup auto-start on login?${NC}"
-read -p "Add startup script to ~/.bashrc? (y/n): " add_to_bashrc
+read -p "Add startup script to ~/.bashrc? (y/n) [Y]: " add_to_bashrc
+add_to_bashrc=${add_to_bashrc:-y}
 add_to_bashrc_lower=$(echo "$add_to_bashrc" | tr '[:upper:]' '[:lower:]')
 
 if [[ "$add_to_bashrc_lower" == "y" ]]; then
