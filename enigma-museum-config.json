@@ -1,16 +1,16 @@
 {
   "config": {
     "mode": "I",
-    "rotor_set": "A III IV I",
-    "ring_settings": "01 01 01",
+    "rotor_set": "B IV I V",
+    "ring_settings": "13 19 25",
     "ring_position": "20 6 10",
-    "pegboard": "VF PQ",
-    "device": "/dev/ttyACM0",
+    "pegboard": "ST UV WX YZ AB CD",
+    "device": "/dev/tty.usbmodem207139584B471",
     "raw_debug_enabled": false,
     "use_models_json": true
   },
   "museum_config": {
-    "function_mode": "Decode - EN",
+    "function_mode": "Interactive",
     "museum_delay": 60,
     "always_send_config": true,
     "word_group_size": 5,
