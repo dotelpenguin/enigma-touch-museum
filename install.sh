@@ -87,7 +87,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
         if [ -f "$STARTUP_SCRIPT" ]; then
             echo -e "${YELLOW}Startup script found: $STARTUP_SCRIPT${NC}"
             read -p "Remove startup script file? (y/n): " remove_script
-            if [[ "${remove_script,,}" == "y" ]]; then
+            remove_script_lower=$(echo "$remove_script" | tr '[:upper:]' '[:lower:]')
+            if [[ "$remove_script_lower" == "y" ]]; then
                 rm -f "$STARTUP_SCRIPT"
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}Removed startup script file${NC}"
@@ -109,7 +110,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             echo -e "${RED}Warning: Removing from dialout group may affect other applications${NC}"
             echo "that need serial port access (e.g., Arduino, other USB serial devices)"
             read -p "Remove user from dialout group? (y/n): " remove_dialout
-            if [[ "${remove_dialout,,}" == "y" ]]; then
+            remove_dialout_lower=$(echo "$remove_dialout" | tr '[:upper:]' '[:lower:]')
+            if [[ "$remove_dialout_lower" == "y" ]]; then
                 # Try gpasswd first, fall back to deluser if needed
                 sudo gpasswd -d $USER dialout 2>/dev/null
                 if [ $? -ne 0 ]; then
@@ -142,7 +144,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             echo -e "${RED}Warning: Removing pyserial may affect other Python applications${NC}"
             echo "that use serial communication"
             read -p "Uninstall python3-serial? (y/n): " remove_pyserial
-            if [[ "${remove_pyserial,,}" == "y" ]]; then
+            remove_pyserial_lower=$(echo "$remove_pyserial" | tr '[:upper:]' '[:lower:]')
+            if [[ "$remove_pyserial_lower" == "y" ]]; then
                 sudo apt-get remove -y python3-serial 2>/dev/null
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}Uninstalled python3-serial${NC}"
@@ -158,7 +161,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             echo -e "${RED}Warning: Removing pyserial may affect other Python applications${NC}"
             echo "that use serial communication"
             read -p "Uninstall pyserial? (y/n): " remove_pyserial
-            if [[ "${remove_pyserial,,}" == "y" ]]; then
+            remove_pyserial_lower=$(echo "$remove_pyserial" | tr '[:upper:]' '[:lower:]')
+            if [[ "$remove_pyserial_lower" == "y" ]]; then
                 # Try with --break-system-packages first (if it was installed that way)
                 pip3 uninstall -y --break-system-packages pyserial 2>/dev/null || \
                 pip3 uninstall -y pyserial 2>/dev/null
@@ -188,7 +192,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             if [ "$CURRENT_BEHAVIOUR" == "2" ]; then
                 echo -e "${YELLOW}Console auto-login is currently enabled${NC}"
                 read -p "Disable console auto-login? (y/n): " disable_autologin
-                if [[ "${disable_autologin,,}" == "y" ]]; then
+                disable_autologin_lower=$(echo "$disable_autologin" | tr '[:upper:]' '[:lower:]')
+                if [[ "$disable_autologin_lower" == "y" ]]; then
                     # B1 = Console require password
                     sudo raspi-config nonint do_boot_behaviour B1
                     if [ $? -eq 0 ]; then
@@ -209,7 +214,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             if [ -f "$AUTOLOGIN_FILE" ]; then
                 echo -e "${YELLOW}Console auto-login override file found${NC}"
                 read -p "Remove console auto-login configuration? (y/n): " remove_autologin
-                if [[ "${remove_autologin,,}" == "y" ]]; then
+                remove_autologin_lower=$(echo "$remove_autologin" | tr '[:upper:]' '[:lower:]')
+                if [[ "$remove_autologin_lower" == "y" ]]; then
                     sudo rm -f "$AUTOLOGIN_FILE"
                     if [ $? -eq 0 ]; then
                         sudo systemctl daemon-reload
@@ -273,7 +279,8 @@ check_desktop_environment() {
         echo -e "${YELLOW}Recommendation: Use Raspberry Pi OS Lite for best results${NC}"
         echo ""
         read -p "Continue installation anyway? (y/n): " continue_install
-        if [[ "${continue_install,,}" != "y" ]]; then
+        continue_install_lower=$(echo "$continue_install" | tr '[:upper:]' '[:lower:]')
+        if [[ "$continue_install_lower" != "y" ]]; then
             echo "Installation cancelled."
             exit 0
         fi
@@ -292,8 +299,9 @@ enable_console_autologin() {
     echo "so the application starts automatically on boot."
     echo ""
     read -p "Enable console auto-login? (y/n): " enable_autologin
+    enable_autologin_lower=$(echo "$enable_autologin" | tr '[:upper:]' '[:lower:]')
     
-    if [[ "${enable_autologin,,}" == "y" ]]; then
+    if [[ "$enable_autologin_lower" == "y" ]]; then
         # Check if raspi-config is available (Raspberry Pi OS)
         if command -v raspi-config &> /dev/null; then
             echo -e "${YELLOW}Enabling console auto-login using raspi-config...${NC}"
@@ -385,7 +393,9 @@ show_installation_checklist() {
     echo ""
     read -p "Continue with installation? (y/n): " confirm_install
     
-    if [[ "${confirm_install,,}" != "y" ]]; then
+    # Convert to lowercase for comparison (portable method)
+    confirm_install_lower=$(echo "$confirm_install" | tr '[:upper:]' '[:lower:]')
+    if [[ "$confirm_install_lower" != "y" ]]; then
         echo ""
         echo "Installation cancelled by user."
         exit 0
@@ -667,8 +677,8 @@ wait_for_input() {
         # User pressed a key - clear the input buffer
         while read -t 0.1 -n 1 -s dummy 2>/dev/null; do :; done
         
-        # Convert input to lowercase for case-insensitive matching
-        choice="\${input,,}"
+        # Convert input to lowercase for case-insensitive matching (portable method)
+        choice=\$(echo "\$input" | tr '[:upper:]' '[:lower:]')
         
         # If user pressed C, S, M, or D directly, use it; otherwise show menu
         if [[ "\$choice" == "c" ]] || [[ "\$choice" == "s" ]] || [[ "\$choice" == "m" ]] || [[ "\$choice" == "d" ]]; then
@@ -684,10 +694,10 @@ wait_for_input() {
             echo "  [D]ebug mode - Start museum mode with debug output"
             echo ""
             read -p "Enter choice (C/S/M/D): " choice
-            choice="\${choice,,}"
+            choice=\$(echo "\$choice" | tr '[:upper:]' '[:lower:]')
         fi
         
-        case "\${choice,,}" in
+        case "\$choice" in
             c)
                 echo "Starting config mode..."
                 cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" --config
@@ -747,13 +757,15 @@ enable_console_autologin
 echo ""
 echo -e "${YELLOW}Setup auto-start on login?${NC}"
 read -p "Add startup script to ~/.bashrc? (y/n): " add_to_bashrc
+add_to_bashrc_lower=$(echo "$add_to_bashrc" | tr '[:upper:]' '[:lower:]')
 
-if [[ "${add_to_bashrc,,}" == "y" ]]; then
+if [[ "$add_to_bashrc_lower" == "y" ]]; then
     # Check if already added
     if grep -q "Enigma Museum Controller" ~/.bashrc 2>/dev/null; then
         echo -e "${YELLOW}Startup script already found in ~/.bashrc${NC}"
         read -p "Replace existing entry? (y/n): " replace
-        if [[ "${replace,,}" == "y" ]]; then
+        replace_lower=$(echo "$replace" | tr '[:upper:]' '[:lower:]')
+        if [[ "$replace_lower" == "y" ]]; then
             # Remove old entries (find the block and remove it)
             sed -i '/# Enigma Museum Controller/,/^fi$/d' ~/.bashrc
         else
