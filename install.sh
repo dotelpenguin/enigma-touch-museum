@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# Installation script for Enigma Museum Controller on Raspberry Pi 2 (Raspbian Lite)
+# Installation script for Enigma Museum Controller on Raspberry Pi (Raspberry Pi OS Lite)
 # This script installs required dependencies and optionally sets up auto-start
+# Requires Raspberry Pi 2 or higher (Pi 1 is no longer supported)
 #
 # Usage:
 #   ./install.sh          - Install the application
@@ -370,7 +371,9 @@ show_installation_checklist() {
     echo ""
     echo -e "${YELLOW}System Requirements:${NC}"
     echo "  - Raspberry Pi OS Lite (console-only) recommended"
+    echo "  - Raspberry Pi 2 or higher (Pi 1 is no longer supported)"
     echo "  - Python 3.x"
+    echo "  - Enigma Touch firmware 4.20 or higher (4.21 recommended)"
     echo "  - Serial device access (USB serial adapter)"
     echo ""
     echo -e "${YELLOW}Note:${NC}"
@@ -411,30 +414,58 @@ else
     echo "pip3 already installed: $(pip3 --version)"
 fi
 
-# Install pyserial
-echo -e "${YELLOW}[3/8] Installing pyserial...${NC}"
-# Try installing via apt first (preferred method for system-wide installation)
-if apt-cache show python3-serial &>/dev/null; then
-    echo "Installing pyserial via apt (python3-serial)..."
-    sudo apt-get install -y python3-serial
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}pyserial installed via apt${NC}"
+# Install Python dependencies
+echo -e "${YELLOW}[3/8] Installing Python dependencies...${NC}"
+# Check if requirements.txt exists
+if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+    echo "Installing dependencies from requirements.txt..."
+    # Try installing via apt first for pyserial (preferred method for system-wide installation)
+    if apt-cache show python3-serial &>/dev/null; then
+        echo "Installing pyserial via apt (python3-serial)..."
+        sudo apt-get install -y python3-serial
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}pyserial installed via apt${NC}"
+            # Install any other dependencies from requirements.txt via pip
+            if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+                # Check if there are other dependencies besides pyserial
+                if grep -v "^pyserial" "$SCRIPT_DIR/requirements.txt" | grep -v "^#" | grep -v "^$" | grep -q .; then
+                    echo "Installing additional dependencies from requirements.txt..."
+                    pip3 install --break-system-packages -r "$SCRIPT_DIR/requirements.txt" || {
+                        echo -e "${YELLOW}Warning: Some dependencies may not have installed correctly${NC}"
+                    }
+                fi
+            fi
+        else
+            echo -e "${YELLOW}apt installation failed, installing all dependencies via pip...${NC}"
+            pip3 install --break-system-packages -r "$SCRIPT_DIR/requirements.txt" || {
+                echo -e "${RED}Error: Could not install dependencies${NC}"
+                echo "Please install manually: sudo apt-get install python3-serial"
+                echo "or: pip3 install --break-system-packages -r requirements.txt"
+                exit 1
+            }
+        fi
     else
-        echo -e "${YELLOW}apt installation failed, trying pip...${NC}"
-        # Fall back to pip with --break-system-packages (acceptable for kiosk systems)
-        pip3 install --break-system-packages pyserial
+        echo "python3-serial not available in apt, installing all dependencies via pip..."
+        pip3 install --break-system-packages -r "$SCRIPT_DIR/requirements.txt"
+        if [ $? -ne 0 ]; then
+            echo -e "${YELLOW}Trying with --user flag as fallback...${NC}"
+            pip3 install --user -r "$SCRIPT_DIR/requirements.txt" || {
+                echo -e "${RED}Error: Could not install dependencies${NC}"
+                echo "Please install manually: sudo apt-get install python3-serial"
+                echo "or: pip3 install --break-system-packages -r requirements.txt"
+                exit 1
+            }
+        fi
     fi
+    echo -e "${GREEN}Python dependencies installed${NC}"
 else
-    echo "python3-serial not available in apt, installing via pip..."
-    # Use --break-system-packages flag for externally managed environments
-    # This is acceptable for kiosk systems where system-wide installation is desired
-    pip3 install --break-system-packages pyserial
-    if [ $? -ne 0 ]; then
-        echo -e "${YELLOW}Trying with --user flag as fallback...${NC}"
-        pip3 install --user pyserial || {
+    echo -e "${YELLOW}requirements.txt not found, installing pyserial only...${NC}"
+    # Fallback to just installing pyserial if requirements.txt doesn't exist
+    if apt-cache show python3-serial &>/dev/null; then
+        sudo apt-get install -y python3-serial
+    else
+        pip3 install --break-system-packages pyserial || pip3 install --user pyserial || {
             echo -e "${RED}Error: Could not install pyserial${NC}"
-            echo "Please install manually: sudo apt-get install python3-serial"
-            echo "or: pip3 install --break-system-packages pyserial"
             exit 1
         }
     fi
@@ -552,14 +583,15 @@ echo -e "${YELLOW}[6/8] Configuring default museum mode...${NC}"
 echo ""
 echo "Select the default museum mode:"
 echo "  [1] Encode - EN (English encode mode)"
-echo "  [2] Decode - EN (English decode mode)"
+echo "  [2] Decode - EN (English decode mode) <-Recommended"
 echo "  [3] Encode - DE (German encode mode)"
-echo "  [4] Decode - DE (German decode mode)"
+echo "  [4] Decode - DE (German decode mode) <-Recommended"
 echo ""
-read -p "Enter choice (1-4) [default: 1]: " museum_mode_choice
+read -p "Enter choice (1-4) [default: 2]: " museum_mode_choice
 
 # Set default museum mode based on choice
-case "${museum_mode_choice:-1}" in
+# Default is 2 (Decode - EN) - recommended for museum displays
+case "${museum_mode_choice:-2}" in
     1)
         DEFAULT_MUSEUM_MODE="--museum-en-encode"
         MUSEUM_MODE_NAME="Encode - EN"
@@ -577,9 +609,9 @@ case "${museum_mode_choice:-1}" in
         MUSEUM_MODE_NAME="Decode - DE"
         ;;
     *)
-        echo -e "${YELLOW}Invalid choice, using default: Encode - EN${NC}"
-        DEFAULT_MUSEUM_MODE="--museum-en-encode"
-        MUSEUM_MODE_NAME="Encode - EN"
+        echo -e "${YELLOW}Invalid choice, using default: Decode - EN${NC}"
+        DEFAULT_MUSEUM_MODE="--museum-en-decode"
+        MUSEUM_MODE_NAME="Decode - EN"
         ;;
 esac
 
@@ -600,6 +632,13 @@ cat > "$STARTUP_SCRIPT" << EOF
 SCRIPT_DIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
 APP_SCRIPT="\$SCRIPT_DIR/main.py"
 DEFAULT_MODE="$DEFAULT_MUSEUM_MODE"
+
+# Change to the script directory to ensure relative file paths work correctly
+# This is critical for accessing config files, message files, and other resources
+cd "\$SCRIPT_DIR" || {
+    echo "ERROR: Could not change to script directory: \$SCRIPT_DIR"
+    exit 1
+}
 
 # Function to wait for input with timeout
 # Returns: 0 = continue loop, 1 = exit to shell
@@ -651,7 +690,7 @@ wait_for_input() {
         case "\${choice,,}" in
             c)
                 echo "Starting config mode..."
-                python3 "\$APP_SCRIPT" --config
+                cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" --config
                 return 0  # Continue loop (restart)
                 ;;
             s)
@@ -660,17 +699,17 @@ wait_for_input() {
                 ;;
             m)
                 echo "Starting museum mode..."
-                python3 "\$APP_SCRIPT" \$DEFAULT_MODE
+                cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" \$DEFAULT_MODE
                 return 0  # Continue loop (restart)
                 ;;
             d)
                 echo "Starting museum mode with debug..."
-                python3 "\$APP_SCRIPT" \$DEFAULT_MODE --debug
+                cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" \$DEFAULT_MODE --debug
                 return 0  # Continue loop (restart)
                 ;;
             *)
                 echo "Invalid choice, starting museum mode..."
-                python3 "\$APP_SCRIPT" \$DEFAULT_MODE
+                cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" \$DEFAULT_MODE
                 return 0  # Continue loop (restart)
                 ;;
         esac
@@ -678,7 +717,7 @@ wait_for_input() {
         # Timeout - start museum mode automatically
         echo ""
         echo "Starting museum mode..."
-        python3 "\$APP_SCRIPT" \$DEFAULT_MODE
+        cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" \$DEFAULT_MODE
         return 0  # Continue loop (restart)
     fi
 }
@@ -766,8 +805,11 @@ echo "  5. If device exists but no permissions: sudo chmod 666 /dev/ttyACM0"
 echo ""
 echo -e "${YELLOW}Important Notes:${NC}"
 echo "  - This application is designed for Raspberry Pi OS Lite (console-only)"
+echo "  - Requires Enigma Touch firmware 4.20 or higher (4.21 recommended)"
+echo "  - Firmware version is automatically checked on connection"
 echo "  - For kiosk mode, enable console auto-login and add startup to ~/.bashrc"
 echo "  - The application will auto-restart if it exits (kiosk mode)"
+echo "  - Startup script changes to application directory before running (ensures file access)"
 echo ""
 echo -e "${YELLOW}Command-Line Options:${NC}"
 echo "  --config, -c              Open configuration menu without connecting"

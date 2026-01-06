@@ -4,13 +4,33 @@ A Python-based control system for Enigma cipher machines, featuring a curses-bas
 
 > **⚠️ WORK IN PROGRESS:** This project is actively under development. Features may be incomplete, documentation may be lacking, and the codebase is subject to significant changes. Use at your own risk and expect bugs and breaking changes.
 >
-> **⚠️ FIRMWARE REQUIREMENT:** This software requires **Enigma Touch firmware version 4.20 or higher**. Earlier firmware versions are not supported and may not work correctly. The application automatically checks firmware version on connection and will display a warning if firmware 4.21 is recommended or exit with an error if the firmware is too old.
+> **⚠️ FIRMWARE REQUIREMENT:** This software requires **Enigma Touch firmware version 4.20 or higher**. **Firmware 4.20 is the bare minimum** and some features may be limited. **Firmware 4.21 is required for all features** to work correctly. Earlier firmware versions are not supported. The application automatically checks firmware version on connection.
+>
 >
 > **⚠️ CRITICAL WARNING - DEVICE LOCKOUT:** You can inadvertently lock yourself out of the Enigma Touch device by disabling the local buttons (kiosk/lock settings). If you disable local buttons and lose access to this application, you will be unable to unlock the device using the physical buttons. **To unlock a locked device, you must either:**
-> - Use this application to re-enable the local buttons, OR
-> - Re-flash the Enigma Touch firmware
+> - Use this application to re-enable the local buttons,
+> - Use this application to factory reset the Enigma Touch,
+> - If this application is not available, Re-flash the Enigma Touch firmware (see Offical Enigma Touch Documentation below)
 >
 > **Always ensure you have a way to access this application before disabling local buttons on your Enigma Touch device.**
+
+## Why Did I Make This?
+
+### The "OFFICIAL" Reason
+
+This project was created to enable museum and educational displays using the Enigma Touch device. The goal is to provide:
+
+- **Automated demonstrations** for museum visitors without requiring manual operation
+- **Consistent configuration** management for multiple devices
+- **Educational value** through automated encoding/decoding demonstrations
+- **Reliable operation** in unattended kiosk environments
+
+The Enigma Touch is an excellent educational tool, but operating it manually for extended periods in museum settings can be impractical. This software bridges that gap by providing automated control while maintaining the authentic Enigma experience.
+
+### The REAL Reason
+
+ - I have always been fascinated and drawn to the Enigma Cipher Machine.
+ - I LOVE Blinkenlights
 
 ## History
 
@@ -30,6 +50,10 @@ We utilize the USB serial interface on the Enigma Touch to establish a serial AP
 - **Purchase**: Available through [Obsolescence Guaranteed](https://obsolescence.dev/enigma-touch.html)
 - **User Forum**: Community discussions and support (see official website)
 - **Documentation**: User manual, reference card, and in-depth guides available on the [official website](https://obsolescence.dev/enigma-touch.html)
+- **Deep Dives**: Down the rabbit hole we go
+   - [Wikipeedia](https://en.wikipedia.org/wiki/Enigma_machine)
+   - [Enigma Museum](https://enigmamuseum.com/ecds.htm)
+   - [Cipher Machines](https://ciphermachines.com/enigma)
 
 The Enigma Touch connects to computers via USB serial interface, making it perfect for museum displays, educational demonstrations, and hands-on cryptography experiences.
 
@@ -84,7 +108,7 @@ Detailed status view showing all device information and current settings:
 - Python 3.x
 - [pyserial](https://pypi.org/project/pyserial/) (for serial communication)
 - Enigma Touch device connected via USB serial interface
-- **Enigma Touch firmware 4.20 or higher** (required - earlier versions are not supported). Firmware version is automatically checked on connection.
+- **Enigma Touch firmware 4.20 or higher** (required - earlier versions are not supported). **Firmware 4.20 is the bare minimum**; **firmware 4.21 is required for all features**. Firmware version is automatically checked on connection.
 
 ### Python Dependencies
 
@@ -101,9 +125,11 @@ pip3 install --break-system-packages -r requirements.txt
 ## Tested Hardware/Systems
 
 - Raspberry Pi 2, 3, 4, 5 - Using [Raspberry Pi OS Lite](https://www.raspberrypi.com/software/)
-- Raspberry Pi 1 - Works but slow due to single core; local display flickers
+- Raspberry Pi 1 - **No longer supported** (too slow, display flickers)
 - ChromeOS Linux with USB Passthrough
 - macOS (Tahoe)
+
+**Minimum Requirements:** Raspberry Pi 2 or higher recommended. Pi 1 is no longer supported due to performance limitations.
 
 In theory this should work on any system that supports Python 3 and has proper permissions to access USB serial devices. For the web server feature, ensure your system can bind to network ports.
 
@@ -465,7 +491,7 @@ The application includes comprehensive error detection and handling:
 
 ### Messages Not Encoding
 
-1. **Verify firmware version**: The application automatically checks firmware version on connection. Ensure your Enigma Touch has firmware 4.20 or higher (4.21 is recommended)
+1. **Verify firmware version**: The application automatically checks firmware version on connection. Ensure your Enigma Touch has firmware 4.20 or higher. **Firmware 4.20 is the bare minimum**; **firmware 4.21 is required for all features**.
 2. Verify Enigma touch is using the proper logging method. (Line returns enabled, either 4,5 mode)
 3. Enable debug mode (`--debug` or menu option 7)
 4. Check serial communication in debug panel
