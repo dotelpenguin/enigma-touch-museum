@@ -326,6 +326,8 @@ python3 main.py [OPTIONS] [DEVICE]
 - `--museum-de-encode`: Start directly in Encode - DE mode (German encode)
 - `--museum-de-decode`: Start directly in Decode - DE mode (German decode)
 - `--debug`: Enable debug output panel (shows serial communication). **Note:** Debug is enabled by default; this option explicitly enables it. Debug can be toggled on/off via the main menu (option 8).
+- `--send-lock-config`: Send kiosk/lock settings to device from saved configuration (⚠️ use with caution - see lockout warning above)
+- `--factory-reset`: Factory reset the Enigma Touch device (⚠️ resets all settings to factory defaults - requires confirmation)
 - `--help`, `-h`: Show help message and exit
 
 ### Examples
@@ -348,6 +350,12 @@ python3 main.py --museum-de-decode
 
 # Start Encode - DE mode with specific device
 python3 main.py --museum-de-encode /dev/ttyUSB0
+
+# Send kiosk/lock settings to device
+python3 main.py --send-lock-config
+
+# Factory reset device (requires confirmation)
+python3 main.py --factory-reset
 ```
 
 ## Main Menu Options
