@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# Installation script for Enigma Museum Controller on Raspberry Pi 2 (Raspbian Lite)
+# Installation script for Enigma Museum Controller on Raspberry Pi (Raspberry Pi OS Lite)
 # This script installs required dependencies and optionally sets up auto-start
+# Requires Raspberry Pi 2 or higher (Pi 1 is no longer supported)
 #
 # Usage:
 #   ./install.sh          - Install the application
@@ -65,6 +66,38 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
     echo "=========================================="
     echo ""
     
+    # Offer factory reset FIRST (before uninstalling tools needed to run it)
+    echo -e "${YELLOW}Factory Reset Enigma Touch?${NC}"
+    echo "This will restore the Enigma Touch device to factory defaults,"
+    echo "including unlocking all settings buttons."
+    echo ""
+    echo -e "${YELLOW}Note:${NC} This must be done BEFORE uninstalling, as the tools"
+    echo "required to reset the device will be removed during uninstall."
+    echo ""
+    read -p "Factory reset Enigma Touch? (y/n) [N]: " factory_reset
+    factory_reset=${factory_reset:-n}
+    factory_reset_lower=$(echo "$factory_reset" | tr '[:upper:]' '[:lower:]')
+    
+    if [[ "$factory_reset_lower" == "y" ]]; then
+        echo ""
+        echo -e "${YELLOW}Preparing to factory reset Enigma Touch...${NC}"
+        echo "Make sure your Enigma Touch device is connected and ready."
+        echo ""
+        read -p "Press Enter when ready to continue..."
+        
+        if python3 "$SCRIPT_DIR/main.py" --factory-reset; then
+            echo -e "${GREEN}Enigma Touch factory reset completed successfully!${NC}"
+        else
+            echo -e "${YELLOW}Warning: Could not factory reset Enigma Touch.${NC}"
+            echo "You can factory reset it later by running:"
+            echo "  python3 $SCRIPT_DIR/main.py --factory-reset"
+        fi
+        echo ""
+    else
+        echo "Skipping Enigma Touch factory reset."
+        echo ""
+    fi
+    
     # Function to remove bashrc entries
     remove_bashrc_entries() {
         if grep -q "Enigma Museum Controller" ~/.bashrc 2>/dev/null; then
@@ -86,7 +119,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
         if [ -f "$STARTUP_SCRIPT" ]; then
             echo -e "${YELLOW}Startup script found: $STARTUP_SCRIPT${NC}"
             read -p "Remove startup script file? (y/n): " remove_script
-            if [[ "${remove_script,,}" == "y" ]]; then
+            remove_script_lower=$(echo "$remove_script" | tr '[:upper:]' '[:lower:]')
+            if [[ "$remove_script_lower" == "y" ]]; then
                 rm -f "$STARTUP_SCRIPT"
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}Removed startup script file${NC}"
@@ -108,7 +142,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             echo -e "${RED}Warning: Removing from dialout group may affect other applications${NC}"
             echo "that need serial port access (e.g., Arduino, other USB serial devices)"
             read -p "Remove user from dialout group? (y/n): " remove_dialout
-            if [[ "${remove_dialout,,}" == "y" ]]; then
+            remove_dialout_lower=$(echo "$remove_dialout" | tr '[:upper:]' '[:lower:]')
+            if [[ "$remove_dialout_lower" == "y" ]]; then
                 # Try gpasswd first, fall back to deluser if needed
                 sudo gpasswd -d $USER dialout 2>/dev/null
                 if [ $? -ne 0 ]; then
@@ -141,7 +176,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             echo -e "${RED}Warning: Removing pyserial may affect other Python applications${NC}"
             echo "that use serial communication"
             read -p "Uninstall python3-serial? (y/n): " remove_pyserial
-            if [[ "${remove_pyserial,,}" == "y" ]]; then
+            remove_pyserial_lower=$(echo "$remove_pyserial" | tr '[:upper:]' '[:lower:]')
+            if [[ "$remove_pyserial_lower" == "y" ]]; then
                 sudo apt-get remove -y python3-serial 2>/dev/null
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}Uninstalled python3-serial${NC}"
@@ -157,7 +193,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             echo -e "${RED}Warning: Removing pyserial may affect other Python applications${NC}"
             echo "that use serial communication"
             read -p "Uninstall pyserial? (y/n): " remove_pyserial
-            if [[ "${remove_pyserial,,}" == "y" ]]; then
+            remove_pyserial_lower=$(echo "$remove_pyserial" | tr '[:upper:]' '[:lower:]')
+            if [[ "$remove_pyserial_lower" == "y" ]]; then
                 # Try with --break-system-packages first (if it was installed that way)
                 pip3 uninstall -y --break-system-packages pyserial 2>/dev/null || \
                 pip3 uninstall -y pyserial 2>/dev/null
@@ -187,7 +224,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             if [ "$CURRENT_BEHAVIOUR" == "2" ]; then
                 echo -e "${YELLOW}Console auto-login is currently enabled${NC}"
                 read -p "Disable console auto-login? (y/n): " disable_autologin
-                if [[ "${disable_autologin,,}" == "y" ]]; then
+                disable_autologin_lower=$(echo "$disable_autologin" | tr '[:upper:]' '[:lower:]')
+                if [[ "$disable_autologin_lower" == "y" ]]; then
                     # B1 = Console require password
                     sudo raspi-config nonint do_boot_behaviour B1
                     if [ $? -eq 0 ]; then
@@ -208,7 +246,8 @@ if [ "$1" == "--uninstall" ] || [ "$1" == "-u" ]; then
             if [ -f "$AUTOLOGIN_FILE" ]; then
                 echo -e "${YELLOW}Console auto-login override file found${NC}"
                 read -p "Remove console auto-login configuration? (y/n): " remove_autologin
-                if [[ "${remove_autologin,,}" == "y" ]]; then
+                remove_autologin_lower=$(echo "$remove_autologin" | tr '[:upper:]' '[:lower:]')
+                if [[ "$remove_autologin_lower" == "y" ]]; then
                     sudo rm -f "$AUTOLOGIN_FILE"
                     if [ $? -eq 0 ]; then
                         sudo systemctl daemon-reload
@@ -272,7 +311,8 @@ check_desktop_environment() {
         echo -e "${YELLOW}Recommendation: Use Raspberry Pi OS Lite for best results${NC}"
         echo ""
         read -p "Continue installation anyway? (y/n): " continue_install
-        if [[ "${continue_install,,}" != "y" ]]; then
+        continue_install_lower=$(echo "$continue_install" | tr '[:upper:]' '[:lower:]')
+        if [[ "$continue_install_lower" != "y" ]]; then
             echo "Installation cancelled."
             exit 0
         fi
@@ -290,9 +330,11 @@ enable_console_autologin() {
     echo "For kiosk mode, it's recommended to enable console auto-login"
     echo "so the application starts automatically on boot."
     echo ""
-    read -p "Enable console auto-login? (y/n): " enable_autologin
+    read -p "Enable console auto-login? (y/n) [Y]: " enable_autologin
+    enable_autologin=${enable_autologin:-y}
+    enable_autologin_lower=$(echo "$enable_autologin" | tr '[:upper:]' '[:lower:]')
     
-    if [[ "${enable_autologin,,}" == "y" ]]; then
+    if [[ "$enable_autologin_lower" == "y" ]]; then
         # Check if raspi-config is available (Raspberry Pi OS)
         if command -v raspi-config &> /dev/null; then
             echo -e "${YELLOW}Enabling console auto-login using raspi-config...${NC}"
@@ -370,7 +412,9 @@ show_installation_checklist() {
     echo ""
     echo -e "${YELLOW}System Requirements:${NC}"
     echo "  - Raspberry Pi OS Lite (console-only) recommended"
+    echo "  - Raspberry Pi 2 or higher (Pi 1 is no longer supported)"
     echo "  - Python 3.x"
+    echo "  - Enigma Touch firmware 4.20 or higher (4.21 recommended)"
     echo "  - Serial device access (USB serial adapter)"
     echo ""
     echo -e "${YELLOW}Note:${NC}"
@@ -380,9 +424,12 @@ show_installation_checklist() {
     echo ""
     echo -e "${GREEN}==========================================${NC}"
     echo ""
-    read -p "Continue with installation? (y/n): " confirm_install
+    read -p "Continue with installation? (y/n) [N]: " confirm_install
+    confirm_install=${confirm_install:-n}
     
-    if [[ "${confirm_install,,}" != "y" ]]; then
+    # Convert to lowercase for comparison (portable method)
+    confirm_install_lower=$(echo "$confirm_install" | tr '[:upper:]' '[:lower:]')
+    if [[ "$confirm_install_lower" != "y" ]]; then
         echo ""
         echo "Installation cancelled by user."
         exit 0
@@ -411,30 +458,58 @@ else
     echo "pip3 already installed: $(pip3 --version)"
 fi
 
-# Install pyserial
-echo -e "${YELLOW}[3/8] Installing pyserial...${NC}"
-# Try installing via apt first (preferred method for system-wide installation)
-if apt-cache show python3-serial &>/dev/null; then
-    echo "Installing pyserial via apt (python3-serial)..."
-    sudo apt-get install -y python3-serial
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}pyserial installed via apt${NC}"
+# Install Python dependencies
+echo -e "${YELLOW}[3/8] Installing Python dependencies...${NC}"
+# Check if requirements.txt exists
+if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+    echo "Installing dependencies from requirements.txt..."
+    # Try installing via apt first for pyserial (preferred method for system-wide installation)
+    if apt-cache show python3-serial &>/dev/null; then
+        echo "Installing pyserial via apt (python3-serial)..."
+        sudo apt-get install -y python3-serial
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}pyserial installed via apt${NC}"
+            # Install any other dependencies from requirements.txt via pip
+            if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+                # Check if there are other dependencies besides pyserial
+                if grep -v "^pyserial" "$SCRIPT_DIR/requirements.txt" | grep -v "^#" | grep -v "^$" | grep -q .; then
+                    echo "Installing additional dependencies from requirements.txt..."
+                    pip3 install --break-system-packages -r "$SCRIPT_DIR/requirements.txt" || {
+                        echo -e "${YELLOW}Warning: Some dependencies may not have installed correctly${NC}"
+                    }
+                fi
+            fi
+        else
+            echo -e "${YELLOW}apt installation failed, installing all dependencies via pip...${NC}"
+            pip3 install --break-system-packages -r "$SCRIPT_DIR/requirements.txt" || {
+                echo -e "${RED}Error: Could not install dependencies${NC}"
+                echo "Please install manually: sudo apt-get install python3-serial"
+                echo "or: pip3 install --break-system-packages -r requirements.txt"
+                exit 1
+            }
+        fi
     else
-        echo -e "${YELLOW}apt installation failed, trying pip...${NC}"
-        # Fall back to pip with --break-system-packages (acceptable for kiosk systems)
-        pip3 install --break-system-packages pyserial
+        echo "python3-serial not available in apt, installing all dependencies via pip..."
+        pip3 install --break-system-packages -r "$SCRIPT_DIR/requirements.txt"
+        if [ $? -ne 0 ]; then
+            echo -e "${YELLOW}Trying with --user flag as fallback...${NC}"
+            pip3 install --user -r "$SCRIPT_DIR/requirements.txt" || {
+                echo -e "${RED}Error: Could not install dependencies${NC}"
+                echo "Please install manually: sudo apt-get install python3-serial"
+                echo "or: pip3 install --break-system-packages -r requirements.txt"
+                exit 1
+            }
+        fi
     fi
+    echo -e "${GREEN}Python dependencies installed${NC}"
 else
-    echo "python3-serial not available in apt, installing via pip..."
-    # Use --break-system-packages flag for externally managed environments
-    # This is acceptable for kiosk systems where system-wide installation is desired
-    pip3 install --break-system-packages pyserial
-    if [ $? -ne 0 ]; then
-        echo -e "${YELLOW}Trying with --user flag as fallback...${NC}"
-        pip3 install --user pyserial || {
+    echo -e "${YELLOW}requirements.txt not found, installing pyserial only...${NC}"
+    # Fallback to just installing pyserial if requirements.txt doesn't exist
+    if apt-cache show python3-serial &>/dev/null; then
+        sudo apt-get install -y python3-serial
+    else
+        pip3 install --break-system-packages pyserial || pip3 install --user pyserial || {
             echo -e "${RED}Error: Could not install pyserial${NC}"
-            echo "Please install manually: sudo apt-get install python3-serial"
-            echo "or: pip3 install --break-system-packages pyserial"
             exit 1
         }
     fi
@@ -552,14 +627,15 @@ echo -e "${YELLOW}[6/8] Configuring default museum mode...${NC}"
 echo ""
 echo "Select the default museum mode:"
 echo "  [1] Encode - EN (English encode mode)"
-echo "  [2] Decode - EN (English decode mode)"
+echo "  [2] Decode - EN (English decode mode) <-Recommended"
 echo "  [3] Encode - DE (German encode mode)"
-echo "  [4] Decode - DE (German decode mode)"
+echo "  [4] Decode - DE (German decode mode) <-Recommended"
 echo ""
-read -p "Enter choice (1-4) [default: 1]: " museum_mode_choice
+read -p "Enter choice (1-4) [default: 2]: " museum_mode_choice
 
 # Set default museum mode based on choice
-case "${museum_mode_choice:-1}" in
+# Default is 2 (Decode - EN) - recommended for museum displays
+case "${museum_mode_choice:-2}" in
     1)
         DEFAULT_MUSEUM_MODE="--museum-en-encode"
         MUSEUM_MODE_NAME="Encode - EN"
@@ -577,9 +653,9 @@ case "${museum_mode_choice:-1}" in
         MUSEUM_MODE_NAME="Decode - DE"
         ;;
     *)
-        echo -e "${YELLOW}Invalid choice, using default: Encode - EN${NC}"
-        DEFAULT_MUSEUM_MODE="--museum-en-encode"
-        MUSEUM_MODE_NAME="Encode - EN"
+        echo -e "${YELLOW}Invalid choice, using default: Decode - EN${NC}"
+        DEFAULT_MUSEUM_MODE="--museum-en-decode"
+        MUSEUM_MODE_NAME="Decode - EN"
         ;;
 esac
 
@@ -600,6 +676,13 @@ cat > "$STARTUP_SCRIPT" << EOF
 SCRIPT_DIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
 APP_SCRIPT="\$SCRIPT_DIR/main.py"
 DEFAULT_MODE="$DEFAULT_MUSEUM_MODE"
+
+# Change to the script directory to ensure relative file paths work correctly
+# This is critical for accessing config files, message files, and other resources
+cd "\$SCRIPT_DIR" || {
+    echo "ERROR: Could not change to script directory: \$SCRIPT_DIR"
+    exit 1
+}
 
 # Function to wait for input with timeout
 # Returns: 0 = continue loop, 1 = exit to shell
@@ -628,8 +711,8 @@ wait_for_input() {
         # User pressed a key - clear the input buffer
         while read -t 0.1 -n 1 -s dummy 2>/dev/null; do :; done
         
-        # Convert input to lowercase for case-insensitive matching
-        choice="\${input,,}"
+        # Convert input to lowercase for case-insensitive matching (portable method)
+        choice=\$(echo "\$input" | tr '[:upper:]' '[:lower:]')
         
         # If user pressed C, S, M, or D directly, use it; otherwise show menu
         if [[ "\$choice" == "c" ]] || [[ "\$choice" == "s" ]] || [[ "\$choice" == "m" ]] || [[ "\$choice" == "d" ]]; then
@@ -645,13 +728,13 @@ wait_for_input() {
             echo "  [D]ebug mode - Start museum mode with debug output"
             echo ""
             read -p "Enter choice (C/S/M/D): " choice
-            choice="\${choice,,}"
+            choice=\$(echo "\$choice" | tr '[:upper:]' '[:lower:]')
         fi
         
-        case "\${choice,,}" in
+        case "\$choice" in
             c)
                 echo "Starting config mode..."
-                python3 "\$APP_SCRIPT" --config
+                cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" --config
                 return 0  # Continue loop (restart)
                 ;;
             s)
@@ -660,17 +743,17 @@ wait_for_input() {
                 ;;
             m)
                 echo "Starting museum mode..."
-                python3 "\$APP_SCRIPT" \$DEFAULT_MODE
+                cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" \$DEFAULT_MODE
                 return 0  # Continue loop (restart)
                 ;;
             d)
                 echo "Starting museum mode with debug..."
-                python3 "\$APP_SCRIPT" \$DEFAULT_MODE --debug
+                cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" \$DEFAULT_MODE --debug
                 return 0  # Continue loop (restart)
                 ;;
             *)
                 echo "Invalid choice, starting museum mode..."
-                python3 "\$APP_SCRIPT" \$DEFAULT_MODE
+                cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" \$DEFAULT_MODE
                 return 0  # Continue loop (restart)
                 ;;
         esac
@@ -678,7 +761,7 @@ wait_for_input() {
         # Timeout - start museum mode automatically
         echo ""
         echo "Starting museum mode..."
-        python3 "\$APP_SCRIPT" \$DEFAULT_MODE
+        cd "\$SCRIPT_DIR" && python3 "\$APP_SCRIPT" \$DEFAULT_MODE
         return 0  # Continue loop (restart)
     fi
 }
@@ -707,14 +790,17 @@ enable_console_autologin
 # Ask if user wants to add to bash profile
 echo ""
 echo -e "${YELLOW}Setup auto-start on login?${NC}"
-read -p "Add startup script to ~/.bashrc? (y/n): " add_to_bashrc
+read -p "Add startup script to ~/.bashrc? (y/n) [Y]: " add_to_bashrc
+add_to_bashrc=${add_to_bashrc:-y}
+add_to_bashrc_lower=$(echo "$add_to_bashrc" | tr '[:upper:]' '[:lower:]')
 
-if [[ "${add_to_bashrc,,}" == "y" ]]; then
+if [[ "$add_to_bashrc_lower" == "y" ]]; then
     # Check if already added
     if grep -q "Enigma Museum Controller" ~/.bashrc 2>/dev/null; then
         echo -e "${YELLOW}Startup script already found in ~/.bashrc${NC}"
         read -p "Replace existing entry? (y/n): " replace
-        if [[ "${replace,,}" == "y" ]]; then
+        replace_lower=$(echo "$replace" | tr '[:upper:]' '[:lower:]')
+        if [[ "$replace_lower" == "y" ]]; then
             # Remove old entries (find the block and remove it)
             sed -i '/# Enigma Museum Controller/,/^fi$/d' ~/.bashrc
         else
@@ -737,6 +823,38 @@ if [[ "${add_to_bashrc,,}" == "y" ]]; then
     echo -e "${YELLOW}Note: Startup will only occur on local login (not SSH)${NC}"
 else
     echo "Skipping bashrc setup. You can manually run: $STARTUP_SCRIPT"
+fi
+
+# Ask if user wants to configure Enigma Touch for museum mode
+echo ""
+echo -e "${YELLOW}Configure Enigma Touch for Museum mode?${NC}"
+echo -e "${RED}WARNING:${NC} This will lock the setting buttons on the Enigma Touch device."
+echo "To unlock, you will need to:"
+echo "  1. Use this application to re-enable local buttons (Menu → Send Enigma Lock Config)"
+echo "  2. Or use Factory Reset (Menu → Factory Reset Enigma) - resets all settings"
+echo "  3. Or re-flash the Enigma Touch firmware"
+echo ""
+read -p "Configure Enigma Touch for Museum mode? (y/n) [N]: " configure_museum
+configure_museum=${configure_museum:-n}
+configure_museum_lower=$(echo "$configure_museum" | tr '[:upper:]' '[:lower:]')
+
+if [[ "$configure_museum_lower" == "y" ]]; then
+    echo ""
+    echo -e "${YELLOW}Configuring Enigma Touch for Museum mode...${NC}"
+    echo "Make sure your Enigma Touch device is connected and ready."
+    echo ""
+    read -p "Press Enter when ready to continue..."
+    
+    # Run the --send-lock-config command
+    if python3 "$SCRIPT_DIR/main.py" --send-lock-config; then
+        echo -e "${GREEN}Enigma Touch configured for Museum mode successfully!${NC}"
+    else
+        echo -e "${YELLOW}Warning: Could not configure Enigma Touch.${NC}"
+        echo "You can configure it later by running:"
+        echo "  python3 $SCRIPT_DIR/main.py --send-lock-config"
+    fi
+else
+    echo "Skipping Enigma Touch museum mode configuration."
 fi
 
 echo ""
@@ -766,8 +884,11 @@ echo "  5. If device exists but no permissions: sudo chmod 666 /dev/ttyACM0"
 echo ""
 echo -e "${YELLOW}Important Notes:${NC}"
 echo "  - This application is designed for Raspberry Pi OS Lite (console-only)"
+echo "  - Requires Enigma Touch firmware 4.20 or higher (4.21 recommended)"
+echo "  - Firmware version is automatically checked on connection"
 echo "  - For kiosk mode, enable console auto-login and add startup to ~/.bashrc"
 echo "  - The application will auto-restart if it exits (kiosk mode)"
+echo "  - Startup script changes to application directory before running (ensures file access)"
 echo ""
 echo -e "${YELLOW}Command-Line Options:${NC}"
 echo "  --config, -c              Open configuration menu without connecting"
@@ -775,7 +896,8 @@ echo "  --museum-en-encode        Start in Encode - EN mode (English encode)"
 echo "  --museum-en-decode        Start in Decode - EN mode (English decode)"
 echo "  --museum-de-encode        Start in Encode - DE mode (German encode)"
 echo "  --museum-de-decode        Start in Decode - DE mode (German decode)"
-echo "  --debug                   Enable debug output panel"
+echo "  --debug                   Enable debug output panel (enabled by default)"
+echo "  --help, -h                Show help message and exit"
 echo "  DEVICE                    Serial device path (e.g., /dev/ttyACM0)"
 echo ""
 echo "Examples:"

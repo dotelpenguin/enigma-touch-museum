@@ -29,6 +29,10 @@ Options:
     --museum-de-encode        Start in Encode - DE mode (German encode)
     --museum-de-decode        Start in Decode - DE mode (German decode)
     --debug                   Enable debug output panel (shows serial communication)
+    --send-lock-config        Send kiosk/lock settings to device from saved config
+                              (⚠️ use with caution - see lockout warning in README)
+    --factory-reset           Factory reset the Enigma Touch device
+                              (⚠️ resets all settings to factory defaults - requires confirmation)
     --help, -h                Show this help message and exit
 
 Arguments:
@@ -44,6 +48,8 @@ Examples:
     {script_name} --museum-en-decode /dev/ttyACM0  # Start Decode - EN mode with specific device
     {script_name} --museum-de-encode   # Start Encode - DE mode
     {script_name} --museum-de-decode   # Start Decode - DE mode
+    {script_name} --send-lock-config   # Send kiosk/lock settings to device
+    {script_name} --factory-reset      # Factory reset device (requires confirmation)
 
 Description:
     This tool provides a curses-based menu interface for controlling an Enigma
@@ -66,6 +72,8 @@ def main():
     config_only = False
     museum_mode = None
     debug_enabled = True
+    send_lock_config = False
+    factory_reset = False
     
     # Parse command line arguments
     i = 1
@@ -87,6 +95,10 @@ def main():
             museum_mode = '4'
         elif arg == '--debug':
             debug_enabled = True
+        elif arg == '--send-lock-config':
+            send_lock_config = True
+        elif arg == '--factory-reset':
+            factory_reset = True
         elif arg.startswith('-'):
             print(f"Unknown option: {arg}")
             print("Use --help or -h for usage information.")
@@ -144,6 +156,69 @@ def main():
         print(f"Firmware version: {controller.firmware_version:.2f}")
     else:
         print("Firmware version: Unknown")
+    
+    # Handle --send-lock-config switch
+    if send_lock_config:
+        print("\nSending kiosk/lock configuration...")
+        controller.load_config(preserve_device=True)
+        
+        def debug_callback(msg, color_type=None):
+            print(f"  {msg}")
+        
+        controller.wakeup_device(debug_callback=debug_callback)
+        if controller.apply_kiosk_settings(debug_callback=debug_callback):
+            print("✓ Kiosk/lock configuration sent successfully!")
+        else:
+            print("✗ Error: Failed to apply some kiosk/lock settings")
+            controller.disconnect()
+            sys.exit(1)
+        
+        controller.disconnect()
+        print("\nDisconnected. Goodbye!")
+        return
+    
+    # Handle --factory-reset switch
+    if factory_reset:
+        print("\n⚠️  WARNING: This will factory reset the Enigma Touch device!")
+        print("All settings will be reset to factory defaults.")
+        print("\nMake sure your Enigma Touch device is connected and ready.")
+        input("Press Enter when ready to continue...")
+        
+        confirm = input("Continue with factory reset? (y/n): ").strip().lower()
+        
+        if confirm != 'y':
+            print("Factory reset cancelled.")
+            controller.disconnect()
+            sys.exit(0)
+        
+        print("\nSending factory reset command...")
+        
+        def debug_callback(msg, color_type=None):
+            print(f"  {msg}")
+        
+        # Send line return, then !RS command with line return
+        controller.ser.write(b'\r\n')
+        controller.ser.flush()
+        time.sleep(0.1)
+        
+        response = controller.send_command(b'!RS\r\n', debug_callback=debug_callback)
+        
+        if response is None:
+            print("✗ Error: No response from device")
+            controller.disconnect()
+            sys.exit(1)
+        
+        has_error, error_message = controller._has_error_response(response)
+        if has_error:
+            print(f"✗ Error: {error_message}")
+            controller.disconnect()
+            sys.exit(1)
+        else:
+            print("✓ Factory reset command sent successfully!")
+        
+        controller.disconnect()
+        print("\nDisconnected. Goodbye!")
+        return
     
     print("Connected! Starting UI...")
     time.sleep(1)
