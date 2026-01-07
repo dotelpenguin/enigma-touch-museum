@@ -140,7 +140,17 @@ Create a new SD card using the [Raspberry Pi Imager](https://www.raspberrypi.com
 
 For Raspberry Pi systems, use the automated installation script:
 
-1. **Clone the repository:**
+1. **Install git (if not already installed):**
+```bash
+# Check if git is installed
+git --version
+
+# If git is not installed, install it:
+sudo apt-get update
+sudo apt-get install -y git
+```
+
+2. **Clone the repository:**
 ```bash
 git clone https://github.com/dotelpenguin/enigma-touch-museum.git
 cd enigma-touch-museum
@@ -148,7 +158,7 @@ cd enigma-touch-museum
 
    Alternatively, download the latest release from the [GitHub repository](https://github.com/dotelpenguin/enigma-touch-museum).
 
-2. **Run the installation script:**
+3. **Run the installation script:**
 ```bash
 chmod +x install.sh
 ./install.sh
@@ -481,6 +491,30 @@ The application includes comprehensive error detection and handling:
 - **User Notification**: Error messages are displayed in the debug output with color coding (red for errors)
 
 ## Troubleshooting
+
+### Raspberry Pi Display Configuration (Headless Setup)
+
+If running on newer Raspberry Pi models (Pi 4, Pi 5) with **NO display (HDMI) connected**, you may need to edit the `config.txt` file to ensure proper operation:
+
+1. **Mount the SD card** on another computer or access via SSH
+2. **Edit the config file**: `/boot/firmware/config.txt` (Pi 5) or `/boot/config.txt` (Pi 4 and earlier)
+3. **Change the display overlay**:
+   ```
+   # Change from:
+   dtoverlay=vc4-kms-v3d
+   
+   # To:
+   dtoverlay=vc4-fkms-v3d
+   ```
+4. **Add HDMI force settings** (add these lines):
+   ```
+   hdmi_force_hotplug=1
+   hdmi_group=2
+   hdmi_mode=82
+   ```
+5. **Save the file** and reboot the Raspberry Pi
+
+**Note:** These settings force HDMI output even when no display is connected, which is necessary for proper operation on headless Raspberry Pi systems.
 
 ### Cannot Connect to Device
 
