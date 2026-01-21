@@ -1,10 +1,10 @@
 {
   "config": {
-    "mode": "M4",
-    "rotor_set": "B beta IV II VII",
-    "ring_settings": "D X E Z",
+    "mode": "I",
+    "rotor_set": "C IV V I",
+    "ring_settings": "10 20 15",
     "ring_position": "20 6 10",
-    "pegboard": "AB CD EF GH IJ KL MN OP QR ST UV WX YZ",
+    "pegboard": "MN OP QR ST UV",
     "device": "/dev/tty.usbmodem207139584B471",
     "raw_debug_enabled": false,
     "use_models_json": true

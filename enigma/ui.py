@@ -2850,6 +2850,115 @@ class EnigmaMuseumUI(UIBase):
                         # Ignore read errors
                         pass
             
+            # Monitor for device input when waiting between messages (not paused, not actively sending)
+            # This allows detection of key touches during the waiting period
+            if (not museum_paused[0] and 
+                self.controller.function_mode.startswith(('Encode', 'Decode')) and 
+                not device_disconnected[0] and
+                current_time - last_message_time < self.controller.museum_delay):
+                # We're in museum mode, waiting between messages - check for device input
+                if self.controller.ser and self.controller.ser.is_open:
+                    try:
+                        if self.controller.ser.in_waiting > 0:
+                            # Read available data to check for Interactive mode input
+                            response = b''
+                            start_time = time.time()
+                            silence_duration = 0.2
+                            last_data_time = None
+                            
+                            # Read data with timeout
+                            while time.time() - start_time < CHAR_TIMEOUT:
+                                if self.controller.ser.in_waiting > 0:
+                                    response += self.controller.ser.read(self.controller.ser.in_waiting)
+                                    last_data_time = time.time()
+                                    
+                                    if b'Positions' in response:
+                                        # Wait for silence to ensure complete response
+                                        silence_start = time.time()
+                                        while time.time() - silence_start < silence_duration:
+                                            if self.controller.ser.in_waiting > 0:
+                                                response += self.controller.ser.read(self.controller.ser.in_waiting)
+                                                silence_start = time.time()
+                                            time.sleep(0.01)
+                                        break
+                                    time.sleep(0.01)
+                                else:
+                                    if response and b'Positions' in response:
+                                        if last_data_time and time.time() - last_data_time >= silence_duration:
+                                            break
+                                    time.sleep(0.01)
+                            
+                            # Final read of any remaining data
+                            if self.controller.ser.in_waiting > 0:
+                                time.sleep(0.1)
+                                if self.controller.ser.in_waiting > 0:
+                                    response += self.controller.ser.read(self.controller.ser.in_waiting)
+                            
+                            # Filter out config summary if present
+                            if response:
+                                response = self.controller._filter_config_summary(response, debug_callback=debug_callback)
+                            
+                            # Parse response if we have data indicating Interactive mode input
+                            if response and b'Positions' in response:
+                                try:
+                                    resp_text = response.decode('ascii', errors='replace')
+                                    resp_text = resp_text.replace('\r', ' ').replace('\n', ' ')
+                                    resp_text = ' '.join(resp_text.split()).strip()
+                                    
+                                    if debug_callback:
+                                        debug_callback(f"<<< {resp_text}")
+                                    
+                                    parts = resp_text.split()
+                                    
+                                    # Get rotor count based on current model
+                                    rotor_count = self.controller._get_rotor_count()
+                                    
+                                    # Look for pattern: "INPUT ENCODED Positions XX XX XX" (or XX XX XX XX for M4)
+                                    min_parts_needed = 2 + rotor_count
+                                    for j in range(len(parts) - min_parts_needed):
+                                        part1 = parts[j]
+                                        part2 = parts[j+1]
+                                        part3 = parts[j+2]
+                                        
+                                        if (len(part1) == 1 and part1.isalpha() and part1.isupper() and
+                                            len(part2) == 1 and part2.isalpha() and part2.isupper() and
+                                            part3.lower() == 'positions'):
+                                            # Found Interactive mode input - switch to Interactive mode
+                                            original_char = part1
+                                            encoded_char = part2
+                                            
+                                            # Switch to Interactive mode
+                                            museum_paused[0] = True
+                                            last_unexpected_input_time[0] = time.time()
+                                            self.controller.function_mode = 'Interactive'
+                                            # Update controller's last character info
+                                            self.controller.last_char_original = original_char.upper() if original_char else None
+                                            self.controller.last_char_received = encoded_char.upper() if encoded_char else None
+                                            # Save the mode change to config file, but preserve cipher config
+                                            self.controller.save_config(preserve_cipher_config=True)
+                                            
+                                            # Update UI to show the mode change
+                                            self.draw_settings_panel()
+                                            self.refresh_all_panels()
+                                            add_log_message(f"Device input detected while waiting - switching to Interactive mode")
+                                            if debug_callback:
+                                                debug_callback(f"Device input detected while waiting - switching to Interactive mode", color_type=self.COLOR_MISMATCH)
+                                            
+                                            # Parse positions if available
+                                            if j + 2 + rotor_count <= len(parts):
+                                                positions = self.controller._parse_positions(parts, j + 3, rotor_count)
+                                                if positions:
+                                                    pos_str = self.controller._format_positions(parts, j + 3, rotor_count, positions)
+                                                    self.controller.config['ring_position'] = pos_str
+                                            
+                                            break
+                                except Exception as e:
+                                    if debug_callback:
+                                        debug_callback(f"Error parsing device input: {e}")
+                    except Exception as e:
+                        # Ignore read errors
+                        pass
+            
             # Check if paused due to verification failure or mismatch
             if museum_paused[0]:
                 # Check for additional input from Enigma while paused

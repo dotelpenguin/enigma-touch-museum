@@ -699,7 +699,6 @@ class MuseumWebServer:
                 config = data.get('config', {})
                 log_messages = data.get('log_messages', [])
                 function_mode = data.get('function_mode', 'N/A')
-                is_interactive_mode = (function_mode == 'Interactive')
                 is_encode_mode = data.get('is_encode_mode', True)
                 enable_slides = data.get('enable_slides', False)
                 slide_path = data.get('slide_path', None)
@@ -710,6 +709,8 @@ class MuseumWebServer:
                 device_disconnected_message = data.get('device_disconnected_message', None)
                 last_char_original = data.get('last_char_original', None)
                 last_char_received = data.get('last_char_received', None)
+                
+                is_interactive_mode = (function_mode == 'Interactive')
                 
                 current_message = None
                 result_message = None
