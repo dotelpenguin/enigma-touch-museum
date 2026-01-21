@@ -872,19 +872,22 @@ class MuseumWebServer:
         html, body {{ width: 100vw; height: 100vh; overflow: hidden; position: fixed; }}
         body {{ font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 0.8vh 0.8vw; }}
         .kiosk-container {{ width: 100%; max-width: 98vw; text-align: center; display: flex; flex-direction: column; height: 100%; max-height: 98vh; justify-content: space-between; }}
-        .logo-section {{ margin-bottom: 1vh; flex-shrink: 0; max-height: 15vh; }}
-        .logo-image {{ max-width: min(25vw, 250px); max-height: min(12vh, 120px); width: auto; height: auto; margin-bottom: 0.5vh; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); transition: opacity 0.3s ease; }}
-        .enigma-logo {{ font-size: min(4.5vw, 48px); font-weight: bold; color: #ffd700; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.3vw; margin-bottom: 0.3vh; }}
-        .subtitle {{ font-size: min(1.5vw, 16px); color: #ccc; letter-spacing: 0.15vw; margin-bottom: 0; }}
+        .logo-overlay {{ position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 0; pointer-events: none; opacity: 0.25; text-align: center; overflow: hidden; }}
+        .logo-overlay .logo-container {{ border: none; padding: min(2vh, 20px) min(2vw, 20px); background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; }}
+        .logo-overlay .logo-image {{ max-width: min(50vw, 500px); max-height: min(40vh, 400px); width: auto; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); margin-bottom: 0.5vh; display: block; }}
+        .logo-overlay .enigma-logo {{ font-size: min(8vw, 80px); font-weight: bold; color: #ffd700; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.3vw; margin-bottom: 0.3vh; display: block; }}
+        .logo-overlay .subtitle {{ font-size: min(2.5vw, 25px); color: #ccc; letter-spacing: 0.15vw; display: block; }}
         .machine-display {{ background: rgba(0, 0, 0, 0.6); border: 2px solid #ffd700; border-radius: 10px; padding: min(1.5vh, 15px); margin: min(1vh, 10px) 0; box-shadow: 0 4px 16px rgba(0,0,0,0.5); flex-shrink: 0; max-height: 25vh; overflow: hidden; }}
         .config-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: min(1vw, 10px); margin: min(1vh, 10px) 0; }}
         .config-item {{ background: rgba(255, 255, 255, 0.1); padding: min(1vh, 10px); border-radius: 6px; border: 1px solid rgba(255, 215, 0, 0.3); }}
         .config-label {{ font-size: min(1.5vw, 15px); color: #ffd700; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
         .config-value {{ font-size: min(2vw, 20px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; }}
-        .message-container {{ display: flex; flex-direction: row; gap: min(1vw, 10px); margin: min(1vh, 10px) 0; flex-grow: 1; min-height: 0; max-height: 50vh; }}
-        .message-section {{ margin: min(1vh, 10px) 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; max-height: 50vh; }}
+        .message-container {{ display: flex; flex-direction: row; gap: min(1vw, 10px); margin: min(0.3vh, 3px) 0; flex-grow: 1; min-height: 0; max-height: 50vh; position: relative; }}
+        .message-section {{ margin: min(0.3vh, 3px) 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; max-height: 50vh; position: relative; overflow: hidden; }}
         .message-container .message-section {{ margin: 0; width: 75%; max-height: none; }}
         #messageContainer > .message-section {{ max-height: 70vh; min-height: 50vh; }}
+        #messageContainer {{ position: relative; }}
+        .message-section > *:not(.logo-overlay) {{ position: relative; z-index: 1; }}
         .slide-section {{ margin: 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; width: 25%; }}
         .slide-placeholder {{ background: rgba(255, 255, 255, 0.05); border: 2px dashed rgba(255, 215, 0, 0.5); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: rgba(255, 215, 0, 0.6); font-size: min(2vw, 20px); font-style: italic; width: 100%; height: 100%; min-height: 200px; }}
         .slide-image {{ width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; display: block; transition: opacity 0.6s ease-in-out; }}
@@ -911,17 +914,18 @@ class MuseumWebServer:
 <body>
     <div class="kiosk-container">
         <div class="disconnected-banner" id="offlineBanner">Connection lost. Attempting to reconnect...</div>
-        <div class="logo-section">
-            <img src="/enigma.png" alt="Enigma Machine" class="logo-image" id="logoImage" onerror="this.style.display='none'; document.getElementById('enigmaLogo').style.display='block';">
-            <div class="enigma-logo" id="enigmaLogo" style="display: none;">ENIGMA</div>
-            <div class="subtitle">Cipher Machine</div>
-        </div>
         
         <div class="machine-display" id="machineDisplay">
             <div class="rotor-display" id="rotorDisplay"></div>
         </div>
         
-        <div id="messageContainer"></div>
+        <div id="messageContainer">
+            <div class="logo-overlay" id="logoOverlay">
+                <img src="/enigma.png" alt="Enigma Machine" class="logo-image" id="logoImage" onerror="this.style.display='none'; document.getElementById('enigmaLogo').style.display='block';">
+                <div class="enigma-logo" id="enigmaLogo" style="display: none;">ENIGMA</div>
+                <div class="subtitle">Cipher Machine</div>
+            </div>
+        </div>
         
         <div class="footer">
             <p>Museum Display {VERSION} - Auto-updating</p>
@@ -1054,11 +1058,9 @@ class MuseumWebServer:
                 }});
                 html += '</div></div>';
                 
-                html += '</div>';
-                
-                // Plugboard
+                // Plugboard - now inside the rotor-display area
                 if (config.pegboard && config.pegboard.length > 0) {{
-                    html += '<div style="display: flex; flex-direction: column; align-items: center; margin-top: min(1vh, 10px);">';
+                    html += '<div class="config-section" style="display: flex; flex-direction: column; align-items: center; margin-top: min(1vh, 10px); width: 100%;">';
                     html += '<div class="config-label">Plugboard</div>';
                     html += '<div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">';
                     config.pegboard.forEach(function(plug) {{
@@ -1066,6 +1068,8 @@ class MuseumWebServer:
                     }});
                     html += '</div></div>';
                 }}
+                
+                html += '</div>';
                 
                 rotorDisplay.innerHTML = html;
             }}
@@ -1098,9 +1102,9 @@ class MuseumWebServer:
                     }} else {{
                         // When slides are disabled and in interactive mode, add flex styling to center content
                         if (interactive.is_interactive_mode) {{
-                            html += '<div class="message-section" id="messageSection" style="display: flex; flex-direction: column; justify-content: center;">';
+                            html += '<div class="message-section" id="messageSection" style="display: flex; flex-direction: column; justify-content: center; position: relative;">';
                         }} else {{
-                            html += '<div class="message-section" id="messageSection">';
+                            html += '<div class="message-section" id="messageSection" style="position: relative;">';
                         }}
                     }}
                     
@@ -1138,6 +1142,16 @@ class MuseumWebServer:
                     }}
                     
                     messageContainer.innerHTML = html;
+                    
+                    // Add logo overlay to the message section (as first child so it's behind everything)
+                    const messageSection = document.getElementById('messageSection');
+                    if (messageSection) {{
+                        const overlay = document.createElement('div');
+                        overlay.className = 'logo-overlay';
+                        overlay.id = 'logoOverlay';
+                        overlay.innerHTML = '<div class="logo-container"><img src="/enigma.png" alt="Enigma Machine" class="logo-image" id="logoImage" onerror="this.style.display=\\'none\\'; document.getElementById(\\'enigmaLogo\\').style.display=\\'block\\';"><div class="enigma-logo" id="enigmaLogo" style="display: none;">ENIGMA</div><div class="subtitle">Cipher Machine</div></div>';
+                        messageSection.insertBefore(overlay, messageSection.firstChild);
+                    }}
                 }}
                 
                 // Update content without rebuilding structure
