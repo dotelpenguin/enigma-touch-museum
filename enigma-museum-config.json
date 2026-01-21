@@ -1,23 +1,23 @@
 {
   "config": {
     "mode": "I",
-    "rotor_set": "B IV I V",
-    "ring_settings": "13 19 25",
+    "rotor_set": "C IV V I",
+    "ring_settings": "10 20 15",
     "ring_position": "20 6 10",
-    "pegboard": "ST UV WX YZ AB CD",
-    "device": "/dev/ttyACM0",
+    "pegboard": "MN OP QR ST UV",
+    "device": "/dev/tty.usbmodem207139584B471",
     "raw_debug_enabled": false,
     "use_models_json": true
   },
   "museum_config": {
-    "function_mode": "Interactive",
+    "function_mode": "Decode - EN",
     "museum_delay": 60,
     "always_send_config": true,
     "word_group_size": 5,
-    "character_delay_ms": 2000,
+    "character_delay_ms": 500,
     "web_server_enabled": true,
     "web_server_port": 8080,
-    "enable_slides": false
+    "enable_slides": true
   },
   "touch_config": {
     "lock_model": true,
