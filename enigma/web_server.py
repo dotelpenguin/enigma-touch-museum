@@ -877,7 +877,7 @@ class MuseumWebServer:
         .logo-overlay .logo-image {{ max-width: min(50vw, 500px); max-height: min(40vh, 400px); width: auto; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); margin-bottom: 0.5vh; display: block; }}
         .logo-overlay .enigma-logo {{ font-size: min(8vw, 80px); font-weight: bold; color: #ffd700; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.3vw; margin-bottom: 0.3vh; display: block; }}
         .logo-overlay .subtitle {{ font-size: min(2.5vw, 25px); color: #ccc; letter-spacing: 0.15vw; display: block; }}
-        .machine-display {{ background: rgba(0, 0, 0, 0.6); border: 2px solid #ffd700; border-radius: 10px; padding: min(1vh, 10px); margin: 0; margin-bottom: 0; padding-bottom: min(0.5vh, 5px); box-shadow: 0 4px 16px rgba(0,0,0,0.5); flex-shrink: 0; max-height: calc(30vh + 23px); overflow: visible; }}
+        .machine-display {{ background: rgba(0, 0, 0, 0.6); border: 2px solid #ffd700; border-radius: 10px; padding: min(1vh, 10px); margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); padding-bottom: min(0.5vh, 5px); box-shadow: 0 4px 16px rgba(0,0,0,0.5); flex-shrink: 0; max-height: calc(30vh + 23px); overflow: visible; }}
         .plugboard-unused {{ opacity: 0.4; color: #888 !important; }}
         .plugboard-unused .config-label {{ color: #666 !important; }}
         .plugboard-unused .plugboard-box {{ background: rgba(100, 100, 100, 0.2) !important; border-color: #666 !important; color: #888 !important; }}
@@ -886,20 +886,21 @@ class MuseumWebServer:
         .config-label {{ font-size: min(1.5vw, 15px); color: #ffd700; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
         .config-value {{ font-size: min(2vw, 20px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; }}
         .message-container {{ display: flex; flex-direction: row; gap: min(1vw, 10px); margin: 0; margin-top: 0; flex-grow: 1; flex-shrink: 1; min-height: 0; position: relative; }}
-        .message-section {{ margin: min(0.3vh, 3px) 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; position: relative; overflow: hidden; }}
-        .message-container .message-section {{ margin: 0; width: 75%; }}
+        .message-section {{ margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; position: relative; overflow: hidden; }}
+        .message-container .message-section {{ margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); width: 75%; }}
         #messageContainer > .message-section {{ min-height: 0; }}
         #messageContainer {{ position: relative; margin: 0; padding: 0; flex-grow: 1; flex-shrink: 1; min-height: 0; display: flex; flex-direction: column; }}
         .message-section > *:not(.logo-overlay) {{ position: relative; z-index: 1; }}
-        .slide-section {{ margin: 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; width: 25%; }}
+        .slide-section {{ margin: min(1vh, 10px) min(1vw, 10px) 0 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; width: 25%; }}
         .slide-placeholder {{ background: rgba(255, 255, 255, 0.05); border: 2px dashed rgba(255, 215, 0, 0.5); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: rgba(255, 215, 0, 0.6); font-size: min(2vw, 20px); font-style: italic; width: 100%; height: 100%; min-height: 200px; }}
         .slide-image {{ width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; display: block; transition: opacity 0.6s ease-in-out; }}
         .slide-section {{ overflow: hidden; }}
-        .message-label {{ font-size: min(1.54vw, 15.4px); color: #0ff; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); flex-shrink: 0; }}
-        .message-text {{ font-size: min(2.64vw, 26.4px); color: #fff; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; line-height: 1.4; overflow-y: auto; overflow-x: hidden; flex-grow: 1; min-height: 0; }}
+        .message-label {{ font-size: min(1.848vw, 18.48px); color: #0ff; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); flex-shrink: 0; }}
+        .message-text {{ font-size: min(3.168vw, 31.68px); color: #fff; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; line-height: 1.4; overflow-y: auto; overflow-x: hidden; flex-grow: 1; min-height: 0; }}
         .char-highlight {{ background-color: #ffd700; color: #000; font-weight: bold; padding: 2px 4px; border-radius: 3px; }}
-        .encoded-text {{ font-size: min(2.42vw, 24.2px); color: #00ff80; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; margin-top: min(1vh, 10px); padding-top: min(1vh, 10px); border-top: 1px solid rgba(0, 255, 128, 0.3); flex-shrink: 0; overflow-y: auto; overflow-x: hidden; max-height: 20vh; }}
-        .rotor-display {{ display: flex; justify-content: center; gap: min(2vw, 30px); margin: 0; flex-wrap: wrap; }}
+        .encoded-text {{ font-size: min(2.904vw, 29.04px); color: #00ff80; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; margin-top: min(1vh, 10px); padding-top: min(1vh, 10px); border-top: 1px solid rgba(0, 255, 128, 0.3); flex-shrink: 0; overflow-y: auto; overflow-x: hidden; max-height: 20vh; }}
+        .rotor-display {{ display: flex; justify-content: center; column-gap: min(2vw, 30px); row-gap: min(0.5vh, 5px); margin: 0; flex-wrap: wrap; }}
+        .config-section {{ margin: 0; }}
         .rotor-box {{ background: rgba(255, 215, 0, 0.2); border: 2px solid #ffd700; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #ffd700; min-width: 60px; }}
         .model-box {{ background: rgba(128, 100, 128, 0.3); border: 2px solid #806480; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #c0a0c0; min-width: 60px; }}
         .ring-settings-box {{ background: rgba(100, 120, 150, 0.3); border: 2px solid #647896; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #90a8c8; min-width: 60px; }}
@@ -1061,7 +1062,7 @@ class MuseumWebServer:
                 html += '</div></div>';
                 
                 // Plugboard - always show, grey out if unused
-                html += '<div class="config-section' + (config.pegboard && config.pegboard.length > 0 ? '' : ' plugboard-unused') + '" style="display: flex; flex-direction: column; align-items: center; margin-top: min(1vh, 10px); width: 100%;">';
+                html += '<div class="config-section' + (config.pegboard && config.pegboard.length > 0 ? '' : ' plugboard-unused') + '" style="display: flex; flex-direction: column; align-items: center; margin-top: min(1vh, 10px); margin-bottom: min(1.5vh, 15px); width: 100%;">';
                 html += '<div class="config-label">Plugboard</div>';
                 html += '<div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">';
                 if (config.pegboard && config.pegboard.length > 0) {{
