@@ -79,14 +79,6 @@ class MuseumWebServer:
                         html = self.generate_status_html(data)
                         self.wfile.write(html.encode('utf-8'))
                         self.wfile.flush()
-                    elif self.path == '/message':
-                        self.send_response(200)
-                        self.send_header('Content-type', 'text/html')
-                        self.send_header('Cache-Control', 'no-cache')
-                        self.end_headers()
-                        html = self.generate_message_html(data)
-                        self.wfile.write(html.encode('utf-8'))
-                        self.wfile.flush()
                     elif self.path == '/message.json':
                         self.send_response(200)
                         self.send_header('Content-type', 'application/json')
@@ -319,375 +311,8 @@ class MuseumWebServer:
         
         <div style="text-align: center; margin-top: 20px; color: #888;">
             <p>Page auto-refreshes every 2 seconds</p>
-            <p><a href="/message" style="color: #0ff;">View Kiosk Display</a></p>
+            <p><a href="/kiosk.html" style="color: #0ff;">View Kiosk Display</a></p>
             <p>Museum Display {VERSION}</p>
-        </div>
-    </div>
-</body>
-</html>"""
-                return html
-            
-            def generate_message_html(self, data):
-                """Generate HTML page for museum kiosk display"""
-                config = data.get('config', {})
-                log_messages = data.get('log_messages', [])
-                function_mode = data.get('function_mode', 'N/A')
-                is_interactive_mode = (function_mode == 'Interactive')
-                is_encode_mode = data.get('is_encode_mode', True)
-                enable_slides = data.get('enable_slides', False)
-                slide_path = data.get('slide_path', None)
-                character_delay_ms = data.get('character_delay_ms', 0)
-                current_char_index = data.get('current_char_index', 0)
-                current_encoded_text = data.get('current_encoded_text', '')
-                device_connected = data.get('device_connected', True)
-                device_disconnected_message = data.get('device_disconnected_message', None)
-                last_char_original = data.get('last_char_original', None)
-                last_char_received = data.get('last_char_received', None)
-                
-                current_message = None
-                result_message = None
-                
-                if is_encode_mode:
-                    if current_encoded_text:
-                        result_message = current_encoded_text
-                        msg_message = None
-                        for msg in reversed(log_messages):
-                            msg_str = str(msg)
-                            if msg_str.startswith('  MSG:'):
-                                msg_message = msg_str.replace('  MSG:', '').strip()
-                            elif msg_str.startswith('Encoding:'):
-                                if msg_message:
-                                    current_message = msg_message
-                                    break
-                    else:
-                        for msg in reversed(log_messages):
-                            msg_str = str(msg)
-                            if msg_str.startswith('Encoded:'):
-                                result_message = msg_str.replace('Encoded:', '').strip()
-                                break
-                        found_encoded = False
-                        msg_message = None
-                        for msg in reversed(log_messages):
-                            msg_str = str(msg)
-                            if msg_str.startswith('Encoded:'):
-                                found_encoded = True
-                            elif found_encoded and msg_str.startswith('  MSG:'):
-                                msg_message = msg_str.replace('  MSG:', '').strip()
-                            elif found_encoded and msg_str.startswith('Encoding:'):
-                                if msg_message:
-                                    current_message = msg_message
-                                    break
-                        if not current_message:
-                            msg_message = None
-                            for msg in reversed(log_messages):
-                                msg_str = str(msg)
-                                if msg_str.startswith('  MSG:'):
-                                    msg_message = msg_str.replace('  MSG:', '').strip()
-                                elif msg_str.startswith('Encoding:'):
-                                    if msg_message:
-                                        current_message = msg_message
-                                        break
-                else:
-                    if current_encoded_text:
-                        result_message = current_encoded_text
-                        coded_message = None
-                        for msg in reversed(log_messages):
-                            msg_str = str(msg)
-                            if msg_str.startswith('  CODED:'):
-                                coded_message = msg_str.replace('  CODED:', '').strip()
-                            elif msg_str.startswith('Decoding:'):
-                                if coded_message:
-                                    current_message = coded_message
-                                    break
-                    else:
-                        for msg in reversed(log_messages):
-                            msg_str = str(msg)
-                            if msg_str.startswith('Decoded:'):
-                                result_message = msg_str.replace('Decoded:', '').strip()
-                                break
-                        found_decoded = False
-                        coded_message = None
-                        for msg in reversed(log_messages):
-                            msg_str = str(msg)
-                            if msg_str.startswith('Decoded:'):
-                                found_decoded = True
-                            elif found_decoded and msg_str.startswith('  CODED:'):
-                                coded_message = msg_str.replace('  CODED:', '').strip()
-                            elif found_decoded and msg_str.startswith('Decoding:'):
-                                if coded_message:
-                                    current_message = coded_message
-                                    break
-                        if not current_message:
-                            coded_message = None
-                            for msg in reversed(log_messages):
-                                msg_str = str(msg)
-                                if msg_str.startswith('  CODED:'):
-                                    coded_message = msg_str.replace('  CODED:', '').strip()
-                                elif msg_str.startswith('Decoding:'):
-                                    if coded_message:
-                                        current_message = coded_message
-                                        break
-                
-                mode = config.get('mode', 'N/A')
-                rotors = config.get('rotor_set', 'N/A')
-                ring_settings = config.get('ring_settings', 'N/A')
-                ring_position = config.get('ring_position', 'N/A')
-                pegboard = config.get('pegboard', 'clear')
-                
-                rotor_display = rotors
-                if ' ' in rotors:
-                    parts = rotors.split()
-                    if len(parts) > 1:
-                        rotor_display = ' '.join(parts[1:])
-                
-                # Generate the HTML (abbreviated for brevity - full HTML is in original)
-                banner_html = ''
-                if device_disconnected_message:
-                    banner_html = f'        <div class="disconnected-banner">{html_module.escape(device_disconnected_message)}</div>\n'
-                
-                html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Enigma Museum Kiosk</title>
-    <meta http-equiv="refresh" content="{'1' if is_interactive_mode else '2'}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        html, body {{ width: 100vw; height: 100vh; overflow: hidden; position: fixed; }}
-        body {{ font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 0.8vh 0.8vw; }}
-        .kiosk-container {{ width: 100%; max-width: 98vw; text-align: center; display: flex; flex-direction: column; height: 100%; max-height: 98vh; justify-content: space-between; }}
-        .logo-section {{ margin-bottom: 1vh; flex-shrink: 0; max-height: 15vh; }}
-        .logo-image {{ max-width: min(25vw, 250px); max-height: min(12vh, 120px); width: auto; height: auto; margin-bottom: 0.5vh; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }}
-        .enigma-logo {{ font-size: min(4.5vw, 48px); font-weight: bold; color: #ffd700; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.3vw; margin-bottom: 0.3vh; }}
-        .subtitle {{ font-size: min(1.5vw, 16px); color: #ccc; letter-spacing: 0.15vw; margin-bottom: 0; }}
-        .machine-display {{ background: rgba(0, 0, 0, 0.6); border: 2px solid #ffd700; border-radius: 10px; padding: min(1.5vh, 15px); margin: min(1vh, 10px) 0; box-shadow: 0 4px 16px rgba(0,0,0,0.5); flex-shrink: 0; max-height: 25vh; overflow: hidden; }}
-        .config-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: min(1vw, 10px); margin: min(1vh, 10px) 0; }}
-        .config-item {{ background: rgba(255, 255, 255, 0.1); padding: min(1vh, 10px); border-radius: 6px; border: 1px solid rgba(255, 215, 0, 0.3); }}
-        .config-label {{ font-size: min(1.5vw, 15px); color: #ffd700; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
-        .config-value {{ font-size: min(2vw, 20px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; }}
-        .message-container {{ display: flex; flex-direction: row; gap: min(1vw, 10px); margin: min(1vh, 10px) 0; flex-grow: 1; min-height: 0; max-height: 50vh; }}
-        .message-section {{ margin: min(1vh, 10px) 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; max-height: 50vh; }}
-        .message-container .message-section {{ margin: 0; width: 75%; max-height: none; }}
-        .slide-section {{ margin: 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; width: 25%; }}
-        .slide-placeholder {{ background: rgba(255, 255, 255, 0.05); border: 2px dashed rgba(255, 215, 0, 0.5); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: rgba(255, 215, 0, 0.6); font-size: min(2vw, 20px); font-style: italic; width: 100%; height: 100%; min-height: 200px; }}
-        .slide-image {{ width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; display: block; }}
-        .slide-section {{ overflow: hidden; }}
-        .message-label {{ font-size: min(1.4vw, 14px); color: #0ff; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); flex-shrink: 0; }}
-        .message-text {{ font-size: min(2.4vw, 24px); color: #fff; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; line-height: 1.4; overflow-y: auto; overflow-x: hidden; flex-grow: 1; min-height: 0; }}
-        .char-highlight {{ background-color: #ffd700; color: #000; font-weight: bold; padding: 2px 4px; border-radius: 3px; }}
-        .encoded-text {{ font-size: min(2.2vw, 22px); color: #0f0; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; margin-top: min(1vh, 10px); padding-top: min(1vh, 10px); border-top: 1px solid rgba(0, 255, 0, 0.3); flex-shrink: 0; overflow-y: auto; overflow-x: hidden; max-height: 20vh; }}
-        .rotor-display {{ display: flex; justify-content: center; gap: min(2vw, 30px); margin: min(1vh, 10px) 0; flex-wrap: wrap; }}
-        .rotor-box {{ background: rgba(255, 215, 0, 0.2); border: 2px solid #ffd700; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #ffd700; min-width: 60px; }}
-        .model-box {{ background: rgba(128, 100, 128, 0.3); border: 2px solid #806480; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #c0a0c0; min-width: 60px; }}
-        .ring-settings-box {{ background: rgba(100, 120, 150, 0.3); border: 2px solid #647896; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #90a8c8; min-width: 60px; }}
-        .ring-position-box {{ background: rgba(120, 150, 160, 0.3); border: 2px solid #7896a0; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #a0c0d0; min-width: 60px; }}
-        .plugboard-box {{ background: rgba(150, 100, 120, 0.3); border: 2px solid #966478; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2vw, 20px); font-weight: bold; color: #c890a8; min-width: 60px; }}
-        .footer {{ margin-top: min(0.5vh, 5px); color: #888; font-size: min(1.1vw, 11px); flex-shrink: 0; }}
-        .disconnected-banner {{ background: rgba(255, 0, 0, 0.8); color: #fff; padding: min(1.5vh, 15px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #f00; border-radius: 10px; margin-bottom: min(1vh, 10px); }}
-        .interactive-container {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
-        .char-box {{ background: rgba(0, 255, 255, 0.2); border: 3px solid #0ff; border-radius: 15px; padding: min(4vh, 40px) min(4vw, 40px); min-width: min(15vw, 150px); min-height: min(15vw, 150px); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0, 255, 255, 0.3); }}
-        .char-box-label {{ font-size: min(1.2vw, 12px); color: #0ff; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
-        .char-box-value {{ font-size: min(10vw, 100px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; line-height: 1; }}
-        .char-arrow {{ font-size: min(6vw, 60px); color: #ffd700; font-weight: bold; }}
-    </style>
-</head>
-<body>
-    <div class="kiosk-container">
-{banner_html}        <div class="logo-section">
-            <img src="/enigma.png" alt="Enigma Machine" class="logo-image" onerror="this.style.display='none'; document.querySelector('.enigma-logo').style.display='block';">
-            <div class="enigma-logo" style="display: none;">ENIGMA</div>
-            <div class="subtitle">Cipher Machine</div>
-        </div>
-        
-        <div class="machine-display">
-            <div class="rotor-display">
-                <div class="config-section" style="display: flex; flex-direction: column; align-items: center;">
-                    <div class="config-label">Model</div>
-                    <div class="model-box">{html_module.escape(mode)}</div>
-                </div>
-                <div class="config-section" style="display: flex; flex-direction: column; align-items: center;">
-                    <div class="config-label">Rotors</div>
-                    <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
-"""
-                rotor_parts = rotor_display.split()
-                for rotor in rotor_parts:
-                    html += f'                        <div class="rotor-box">{html_module.escape(rotor)}</div>\n'
-                
-                html += f"""                    </div>
-                </div>
-                <div class="config-section" style="display: flex; flex-direction: column; align-items: center;">
-                    <div class="config-label">Ring Settings</div>
-                    <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
-"""
-                ring_settings_parts = ring_settings.split()
-                for setting in ring_settings_parts:
-                    html += f'                        <div class="ring-settings-box">{html_module.escape(setting)}</div>\n'
-                
-                html += f"""                    </div>
-                </div>
-                <div class="config-section" style="display: flex; flex-direction: column; align-items: center;">
-                    <div class="config-label">Ring Position</div>
-                    <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
-"""
-                ring_position_parts = ring_position.split()
-                for position in ring_position_parts:
-                    html += f'                        <div class="ring-position-box">{html_module.escape(position)}</div>\n'
-                
-                html += f"""                    </div>
-                </div>
-            </div>
-"""
-                # Add plugboard display on its own line if configured
-                if pegboard and pegboard.strip() and pegboard.lower() != 'clear':
-                    html += f"""            <div style="display: flex; flex-direction: column; align-items: center; margin-top: min(1vh, 10px);">
-                <div class="config-label">Plugboard</div>
-                <div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">
-"""
-                    plugboard_parts = pegboard.split()
-                    for plug in plugboard_parts:
-                        html += f'                    <div class="plugboard-box">{html_module.escape(plug)}</div>\n'
-                    html += f"""                </div>
-            </div>
-"""
-                html += f"""        </div>
-"""
-                if enable_slides:
-                    if is_interactive_mode:
-                        # Interactive mode: Show large Received -> Encoded boxes
-                        html += """        <div class="message-container">
-            <div class="message-section" style="display: flex; flex-direction: column; justify-content: center;">
-                <div class="interactive-container">
-                    <div class="char-box">
-                        <div class="char-box-label">Received</div>
-                        <div class="char-box-value">"""
-                        received_char = last_char_original.upper() if last_char_original else '--'
-                        html += html_module.escape(str(received_char))
-                        html += """</div>
-                    </div>
-                    <div class="char-arrow">&rarr;</div>
-                    <div class="char-box">
-                        <div class="char-box-label">Encoded</div>
-                        <div class="char-box-value">"""
-                        encoded_char = last_char_received.upper() if last_char_received else '--'
-                        html += html_module.escape(str(encoded_char))
-                        html += """</div>
-                    </div>
-                </div>
-            </div>
-            <div class="slide-section">"""
-                    else:
-                        html += """        <div class="message-container">
-            <div class="message-section">
-                <div class="message-label">Current Message</div>
-                <div class="message-text">"""
-                        
-                        if current_message and current_char_index > 0:
-                            message_no_spaces = current_message.replace(' ', '')
-                            if current_char_index <= len(message_no_spaces):
-                                char_count = 0
-                                highlighted_message = ""
-                                for char in current_message:
-                                    if char != ' ':
-                                        char_count += 1
-                                        if char_count == current_char_index:
-                                            highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
-                                        else:
-                                            highlighted_message += html_module.escape(char)
-                                    else:
-                                        highlighted_message += html_module.escape(char)
-                                html += highlighted_message
-                            else:
-                                html += html_module.escape(current_message)
-                        else:
-                            html += html_module.escape(current_message) if current_message else 'Waiting for message...'
-                        
-                        html += """</div>
-"""
-                        result_label = "Encoded" if is_encode_mode else "Decoded"
-                        result_label += " Message"
-                        if result_message:
-                            html += f'                <div class="message-label">{result_label}</div>\n'
-                            html += f'                <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
-                        
-                        html += """            </div>
-            <div class="slide-section">"""
-                    
-                    if slide_path:
-                        html += f'                <img src="/{slide_path}" alt="Slide" class="slide-image" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">'
-                        html += """                <div class="slide-placeholder" style="display: none;">
-                    Slide Image Placeholder
-                </div>"""
-                    else:
-                        html += """                <div class="slide-placeholder">
-                    Slide Image Placeholder
-                </div>"""
-                    
-                    html += """            </div>
-        </div>
-"""
-                else:
-                    if is_interactive_mode:
-                        # Interactive mode: Show large Received -> Encoded boxes
-                        html += """        <div class="message-section" style="display: flex; flex-direction: column; justify-content: center;">
-            <div class="interactive-container">
-                <div class="char-box">
-                    <div class="char-box-label">Received</div>
-                    <div class="char-box-value">"""
-                        received_char = last_char_original if last_char_original else '-'
-                        html += html_module.escape(str(received_char))
-                        html += """</div>
-                </div>
-                <div class="char-arrow">&rarr;</div>
-                <div class="char-box">
-                    <div class="char-box-label">Encoded</div>
-                    <div class="char-box-value">"""
-                        encoded_char = last_char_received if last_char_received else '-'
-                        html += html_module.escape(str(encoded_char))
-                        html += """</div>
-                </div>
-            </div>
-        </div>
-"""
-                    else:
-                        html += """        <div class="message-section">
-            <div class="message-label">Current Message</div>
-            <div class="message-text">"""
-                        
-                        if current_message and current_char_index > 0:
-                            message_no_spaces = current_message.replace(' ', '')
-                            if current_char_index <= len(message_no_spaces):
-                                char_count = 0
-                                highlighted_message = ""
-                                for char in current_message:
-                                    if char != ' ':
-                                        char_count += 1
-                                        if char_count == current_char_index:
-                                            highlighted_message += f'<span class="char-highlight">{html_module.escape(char)}</span>'
-                                        else:
-                                            highlighted_message += html_module.escape(char)
-                                    else:
-                                        highlighted_message += html_module.escape(char)
-                                html += highlighted_message
-                            else:
-                                html += html_module.escape(current_message)
-                        else:
-                            html += html_module.escape(current_message) if current_message else 'Waiting for message...'
-                        
-                        html += """</div>
-"""
-                        result_label = "Encoded" if is_encode_mode else "Decoded"
-                        result_label += " Message"
-                        if result_message:
-                            html += f'            <div class="message-label">{result_label}</div>\n'
-                            html += f'            <div class="encoded-text">{html_module.escape(result_message)}</div>\n'
-                        
-                        html += """        </div>
-"""
-                
-                html += f"""        
-        <div class="footer">
-            <p>Museum Display {VERSION} - Auto-refreshes every 2 seconds</p>
-            <p>by Andrew Baker (DotelPenguin)</p>
         </div>
     </div>
 </body>
@@ -715,7 +340,7 @@ class MuseumWebServer:
                 current_message = None
                 result_message = None
                 
-                # Extract current_message and result_message using same logic as generate_message_html
+                # Extract current_message and result_message from log messages
                 if is_encode_mode:
                     if current_encoded_text:
                         result_message = current_encoded_text
@@ -908,7 +533,15 @@ class MuseumWebServer:
         .ring-position-box {{ background: rgba(120, 150, 160, 0.3); border: 2px solid #7896a0; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #a0c0d0; min-width: 60px; }}
         .plugboard-box {{ background: rgba(150, 100, 120, 0.3); border: 2px solid #966478; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2vw, 20px); font-weight: bold; color: #c890a8; min-width: 60px; }}
         .footer {{ margin-top: min(0.2vh, 2px); color: #888; font-size: min(0.9vw, 9px); flex-shrink: 0; padding: min(1.3vh, 13px) 0; }}
-        .disconnected-banner {{ background: rgba(255, 0, 0, 0.8); color: #fff; padding: min(1.5vh, 15px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #f00; border-radius: 10px; margin-bottom: min(1vh, 10px); display: none; }}
+        .disconnected-banner {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 0, 0, 0.95); color: #fff; padding: min(2vh, 20px) min(4vw, 40px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #f00; border-radius: 10px; box-shadow: 0 4px 20px rgba(255, 0, 0, 0.5), 0 0 20px rgba(255, 0, 0, 0.3); z-index: 10000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out; pointer-events: none; max-width: 80vw; min-width: min(40vw, 400px); }}
+        .disconnected-banner.show {{ opacity: 1; visibility: visible; }}
+        .disconnected-banner .error-title {{ font-size: min(2.2vw, 22px); margin-bottom: min(1vh, 10px); }}
+        .disconnected-banner .error-details {{ font-size: min(1.6vw, 16px); font-weight: normal; opacity: 0.9; margin-top: min(0.8vh, 8px); line-height: 1.4; }}
+        .device-disconnected-banner {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 140, 0, 0.95); color: #fff; padding: min(2vh, 20px) min(4vw, 40px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #ff8c00; border-radius: 10px; box-shadow: 0 4px 20px rgba(255, 140, 0, 0.5), 0 0 20px rgba(255, 140, 0, 0.3); z-index: 10001; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; pointer-events: none; max-width: 80vw; min-width: min(40vw, 400px); }}
+        .device-disconnected-banner.show {{ opacity: 1; visibility: visible; }}
+        .device-disconnected-banner .error-title {{ font-size: min(2.2vw, 22px); margin-bottom: min(1vh, 10px); }}
+        .device-disconnected-banner .error-details {{ font-size: min(1.6vw, 16px); font-weight: normal; opacity: 0.9; margin-top: min(0.8vh, 8px); line-height: 1.4; }}
+        .disconnected-banner {{ transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; }}
         .interactive-container {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
         .char-box {{ background: rgba(0, 255, 255, 0.2); border: 3px solid #0ff; border-radius: 15px; padding: min(4vh, 40px) min(4vw, 40px); min-width: min(15vw, 150px); min-height: min(15vw, 150px); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0, 255, 255, 0.3); }}
         .char-box-label {{ font-size: min(1.2vw, 12px); color: #0ff; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
@@ -917,9 +550,17 @@ class MuseumWebServer:
     </style>
 </head>
 <body>
+    <div class="device-disconnected-banner" id="deviceBanner">
+        <div class="error-title">Enigma Touch Device Disconnected</div>
+        <div class="error-details" id="deviceErrorDetails">Please reconnect the Enigma Touch device or turn it back on.</div>
+    </div>
+    
+    <div class="disconnected-banner" id="offlineBanner">
+        <div class="error-title">Connection Lost</div>
+        <div class="error-details" id="errorDetails">Attempting to reconnect...</div>
+    </div>
+    
     <div class="kiosk-container">
-        <div class="disconnected-banner" id="offlineBanner">Connection lost. Attempting to reconnect...</div>
-        
         <div class="machine-display" id="machineDisplay">
             <div class="rotor-display" id="rotorDisplay"></div>
         </div>
@@ -949,9 +590,12 @@ class MuseumWebServer:
             const maxRetryDelay = 10000; // Max 10 seconds
             let isOffline = false;
             let imageCache = {{}};
+            let consecutiveFailures = 0;
+            const failureThreshold = 4; // Show error after 4 consecutive failures (~2 seconds)
             
             // DOM elements
             const offlineBanner = document.getElementById('offlineBanner');
+            const deviceBanner = document.getElementById('deviceBanner');
             const machineDisplay = document.getElementById('machineDisplay');
             const rotorDisplay = document.getElementById('rotorDisplay');
             const messageContainer = document.getElementById('messageContainer');
@@ -1265,12 +909,70 @@ class MuseumWebServer:
             }}
             
             // Update offline status
-            function setOfflineStatus(offline) {{
-                if (isOffline === offline) return;
+            function setOfflineStatus(offline, errorDetails) {{
+                if (isOffline === offline && !errorDetails) return;
                 isOffline = offline;
-                offlineBanner.style.display = offline ? 'block' : 'none';
-                if (!offline) {{
+                const errorDetailsEl = document.getElementById('errorDetails');
+                if (offline) {{
+                    if (errorDetails) {{
+                        let detailsText = '';
+                        if (errorDetails.type) {{
+                            detailsText = errorDetails.type;
+                            if (errorDetails.message) {{
+                                detailsText += ': ' + errorDetails.message;
+                            }}
+                            if (errorDetails.status) {{
+                                detailsText += ' (HTTP ' + errorDetails.status + ')';
+                            }}
+                        }} else if (errorDetails.message) {{
+                            detailsText = errorDetails.message;
+                        }} else {{
+                            detailsText = 'Connection lost';
+                        }}
+                        detailsText += '. Please check the Museum Kiosk Controller. Attempting to reconnect...';
+                        errorDetailsEl.textContent = detailsText;
+                    }} else {{
+                        errorDetailsEl.textContent = 'Connection lost. Please check the Museum Kiosk Controller. Attempting to reconnect...';
+                    }}
+                    offlineBanner.classList.add('show');
+                    // Adjust positioning if both banners are showing
+                    if (deviceBanner.classList.contains('show')) {{
+                        deviceBanner.style.top = '40%';
+                        offlineBanner.style.top = '60%';
+                    }} else {{
+                        offlineBanner.style.top = '50%';
+                    }}
+                }} else {{
+                    offlineBanner.classList.remove('show');
+                    errorDetailsEl.textContent = 'Attempting to reconnect...';
                     retryDelay = 1000; // Reset retry delay on reconnect
+                    consecutiveFailures = 0; // Reset failure counter on reconnect
+                    // Reset device banner position if connection banner is hidden
+                    if (deviceBanner.classList.contains('show')) {{
+                        deviceBanner.style.top = '50%';
+                    }}
+                }}
+            }}
+            
+            // Update device status
+            function setDeviceStatus(disconnectedMessage) {{
+                const deviceErrorDetailsEl = document.getElementById('deviceErrorDetails');
+                if (disconnectedMessage) {{
+                    deviceErrorDetailsEl.textContent = 'Please reconnect the Enigma Touch device or turn it back on.';
+                    deviceBanner.classList.add('show');
+                    // Adjust positioning if both banners are showing
+                    if (offlineBanner.classList.contains('show')) {{
+                        deviceBanner.style.top = '40%';
+                        offlineBanner.style.top = '60%';
+                    }} else {{
+                        deviceBanner.style.top = '50%';
+                    }}
+                }} else {{
+                    deviceBanner.classList.remove('show');
+                    // Reset connection banner position if device banner is hidden
+                    if (offlineBanner.classList.contains('show')) {{
+                        offlineBanner.style.top = '50%';
+                    }}
                 }}
             }}
             
@@ -1289,11 +991,16 @@ class MuseumWebServer:
                 fetchWithTimeout('/message.json')
                     .then(function(response) {{
                         if (!response.ok) {{
-                            throw new Error('HTTP ' + response.status);
+                            const error = new Error('HTTP ' + response.status);
+                            error.status = response.status;
+                            error.type = 'Server Error';
+                            throw error;
                         }}
                         return response.json();
                     }})
                     .then(function(data) {{
+                        // Reset failure counter on successful fetch
+                        consecutiveFailures = 0;
                         setOfflineStatus(false);
                         
                         if (dataChanged(data)) {{
@@ -1303,10 +1010,8 @@ class MuseumWebServer:
                             // Update message display
                             updateMessageDisplay(data);
                             
-                            // Update device banner if needed
-                            if (data.device.disconnected_message) {{
-                                // Device disconnected banner would go here if needed
-                            }}
+                            // Update device banner if needed (immediate, no failure threshold)
+                            setDeviceStatus(data.device.disconnected_message);
                             
                             lastData = data;
                         }}
@@ -1317,7 +1022,35 @@ class MuseumWebServer:
                     }})
                     .catch(function(error) {{
                         console.error('Fetch error:', error);
-                        setOfflineStatus(true);
+                        
+                        // Increment failure counter
+                        consecutiveFailures++;
+                        
+                        // Only show error banner after threshold failures
+                        if (consecutiveFailures >= failureThreshold) {{
+                            let errorDetails = {{
+                                type: 'Connection Error',
+                                message: 'Unable to reach server'
+                            }};
+                            
+                            if (error.message) {{
+                                if (error.message === 'Timeout') {{
+                                    errorDetails.type = 'Timeout';
+                                    errorDetails.message = 'Request timed out after 5 seconds';
+                                }} else if (error.message.startsWith('HTTP')) {{
+                                    errorDetails.type = 'Server Error';
+                                    errorDetails.message = 'Server returned an error';
+                                    errorDetails.status = error.status;
+                                }} else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {{
+                                    errorDetails.type = 'Network Error';
+                                    errorDetails.message = 'Network connection failed';
+                                }} else {{
+                                    errorDetails.message = error.message;
+                                }}
+                            }}
+                            
+                            setOfflineStatus(true, errorDetails);
+                        }}
                         
                         // Retry with exponential backoff
                         retryTimer = setTimeout(function() {{
