@@ -100,7 +100,7 @@ class MuseumWebServer:
                         self.wfile.write(json.dumps(json_data).encode('utf-8'))
                         self.wfile.flush()
                     elif self.path.startswith('/kiosk.html'):
-                        # Parse URL to get language parameter
+                        # Parse URL to get language and debug parameters
                         parsed_url = urlparse(self.path)
                         query_params = parse_qs(parsed_url.query)
                         language = DEFAULT_LOCALE
@@ -110,11 +110,17 @@ class MuseumWebServer:
                             if requested_lang and requested_lang.isalnum() and 2 <= len(requested_lang) <= 5:
                                 language = requested_lang
                         
+                        # Parse debug parameter
+                        debug_mode = False
+                        if 'debug' in query_params and query_params['debug']:
+                            debug_value = query_params['debug'][0].strip().lower()
+                            debug_mode = debug_value in ('true', '1', 'yes', 'on')
+                        
                         self.send_response(200)
                         self.send_header('Content-type', 'text/html')
                         self.send_header('Cache-Control', 'no-cache')
                         self.end_headers()
-                        html = self.generate_kiosk_html(language=language)
+                        html = self.generate_kiosk_html(language=language, debug=debug_mode)
                         self.wfile.write(html.encode('utf-8'))
                         self.wfile.flush()
                     elif self.path == '/enigma.png':
@@ -508,11 +514,12 @@ class MuseumWebServer:
                     }
                 }
             
-            def generate_kiosk_html(self, language: str = None):
+            def generate_kiosk_html(self, language: str = None, debug: bool = False):
                 """Generate HTML page for JavaScript-powered kiosk display
                 
                 Args:
                     language: Language code to use (e.g., 'en', 'de'). If None, uses default.
+                    debug: If True, display debug information (e.g., screen size) in footer.
                 """
                 theme = theme_ref
                 # Load locale for the requested language
@@ -545,6 +552,8 @@ class MuseumWebServer:
                 
                 # Prepare locale strings for JavaScript (escape script tags)
                 locale_js = json.dumps(locale).replace('</script>', '<\\/script>')
+                # Prepare debug mode for JavaScript
+                debug_js = 'true' if debug else 'false'
                 
                 html = f"""<!DOCTYPE html>
 <html>
@@ -634,7 +643,7 @@ class MuseumWebServer:
         </div>
         
         <div class="footer">
-            <p>{html_module.escape(get_locale('footer.text', f'Museum Display {VERSION} - by Andrew Baker (DotelPenguin)').format(VERSION=VERSION))}</p>
+            <p>{html_module.escape(get_locale('footer.text', f'Museum Display {VERSION} - by Andrew Baker (DotelPenguin)').format(VERSION=VERSION))}<span id="debugInfo"></span></p>
         </div>
     </div>
     
@@ -677,6 +686,25 @@ class MuseumWebServer:
             const rotorDisplay = document.getElementById('rotorDisplay');
             const messageContainer = document.getElementById('messageContainer');
             const logoImage = document.getElementById('logoImage');
+            const debugInfo = document.getElementById('debugInfo');
+            
+            // Debug mode (set from Python)
+            const debugMode = {debug_js};
+            
+            // Update debug info in footer
+            function updateDebugInfo() {{
+                if (debugMode && debugInfo) {{
+                    const width = window.innerWidth;
+                    const height = window.innerHeight;
+                    debugInfo.textContent = ' | Display: ' + width + ' x ' + height + 'px';
+                }}
+            }}
+            
+            // Update debug info on load and resize
+            if (debugMode) {{
+                updateDebugInfo();
+                window.addEventListener('resize', updateDebugInfo);
+            }}
             
             // Fetch with timeout
             function fetchWithTimeout(url, timeout = 5000) {{
