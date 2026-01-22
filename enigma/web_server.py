@@ -116,11 +116,17 @@ class MuseumWebServer:
                             debug_value = query_params['debug'][0].strip().lower()
                             debug_mode = debug_value in ('true', '1', 'yes', 'on')
                         
+                        # Parse checkres parameter (default true)
+                        check_resolution = True
+                        if 'checkres' in query_params and query_params['checkres']:
+                            checkres_value = query_params['checkres'][0].strip().lower()
+                            check_resolution = checkres_value not in ('false', '0', 'no', 'off')
+                        
                         self.send_response(200)
                         self.send_header('Content-type', 'text/html')
                         self.send_header('Cache-Control', 'no-cache')
                         self.end_headers()
-                        html = self.generate_kiosk_html(language=language, debug=debug_mode)
+                        html = self.generate_kiosk_html(language=language, debug=debug_mode, check_resolution=check_resolution)
                         self.wfile.write(html.encode('utf-8'))
                         self.wfile.flush()
                     elif self.path == '/enigma.png':
@@ -514,12 +520,13 @@ class MuseumWebServer:
                     }
                 }
             
-            def generate_kiosk_html(self, language: str = None, debug: bool = False):
+            def generate_kiosk_html(self, language: str = None, debug: bool = False, check_resolution: bool = True):
                 """Generate HTML page for JavaScript-powered kiosk display
                 
                 Args:
                     language: Language code to use (e.g., 'en', 'de'). If None, uses default.
                     debug: If True, display debug information (e.g., screen size) in footer.
+                    check_resolution: If True, check and warn about non-optimal display resolutions.
                 """
                 theme = theme_ref
                 # Load locale for the requested language
@@ -554,6 +561,8 @@ class MuseumWebServer:
                 locale_js = json.dumps(locale).replace('</script>', '<\\/script>')
                 # Prepare debug mode for JavaScript
                 debug_js = 'true' if debug else 'false'
+                # Prepare check resolution for JavaScript
+                check_resolution_js = 'true' if check_resolution else 'false'
                 
                 html = f"""<!DOCTYPE html>
 <html>
@@ -609,6 +618,10 @@ class MuseumWebServer:
         .device-disconnected-banner .error-title {{ font-size: min(2.2vw, 22px); margin-bottom: min(1vh, 10px); }}
         .device-disconnected-banner .error-details {{ font-size: min(1.6vw, 16px); font-weight: normal; opacity: 0.9; margin-top: min(0.8vh, 8px); line-height: 1.4; }}
         .disconnected-banner {{ transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; }}
+        .resolution-warning-banner {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 193, 7, 0.95); color: #000; padding: min(2vh, 20px) min(4vw, 40px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #ffc107; border-radius: 10px; box-shadow: 0 4px 20px rgba(255, 193, 7, 0.5), 0 0 20px rgba(255, 193, 7, 0.3); z-index: 9999; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; pointer-events: none; max-width: 80vw; min-width: min(40vw, 400px); }}
+        .resolution-warning-banner.show {{ opacity: 1; visibility: visible; }}
+        .resolution-warning-banner .warning-title {{ font-size: min(2.2vw, 22px); margin-bottom: min(1vh, 10px); }}
+        .resolution-warning-banner .warning-details {{ font-size: min(1.6vw, 16px); font-weight: normal; opacity: 0.9; margin-top: min(0.8vh, 8px); line-height: 1.4; }}
         .interactive-container {{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: min(2vh, 20px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
         .interactive-mode-label {{ font-size: min(1.848vw, 18.48px); color: {get_theme('text.message_label.color', '#0ff')}; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); font-weight: bold; flex-shrink: 0; }}
         .interactive-content {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); }}
@@ -619,6 +632,11 @@ class MuseumWebServer:
     </style>
 </head>
 <body>
+    <div class="resolution-warning-banner" id="resolutionBanner">
+        <div class="warning-title">{html_module.escape(get_locale('warnings.resolution.title', 'Display Resolution Warning'))}</div>
+        <div class="warning-details" id="resolutionWarningDetails">{html_module.escape(get_locale('warnings.resolution.message', 'This display has been optimized for 1024x768 resolution.'))}</div>
+    </div>
+    
     <div class="device-disconnected-banner" id="deviceBanner">
         <div class="error-title">{html_module.escape(get_locale('errors.device_disconnected', 'Enigma Touch Device Disconnected'))}</div>
         <div class="error-details" id="deviceErrorDetails">{html_module.escape(get_locale('errors.device_disconnected_message', 'Please reconnect the Enigma Touch device or turn it back on.'))}</div>
@@ -678,10 +696,14 @@ class MuseumWebServer:
             let imageCache = {{}};
             let consecutiveFailures = 0;
             const failureThreshold = 4; // Show error after 4 consecutive failures (~2 seconds)
+            let resolutionWarningTimer = null;
+            let resolutionWarningCountdownInterval = null;
             
             // DOM elements
             const offlineBanner = document.getElementById('offlineBanner');
             const deviceBanner = document.getElementById('deviceBanner');
+            const resolutionBanner = document.getElementById('resolutionBanner');
+            const resolutionWarningDetails = document.getElementById('resolutionWarningDetails');
             const machineDisplay = document.getElementById('machineDisplay');
             const rotorDisplay = document.getElementById('rotorDisplay');
             const messageContainer = document.getElementById('messageContainer');
@@ -690,6 +712,8 @@ class MuseumWebServer:
             
             // Debug mode (set from Python)
             const debugMode = {debug_js};
+            // Check resolution mode (set from Python)
+            const checkResolution = {check_resolution_js};
             
             // Update debug info in footer
             function updateDebugInfo() {{
@@ -704,6 +728,103 @@ class MuseumWebServer:
             if (debugMode) {{
                 updateDebugInfo();
                 window.addEventListener('resize', updateDebugInfo);
+            }}
+            
+            // Update all banner positions (resolution warning at top, then device, then offline)
+            function updateBannerPositions() {{
+                const banners = [];
+                if (resolutionBanner && resolutionBanner.classList.contains('show')) {{
+                    banners.push(resolutionBanner);
+                }}
+                if (deviceBanner && deviceBanner.classList.contains('show')) {{
+                    banners.push(deviceBanner);
+                }}
+                if (offlineBanner && offlineBanner.classList.contains('show')) {{
+                    banners.push(offlineBanner);
+                }}
+                
+                // Position banners vertically centered, stacked
+                if (banners.length === 1) {{
+                    banners[0].style.top = '50%';
+                }} else if (banners.length === 2) {{
+                    banners[0].style.top = '40%';
+                    banners[1].style.top = '60%';
+                }} else if (banners.length === 3) {{
+                    banners[0].style.top = '30%';
+                    banners[1].style.top = '50%';
+                    banners[2].style.top = '70%';
+                }}
+            }}
+            
+            // Check resolution and show/hide warning
+            function checkResolutionWarning() {{
+                if (!checkResolution || !resolutionBanner || !resolutionWarningDetails) {{
+                    return;
+                }}
+                
+                // Clear any existing timeout and interval
+                if (resolutionWarningTimer) {{
+                    clearTimeout(resolutionWarningTimer);
+                    resolutionWarningTimer = null;
+                }}
+                if (resolutionWarningCountdownInterval) {{
+                    clearInterval(resolutionWarningCountdownInterval);
+                    resolutionWarningCountdownInterval = null;
+                }}
+                
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                const showWarning = height < 600 || height > 1080;
+                
+                if (showWarning) {{
+                    // Update message with current resolution
+                    let message = getLocale('warnings.resolution.message', 'This display has been optimized for 1024x768 resolution. Your current resolution is {{WIDTH}}x{{HEIGHT}}px, which is outside the recommended range (600-1080px height).');
+                    message = message.replace('{{WIDTH}}', width).replace('{{HEIGHT}}', height);
+                    
+                    let secondsRemaining = 10;
+                    function updateCountdown() {{
+                        if (secondsRemaining <= 0) {{
+                            clearInterval(resolutionWarningCountdownInterval);
+                            resolutionWarningCountdownInterval = null;
+                            return;
+                        }}
+                        
+                        let autoClearMsg = getLocale('warnings.resolution.auto_clear', 'This warning will automatically clear in {{SECONDS}} seconds.');
+                        autoClearMsg = autoClearMsg.replace('{{SECONDS}}', secondsRemaining);
+                        resolutionWarningDetails.innerHTML = message + '<br><br>' + autoClearMsg;
+                        
+                        secondsRemaining--;
+                    }}
+                    
+                    // Initial update
+                    updateCountdown();
+                    
+                    // Update countdown every second
+                    resolutionWarningCountdownInterval = setInterval(updateCountdown, 1000);
+                    
+                    resolutionBanner.classList.add('show');
+                    updateBannerPositions();
+                    
+                    // Auto-hide after 10 seconds
+                    resolutionWarningTimer = setTimeout(function() {{
+                        resolutionBanner.classList.remove('show');
+                        updateBannerPositions();
+                        resolutionWarningTimer = null;
+                        if (resolutionWarningCountdownInterval) {{
+                            clearInterval(resolutionWarningCountdownInterval);
+                            resolutionWarningCountdownInterval = null;
+                        }}
+                    }}, 10000);
+                }} else {{
+                    resolutionBanner.classList.remove('show');
+                    updateBannerPositions();
+                }}
+            }}
+            
+            // Check resolution on load and resize
+            if (checkResolution) {{
+                checkResolutionWarning();
+                window.addEventListener('resize', checkResolutionWarning);
             }}
             
             // Fetch with timeout
@@ -1043,22 +1164,13 @@ class MuseumWebServer:
                         errorDetailsEl.textContent = getLocale('errors.connection_lost_message', 'Connection lost. Please check the Museum Kiosk Controller. Attempting to reconnect...');
                     }}
                     offlineBanner.classList.add('show');
-                    // Adjust positioning if both banners are showing
-                    if (deviceBanner.classList.contains('show')) {{
-                        deviceBanner.style.top = '40%';
-                        offlineBanner.style.top = '60%';
-                    }} else {{
-                        offlineBanner.style.top = '50%';
-                    }}
+                    updateBannerPositions();
                 }} else {{
                     offlineBanner.classList.remove('show');
                     errorDetailsEl.textContent = getLocale('errors.attempting_reconnect', 'Attempting to reconnect...');
                     retryDelay = 1000; // Reset retry delay on reconnect
                     consecutiveFailures = 0; // Reset failure counter on reconnect
-                    // Reset device banner position if connection banner is hidden
-                    if (deviceBanner.classList.contains('show')) {{
-                        deviceBanner.style.top = '50%';
-                    }}
+                    updateBannerPositions();
                 }}
             }}
             
@@ -1068,19 +1180,10 @@ class MuseumWebServer:
                 if (disconnectedMessage) {{
                     deviceErrorDetailsEl.textContent = getLocale('errors.device_disconnected_message', 'Please reconnect the Enigma Touch device or turn it back on.');
                     deviceBanner.classList.add('show');
-                    // Adjust positioning if both banners are showing
-                    if (offlineBanner.classList.contains('show')) {{
-                        deviceBanner.style.top = '40%';
-                        offlineBanner.style.top = '60%';
-                    }} else {{
-                        deviceBanner.style.top = '50%';
-                    }}
+                    updateBannerPositions();
                 }} else {{
                     deviceBanner.classList.remove('show');
-                    // Reset connection banner position if device banner is hidden
-                    if (offlineBanner.classList.contains('show')) {{
-                        offlineBanner.style.top = '50%';
-                    }}
+                    updateBannerPositions();
                 }}
             }}
             

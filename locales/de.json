@@ -40,6 +40,13 @@
     "network_error_message": "Netzwerkverbindung fehlgeschlagen",
     "unable_to_reach_server": "Server nicht erreichbar"
   },
+  "warnings": {
+    "resolution": {
+      "title": "Bildschirmauflösung Warnung",
+      "message": "Diese Anzeige wurde für eine Auflösung von 1024x768 optimiert. Ihre aktuelle Auflösung ist {{WIDTH}}x{{HEIGHT}}px, was außerhalb des empfohlenen Bereichs liegt (600-1080px Höhe).",
+      "auto_clear": "Diese Warnung wird automatisch in {{SECONDS}} Sekunden ausgeblendet."
+    }
+  },
   "footer": {
     "text": "Museum Display {VERSION} - von Andrew Baker (DotelPenguin)"
   }
