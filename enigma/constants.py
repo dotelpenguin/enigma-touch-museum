@@ -20,6 +20,11 @@ CONFIG_FILE = os.path.join(SCRIPT_DIR, 'enigma-museum-config.json')
 ENGLISH_MSG_FILE = os.path.join(SCRIPT_DIR, 'english.msg')
 GERMAN_MSG_FILE = os.path.join(SCRIPT_DIR, 'german.msg')
 
+# Kiosk theme and localization
+KIOSK_THEME_FILE = os.path.join(SCRIPT_DIR, 'kiosk-theme.json')
+LOCALES_DIR = os.path.join(SCRIPT_DIR, 'locales')
+DEFAULT_LOCALE = 'en'
+
 # Terminal size requirements
 MIN_COLS = 100
 MIN_LINES = 25
