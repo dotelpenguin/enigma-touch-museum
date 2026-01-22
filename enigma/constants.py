@@ -6,7 +6,7 @@ Constants for Enigma Museum Controller
 import os
 
 # Application Version
-VERSION = "v4.21.15"
+VERSION = "v4.21.19"
 
 # Serial Configuration
 DEFAULT_DEVICE = '/dev/ttyACM0'
@@ -19,6 +19,11 @@ SCRIPT_DIR = os.getcwd()
 CONFIG_FILE = os.path.join(SCRIPT_DIR, 'enigma-museum-config.json')
 ENGLISH_MSG_FILE = os.path.join(SCRIPT_DIR, 'english.msg')
 GERMAN_MSG_FILE = os.path.join(SCRIPT_DIR, 'german.msg')
+
+# Kiosk theme and localization
+KIOSK_THEME_FILE = os.path.join(SCRIPT_DIR, 'kiosk-theme.json')
+LOCALES_DIR = os.path.join(SCRIPT_DIR, 'locales')
+DEFAULT_LOCALE = 'en'
 
 # Terminal size requirements
 MIN_COLS = 100

@@ -1,0 +1,46 @@
+{
+  "page_title": "Enigma Museum Kiosk",
+  "labels": {
+    "model": "Model",
+    "rotors": "Rotors",
+    "ring_settings": "Ring Settings",
+    "ring_position": "Ring Position",
+    "plugboard": "Plugboard",
+    "unused": "Unused"
+  },
+  "messages": {
+    "current_message": "Current Message",
+    "encoded_message": "Encoded Message",
+    "decoded_message": "Decoded Message",
+    "waiting_for_message": "Waiting for message...",
+    "slide_image_placeholder": "Slide Image Placeholder"
+  },
+  "interactive": {
+    "mode": "Interactive Mode",
+    "received": "Received",
+    "encoded": "Encoded"
+  },
+  "logo": {
+    "enigma": "ENIGMA",
+    "subtitle": "Cipher Machine",
+    "alt_text": "Enigma Machine"
+  },
+  "errors": {
+    "connection_lost": "Connection Lost",
+    "device_disconnected": "Enigma Touch Device Disconnected",
+    "attempting_reconnect": "Attempting to reconnect...",
+    "connection_lost_message": "Connection lost. Please check the Museum Kiosk Controller. Attempting to reconnect...",
+    "device_disconnected_message": "Please reconnect the Enigma Touch device or turn it back on.",
+    "connection_error": "Connection Error",
+    "timeout": "Timeout",
+    "timeout_message": "Request timed out after 5 seconds",
+    "server_error": "Server Error",
+    "server_error_message": "Server returned an error",
+    "network_error": "Network Error",
+    "network_error_message": "Network connection failed",
+    "unable_to_reach_server": "Unable to reach server"
+  },
+  "footer": {
+    "text": "Museum Display {VERSION} - by Andrew Baker (DotelPenguin)"
+  }
+}

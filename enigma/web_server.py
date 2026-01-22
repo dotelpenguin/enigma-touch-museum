@@ -8,8 +8,11 @@ import socket
 import threading
 import json
 import html as html_module
+from urllib.parse import urlparse, parse_qs
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from .constants import SCRIPT_DIR, VERSION
+from .constants import SCRIPT_DIR, VERSION, DEFAULT_LOCALE
+from .theme_config import ThemeConfigManager
+from .locale_manager import LocaleManager
 
 
 class MuseumWebServer:
@@ -30,6 +33,12 @@ class MuseumWebServer:
         self.running = False
         # Path to logo image
         self.logo_path = os.path.join(SCRIPT_DIR, 'enigma.png')
+        # Initialize theme and locale managers
+        self.theme_manager = ThemeConfigManager()
+        self.locale_manager = LocaleManager()
+        # Load theme and locale
+        self.theme = self.theme_manager.load_theme()
+        self.locale = self.locale_manager.load_locale()
     
     def get_local_ip(self):
         """Get the local IP address"""
@@ -52,6 +61,9 @@ class MuseumWebServer:
         # Store callback reference and server instance for handler
         data_callback_ref = self.data_callback
         server_instance = self
+        theme_ref = self.theme
+        locale_ref = self.locale
+        locale_manager_ref = self.locale_manager
         
         class MuseumHandler(BaseHTTPRequestHandler):
             def do_GET(self):
@@ -87,12 +99,22 @@ class MuseumWebServer:
                         json_data = self.generate_message_json(data)
                         self.wfile.write(json.dumps(json_data).encode('utf-8'))
                         self.wfile.flush()
-                    elif self.path == '/kiosk.html':
+                    elif self.path.startswith('/kiosk.html'):
+                        # Parse URL to get language parameter
+                        parsed_url = urlparse(self.path)
+                        query_params = parse_qs(parsed_url.query)
+                        language = DEFAULT_LOCALE
+                        if 'lang' in query_params and query_params['lang']:
+                            requested_lang = query_params['lang'][0].strip().lower()
+                            # Validate language code (alphanumeric, 2-5 chars for safety)
+                            if requested_lang and requested_lang.isalnum() and 2 <= len(requested_lang) <= 5:
+                                language = requested_lang
+                        
                         self.send_response(200)
                         self.send_header('Content-type', 'text/html')
                         self.send_header('Cache-Control', 'no-cache')
                         self.end_headers()
-                        html = self.generate_kiosk_html()
+                        html = self.generate_kiosk_html(language=language)
                         self.wfile.write(html.encode('utf-8'))
                         self.wfile.flush()
                     elif self.path == '/enigma.png':
@@ -486,78 +508,116 @@ class MuseumWebServer:
                     }
                 }
             
-            def generate_kiosk_html(self):
-                """Generate HTML page for JavaScript-powered kiosk display"""
+            def generate_kiosk_html(self, language: str = None):
+                """Generate HTML page for JavaScript-powered kiosk display
+                
+                Args:
+                    language: Language code to use (e.g., 'en', 'de'). If None, uses default.
+                """
+                theme = theme_ref
+                # Load locale for the requested language
+                if language:
+                    locale = locale_manager_ref.load_locale(language)
+                else:
+                    locale = locale_ref
+                
+                # Helper function to get nested theme value
+                def get_theme(path, default=""):
+                    keys = path.split('.')
+                    value = theme
+                    try:
+                        for key in keys:
+                            value = value[key]
+                        return value
+                    except (KeyError, TypeError):
+                        return default
+                
+                # Helper function to get nested locale string
+                def get_locale(path, default=""):
+                    keys = path.split('.')
+                    value = locale
+                    try:
+                        for key in keys:
+                            value = value[key]
+                        return value
+                    except (KeyError, TypeError):
+                        return default
+                
+                # Prepare locale strings for JavaScript (escape script tags)
+                locale_js = json.dumps(locale).replace('</script>', '<\\/script>')
+                
                 html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Enigma Museum Kiosk</title>
+    <title>{get_locale('page_title', 'Enigma Museum Kiosk')}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         html, body {{ width: 100vw; height: 100vh; overflow: hidden; position: fixed; margin: 0; padding: 0; }}
-        body {{ font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; }}
+        body {{ font-family: {get_theme('fonts.primary', "'Arial', sans-serif")}; background: linear-gradient(135deg, {get_theme('background.gradient_start', '#1a1a2e')} 0%, {get_theme('background.gradient_end', '#16213e')} 100%); color: {get_theme('colors.primary_text', '#fff')}; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; }}
         .kiosk-container {{ width: 100vw; height: 100vh; text-align: center; display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; flex: 1 1 auto; }}
-        .logo-overlay {{ position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 0; pointer-events: none; opacity: 0.25; text-align: center; overflow: hidden; }}
+        .logo-overlay {{ position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 0; pointer-events: none; opacity: {get_theme('logo.opacity', '0.25')}; text-align: center; overflow: hidden; }}
         .logo-overlay .logo-container {{ border: none; padding: min(2vh, 20px) min(2vw, 20px); background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; }}
         .logo-overlay .logo-image {{ max-width: min(50vw, 500px); max-height: min(40vh, 400px); width: auto; height: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); margin-bottom: 0.5vh; display: block; }}
-        .logo-overlay .enigma-logo {{ font-size: min(8vw, 80px); font-weight: bold; color: #ffd700; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.3vw; margin-bottom: 0.3vh; display: block; }}
-        .logo-overlay .subtitle {{ font-size: min(2.5vw, 25px); color: #ccc; letter-spacing: 0.15vw; display: block; }}
-        .machine-display {{ background: rgba(0, 0, 0, 0.6); border: 2px solid #ffd700; border-radius: 10px; padding: min(1vh, 10px); margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); padding-bottom: min(0.5vh, 5px); box-shadow: 0 4px 16px rgba(0,0,0,0.5); flex-shrink: 0; max-height: calc(30vh + 23px); overflow: visible; }}
-        .plugboard-unused {{ opacity: 0.4; color: #888 !important; }}
-        .plugboard-unused .config-label {{ color: #666 !important; }}
-        .plugboard-unused .plugboard-box {{ background: rgba(100, 100, 100, 0.2) !important; border-color: #666 !important; color: #888 !important; }}
+        .logo-overlay .enigma-logo {{ font-size: min(8vw, 80px); font-weight: bold; color: {get_theme('logo.text_color', '#ffd700')}; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 0.3vw; margin-bottom: 0.3vh; display: block; }}
+        .logo-overlay .subtitle {{ font-size: min(2.5vw, 25px); color: {get_theme('logo.subtitle_color', '#ccc')}; letter-spacing: 0.15vw; display: block; }}
+        .machine-display {{ background: {get_theme('boxes.machine_display.background', 'rgba(0, 0, 0, 0.6)')}; border: 2px solid {get_theme('boxes.machine_display.border', '#ffd700')}; border-radius: {get_theme('boxes.machine_display.border_radius', '10px')}; padding: min(1vh, 10px); margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); padding-bottom: min(0.5vh, 5px); box-shadow: {get_theme('boxes.machine_display.box_shadow', '0 4px 16px rgba(0,0,0,0.5)')}; flex-shrink: 0; max-height: calc(30vh + 23px); overflow: visible; }}
+        .plugboard-unused {{ opacity: {get_theme('boxes.plugboard_unused.opacity', '0.4')}; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
+        .plugboard-unused .config-label {{ color: {get_theme('colors.dark_gray', '#666')} !important; }}
+        .plugboard-unused .plugboard-box {{ background: {get_theme('boxes.plugboard_unused.background', 'rgba(100, 100, 100, 0.2)')} !important; border-color: {get_theme('boxes.plugboard_unused.border', '#666')} !important; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
         .config-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: min(1vw, 10px); margin: min(1vh, 10px) 0; }}
-        .config-item {{ background: rgba(255, 255, 255, 0.1); padding: min(1vh, 10px); border-radius: 6px; border: 1px solid rgba(255, 215, 0, 0.3); }}
-        .config-label {{ font-size: min(1.5vw, 15px); color: #ffd700; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
-        .config-value {{ font-size: min(2vw, 20px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; }}
+        .config-item {{ background: {get_theme('boxes.config_item.background', 'rgba(255, 255, 255, 0.1)')}; padding: min(1vh, 10px); border-radius: {get_theme('boxes.config_item.border_radius', '6px')}; border: {get_theme('boxes.config_item.border', '1px solid rgba(255, 215, 0, 0.3)')}; }}
+        .config-label {{ font-size: min(1.5vw, 15px); color: {get_theme('text.config_label.color', '#ffd700')}; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
+        .config-value {{ font-size: min(2vw, 20px); color: {get_theme('text.config_value.color', '#fff')}; font-weight: bold; font-family: {get_theme('fonts.monospace', "'Courier New', monospace")}; }}
         .message-container {{ display: flex; flex-direction: row; gap: min(1vw, 10px); margin: 0; margin-top: 0; flex-grow: 1; flex-shrink: 1; min-height: 0; position: relative; }}
-        .message-section {{ margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; position: relative; overflow: hidden; }}
+        .message-section {{ margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); padding: min(1.5vh, 15px); background: {get_theme('boxes.message_section.background', 'rgba(0, 0, 0, 0.7)')}; border-radius: {get_theme('boxes.message_section.border_radius', '10px')}; border: 2px solid {get_theme('boxes.message_section.border', '#0ff')}; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; position: relative; overflow: hidden; }}
         .message-container .message-section {{ margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); width: 75%; }}
         #messageContainer > .message-section {{ min-height: 0; }}
         #messageContainer {{ position: relative; margin: 0; padding: 0; flex-grow: 1; flex-shrink: 1; min-height: 0; display: flex; flex-direction: column; }}
         .message-section > *:not(.logo-overlay) {{ position: relative; z-index: 1; }}
-        .slide-section {{ margin: min(1vh, 10px) min(1vw, 10px) 0 0; padding: min(1.5vh, 15px); background: rgba(0, 0, 0, 0.7); border-radius: 10px; border: 2px solid #0ff; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; width: 25%; }}
-        .slide-placeholder {{ background: rgba(255, 255, 255, 0.05); border: 2px dashed rgba(255, 215, 0, 0.5); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: rgba(255, 215, 0, 0.6); font-size: min(2vw, 20px); font-style: italic; width: 100%; height: 100%; min-height: 200px; }}
+        .slide-section {{ margin: min(1vh, 10px) min(1vw, 10px) 0 0; padding: min(1.5vh, 15px); background: {get_theme('boxes.slide_section.background', 'rgba(0, 0, 0, 0.7)')}; border-radius: {get_theme('boxes.slide_section.border_radius', '10px')}; border: 2px solid {get_theme('boxes.slide_section.border', '#0ff')}; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 0; width: 25%; }}
+        .slide-placeholder {{ background: {get_theme('boxes.slide_placeholder.background', 'rgba(255, 255, 255, 0.05)')}; border: {get_theme('boxes.slide_placeholder.border', '2px dashed rgba(255, 215, 0, 0.5)')}; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: {get_theme('boxes.slide_placeholder.color', 'rgba(255, 215, 0, 0.6)')}; font-size: min(2vw, 20px); font-style: italic; width: 100%; height: 100%; min-height: 200px; }}
         .slide-image {{ width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; display: block; transition: opacity 0.6s ease-in-out; }}
         .slide-section {{ overflow: hidden; }}
-        .message-label {{ font-size: min(1.848vw, 18.48px); color: #0ff; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); flex-shrink: 0; }}
-        .message-text {{ font-size: min(3.168vw, 31.68px); color: #fff; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; line-height: 1.4; overflow-y: auto; overflow-x: hidden; flex-grow: 1; min-height: 0; }}
-        .char-highlight {{ background-color: #ffd700; color: #000; font-weight: bold; padding: 2px 4px; border-radius: 3px; }}
-        .encoded-text {{ font-size: min(2.904vw, 29.04px); color: #00ff80; font-family: 'Courier New', monospace; letter-spacing: 0.2vw; word-break: break-word; margin-top: min(1vh, 10px); padding-top: min(1vh, 10px); border-top: 1px solid rgba(0, 255, 128, 0.3); flex-shrink: 0; overflow-y: auto; overflow-x: hidden; max-height: 20vh; }}
+        .message-label {{ font-size: min(1.848vw, 18.48px); color: {get_theme('text.message_label.color', '#0ff')}; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); flex-shrink: 0; }}
+        .message-text {{ font-size: min(3.168vw, 31.68px); color: {get_theme('text.message_text.color', '#fff')}; font-family: {get_theme('fonts.monospace', "'Courier New', monospace")}; letter-spacing: 0.2vw; word-break: break-word; line-height: 1.4; overflow-y: auto; overflow-x: hidden; flex-grow: 1; min-height: 0; }}
+        .char-highlight {{ background-color: {get_theme('text.char_highlight.background', '#ffd700')}; color: {get_theme('text.char_highlight.color', '#000')}; font-weight: bold; padding: 2px 4px; border-radius: 3px; }}
+        .encoded-text {{ font-size: min(2.904vw, 29.04px); color: {get_theme('text.encoded_text.color', '#00ff80')}; font-family: {get_theme('fonts.monospace', "'Courier New', monospace")}; letter-spacing: 0.2vw; word-break: break-word; margin-top: min(1vh, 10px); padding-top: min(1vh, 10px); border-top: {get_theme('text.encoded_text.border_top', '1px solid rgba(0, 255, 128, 0.3)')}; flex-shrink: 0; overflow-y: auto; overflow-x: hidden; max-height: 20vh; }}
         .rotor-display {{ display: flex; justify-content: center; column-gap: min(2vw, 30px); row-gap: min(0.5vh, 5px); margin: 0; flex-wrap: wrap; }}
         .config-section {{ margin: 0; }}
-        .rotor-box {{ background: rgba(255, 215, 0, 0.2); border: 2px solid #ffd700; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #ffd700; min-width: 60px; }}
-        .model-box {{ background: rgba(128, 100, 128, 0.3); border: 2px solid #806480; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #c0a0c0; min-width: 60px; }}
-        .ring-settings-box {{ background: rgba(100, 120, 150, 0.3); border: 2px solid #647896; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #90a8c8; min-width: 60px; }}
-        .ring-position-box {{ background: rgba(120, 150, 160, 0.3); border: 2px solid #7896a0; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: #a0c0d0; min-width: 60px; }}
-        .plugboard-box {{ background: rgba(150, 100, 120, 0.3); border: 2px solid #966478; border-radius: 6px; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2vw, 20px); font-weight: bold; color: #c890a8; min-width: 60px; }}
-        .footer {{ margin-top: min(0.2vh, 2px); color: #888; font-size: min(0.9vw, 9px); flex-shrink: 0; padding: min(1.3vh, 13px) 0; }}
-        .disconnected-banner {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 0, 0, 0.95); color: #fff; padding: min(2vh, 20px) min(4vw, 40px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #f00; border-radius: 10px; box-shadow: 0 4px 20px rgba(255, 0, 0, 0.5), 0 0 20px rgba(255, 0, 0, 0.3); z-index: 10000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out; pointer-events: none; max-width: 80vw; min-width: min(40vw, 400px); }}
+        .rotor-box {{ background: {get_theme('boxes.rotor_box.background', 'rgba(255, 215, 0, 0.2)')}; border: 2px solid {get_theme('boxes.rotor_box.border', '#ffd700')}; border-radius: {get_theme('boxes.rotor_box.border_radius', '6px')}; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: {get_theme('boxes.rotor_box.color', '#ffd700')}; min-width: 60px; }}
+        .model-box {{ background: {get_theme('boxes.model_box.background', 'rgba(128, 100, 128, 0.3)')}; border: 2px solid {get_theme('boxes.model_box.border', '#806480')}; border-radius: {get_theme('boxes.model_box.border_radius', '6px')}; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: {get_theme('boxes.model_box.color', '#c0a0c0')}; min-width: 60px; }}
+        .ring-settings-box {{ background: {get_theme('boxes.ring_settings_box.background', 'rgba(100, 120, 150, 0.3)')}; border: 2px solid {get_theme('boxes.ring_settings_box.border', '#647896')}; border-radius: {get_theme('boxes.ring_settings_box.border_radius', '6px')}; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: {get_theme('boxes.ring_settings_box.color', '#90a8c8')}; min-width: 60px; }}
+        .ring-position-box {{ background: {get_theme('boxes.ring_position_box.background', 'rgba(120, 150, 160, 0.3)')}; border: 2px solid {get_theme('boxes.ring_position_box.border', '#7896a0')}; border-radius: {get_theme('boxes.ring_position_box.border_radius', '6px')}; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: {get_theme('boxes.ring_position_box.color', '#a0c0d0')}; min-width: 60px; }}
+        .plugboard-box {{ background: {get_theme('boxes.plugboard_box.background', 'rgba(150, 100, 120, 0.3)')}; border: 2px solid {get_theme('boxes.plugboard_box.border', '#966478')}; border-radius: {get_theme('boxes.plugboard_box.border_radius', '6px')}; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2vw, 20px); font-weight: bold; color: {get_theme('boxes.plugboard_box.color', '#c890a8')}; min-width: 60px; }}
+        .footer {{ margin-top: min(0.2vh, 2px); color: {get_theme('text.footer.color', '#888')}; font-size: min(0.9vw, 9px); flex-shrink: 0; padding: min(1.3vh, 13px) 0; }}
+        .disconnected-banner {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: {get_theme('errors.connection_lost.background', 'rgba(255, 0, 0, 0.95)')}; color: {get_theme('errors.connection_lost.color', '#fff')}; padding: min(2vh, 20px) min(4vw, 40px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: {get_theme('errors.connection_lost.border', '2px solid #f00')}; border-radius: 10px; box-shadow: {get_theme('errors.connection_lost.box_shadow', '0 4px 20px rgba(255, 0, 0, 0.5), 0 0 20px rgba(255, 0, 0, 0.3)')}; z-index: 10000; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out; pointer-events: none; max-width: 80vw; min-width: min(40vw, 400px); }}
         .disconnected-banner.show {{ opacity: 1; visibility: visible; }}
         .disconnected-banner .error-title {{ font-size: min(2.2vw, 22px); margin-bottom: min(1vh, 10px); }}
         .disconnected-banner .error-details {{ font-size: min(1.6vw, 16px); font-weight: normal; opacity: 0.9; margin-top: min(0.8vh, 8px); line-height: 1.4; }}
-        .device-disconnected-banner {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 140, 0, 0.95); color: #fff; padding: min(2vh, 20px) min(4vw, 40px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #ff8c00; border-radius: 10px; box-shadow: 0 4px 20px rgba(255, 140, 0, 0.5), 0 0 20px rgba(255, 140, 0, 0.3); z-index: 10001; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; pointer-events: none; max-width: 80vw; min-width: min(40vw, 400px); }}
+        .device-disconnected-banner {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: {get_theme('errors.device_disconnected.background', 'rgba(255, 140, 0, 0.95)')}; color: {get_theme('errors.device_disconnected.color', '#fff')}; padding: min(2vh, 20px) min(4vw, 40px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: {get_theme('errors.device_disconnected.border', '2px solid #ff8c00')}; border-radius: 10px; box-shadow: {get_theme('errors.device_disconnected.box_shadow', '0 4px 20px rgba(255, 140, 0, 0.5), 0 0 20px rgba(255, 140, 0, 0.3)')}; z-index: 10001; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; pointer-events: none; max-width: 80vw; min-width: min(40vw, 400px); }}
         .device-disconnected-banner.show {{ opacity: 1; visibility: visible; }}
         .device-disconnected-banner .error-title {{ font-size: min(2.2vw, 22px); margin-bottom: min(1vh, 10px); }}
         .device-disconnected-banner .error-details {{ font-size: min(1.6vw, 16px); font-weight: normal; opacity: 0.9; margin-top: min(0.8vh, 8px); line-height: 1.4; }}
         .disconnected-banner {{ transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; }}
-        .interactive-container {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
-        .char-box {{ background: rgba(0, 255, 255, 0.2); border: 3px solid #0ff; border-radius: 15px; padding: min(4vh, 40px) min(4vw, 40px); min-width: min(15vw, 150px); min-height: min(15vw, 150px); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0, 255, 255, 0.3); }}
-        .char-box-label {{ font-size: min(1.2vw, 12px); color: #0ff; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
-        .char-box-value {{ font-size: min(10vw, 100px); color: #fff; font-weight: bold; font-family: 'Courier New', monospace; line-height: 1; }}
-        .char-arrow {{ font-size: min(6vw, 60px); color: #ffd700; font-weight: bold; }}
+        .interactive-container {{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: min(2vh, 20px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
+        .interactive-mode-label {{ font-size: min(1.848vw, 18.48px); color: {get_theme('text.message_label.color', '#0ff')}; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); font-weight: bold; flex-shrink: 0; }}
+        .interactive-content {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); }}
+        .char-box {{ background: {get_theme('boxes.char_box.background', 'rgba(0, 255, 255, 0.2)')}; border: {get_theme('boxes.char_box.border', '3px solid #0ff')}; border-radius: {get_theme('boxes.char_box.border_radius', '15px')}; padding: min(4vh, 40px) min(4vw, 40px); min-width: min(15vw, 150px); min-height: min(15vw, 150px); display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: {get_theme('boxes.char_box.box_shadow', '0 4px 16px rgba(0, 255, 255, 0.3)')}; }}
+        .char-box-label {{ font-size: min(1.2vw, 12px); color: {get_theme('text.char_box_label.color', '#0ff')}; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
+        .char-box-value {{ font-size: min(10vw, 100px); color: {get_theme('text.char_box_value.color', '#fff')}; font-weight: bold; font-family: {get_theme('fonts.monospace', "'Courier New', monospace")}; line-height: 1; }}
+        .char-arrow {{ font-size: min(6vw, 60px); color: {get_theme('text.char_arrow.color', '#ffd700')}; font-weight: bold; }}
     </style>
 </head>
 <body>
     <div class="device-disconnected-banner" id="deviceBanner">
-        <div class="error-title">Enigma Touch Device Disconnected</div>
-        <div class="error-details" id="deviceErrorDetails">Please reconnect the Enigma Touch device or turn it back on.</div>
+        <div class="error-title">{html_module.escape(get_locale('errors.device_disconnected', 'Enigma Touch Device Disconnected'))}</div>
+        <div class="error-details" id="deviceErrorDetails">{html_module.escape(get_locale('errors.device_disconnected_message', 'Please reconnect the Enigma Touch device or turn it back on.'))}</div>
     </div>
     
     <div class="disconnected-banner" id="offlineBanner">
-        <div class="error-title">Connection Lost</div>
-        <div class="error-details" id="errorDetails">Attempting to reconnect...</div>
+        <div class="error-title">{html_module.escape(get_locale('errors.connection_lost', 'Connection Lost'))}</div>
+        <div class="error-details" id="errorDetails">{html_module.escape(get_locale('errors.attempting_reconnect', 'Attempting to reconnect...'))}</div>
     </div>
     
     <div class="kiosk-container">
@@ -567,20 +627,37 @@ class MuseumWebServer:
         
         <div id="messageContainer">
             <div class="logo-overlay" id="logoOverlay">
-                <img src="/enigma.png" alt="Enigma Machine" class="logo-image" id="logoImage" onerror="this.style.display='none'; document.getElementById('enigmaLogo').style.display='block';">
-                <div class="enigma-logo" id="enigmaLogo" style="display: none;">ENIGMA</div>
-                <div class="subtitle">Cipher Machine</div>
+                <img src="/enigma.png" alt="{html_module.escape(get_locale('logo.alt_text', 'Enigma Machine'))}" class="logo-image" id="logoImage" onerror="this.style.display='none'; document.getElementById('enigmaLogo').style.display='block';">
+                <div class="enigma-logo" id="enigmaLogo" style="display: none;">{html_module.escape(get_locale('logo.enigma', 'ENIGMA'))}</div>
+                <div class="subtitle">{html_module.escape(get_locale('logo.subtitle', 'Cipher Machine'))}</div>
             </div>
         </div>
         
         <div class="footer">
-            <p>Museum Display {VERSION} - by Andrew Baker (DotelPenguin)</p>
+            <p>{html_module.escape(get_locale('footer.text', f'Museum Display {VERSION} - by Andrew Baker (DotelPenguin)').format(VERSION=VERSION))}</p>
         </div>
     </div>
     
     <script>
         (function() {{
             'use strict';
+            
+            // Locale strings
+            const locale = {locale_js};
+            
+            // Helper function to get locale string
+            function getLocale(path, defaultVal) {{
+                const keys = path.split('.');
+                let value = locale;
+                try {{
+                    for (const key of keys) {{
+                        value = value[key];
+                    }}
+                    return value || defaultVal || path;
+                }} catch (e) {{
+                    return defaultVal || path;
+                }}
+            }}
             
             // State management
             let lastData = null;
@@ -675,13 +752,13 @@ class MuseumWebServer:
                 
                 // Model
                 html += '<div class="config-section" style="display: flex; flex-direction: column; align-items: center;">';
-                html += '<div class="config-label">Model</div>';
+                html += '<div class="config-label">' + escapeHtml(getLocale('labels.model', 'Model')) + '</div>';
                 html += '<div class="model-box">' + escapeHtml(config.mode) + '</div>';
                 html += '</div>';
                 
                 // Rotors
                 html += '<div class="config-section" style="display: flex; flex-direction: column; align-items: center;">';
-                html += '<div class="config-label">Rotors</div>';
+                html += '<div class="config-label">' + escapeHtml(getLocale('labels.rotors', 'Rotors')) + '</div>';
                 html += '<div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">';
                 config.rotors.forEach(function(rotor) {{
                     html += '<div class="rotor-box">' + escapeHtml(rotor) + '</div>';
@@ -690,7 +767,7 @@ class MuseumWebServer:
                 
                 // Ring Settings
                 html += '<div class="config-section" style="display: flex; flex-direction: column; align-items: center;">';
-                html += '<div class="config-label">Ring Settings</div>';
+                html += '<div class="config-label">' + escapeHtml(getLocale('labels.ring_settings', 'Ring Settings')) + '</div>';
                 html += '<div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">';
                 config.ring_settings.forEach(function(setting) {{
                     html += '<div class="ring-settings-box">' + escapeHtml(setting) + '</div>';
@@ -699,7 +776,7 @@ class MuseumWebServer:
                 
                 // Ring Position
                 html += '<div class="config-section" style="display: flex; flex-direction: column; align-items: center;">';
-                html += '<div class="config-label">Ring Position</div>';
+                html += '<div class="config-label">' + escapeHtml(getLocale('labels.ring_position', 'Ring Position')) + '</div>';
                 html += '<div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">';
                 config.ring_position.forEach(function(position) {{
                     html += '<div class="ring-position-box">' + escapeHtml(position) + '</div>';
@@ -708,14 +785,14 @@ class MuseumWebServer:
                 
                 // Plugboard - always show, grey out if unused
                 html += '<div class="config-section' + (config.pegboard && config.pegboard.length > 0 ? '' : ' plugboard-unused') + '" style="display: flex; flex-direction: column; align-items: center; margin-top: min(1vh, 10px); margin-bottom: min(1.5vh, 15px); width: 100%;">';
-                html += '<div class="config-label">Plugboard</div>';
+                html += '<div class="config-label">' + escapeHtml(getLocale('labels.plugboard', 'Plugboard')) + '</div>';
                 html += '<div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">';
                 if (config.pegboard && config.pegboard.length > 0) {{
                     config.pegboard.forEach(function(plug) {{
                         html += '<div class="plugboard-box">' + escapeHtml(plug) + '</div>';
                     }});
                 }} else {{
-                    html += '<div class="plugboard-box" style="font-style: italic;">Unused</div>';
+                    html += '<div class="plugboard-box" style="font-style: italic;">' + escapeHtml(getLocale('labels.unused', 'Unused')) + '</div>';
                 }}
                 html += '</div></div>';
                 
@@ -760,18 +837,21 @@ class MuseumWebServer:
                     
                     if (interactive.is_interactive_mode) {{
                         html += '<div class="interactive-container" id="interactiveContainer">';
+                        html += '<div class="interactive-mode-label">' + escapeHtml(getLocale('interactive.mode', 'Interactive Mode')) + '</div>';
+                        html += '<div class="interactive-content">';
                         html += '<div class="char-box">';
-                        html += '<div class="char-box-label">Received</div>';
+                        html += '<div class="char-box-label">' + escapeHtml(getLocale('interactive.received', 'Received')) + '</div>';
                         html += '<div class="char-box-value" id="receivedChar">' + escapeHtml(interactive.last_char_original || '--') + '</div>';
                         html += '</div>';
                         html += '<div class="char-arrow">&rarr;</div>';
                         html += '<div class="char-box">';
-                        html += '<div class="char-box-label">Encoded</div>';
+                        html += '<div class="char-box-label">' + escapeHtml(getLocale('interactive.encoded', 'Encoded')) + '</div>';
                         html += '<div class="char-box-value" id="encodedChar">' + escapeHtml(interactive.last_char_received || '--') + '</div>';
                         html += '</div>';
                         html += '</div>';
+                        html += '</div>';
                     }} else {{
-                        html += '<div class="message-label">Current Message</div>';
+                        html += '<div class="message-label">' + escapeHtml(getLocale('messages.current_message', 'Current Message')) + '</div>';
                         html += '<div class="message-text" id="currentMessageText"></div>';
                         html += '<div class="message-label" id="resultLabel" style="display: none;"></div>';
                         html += '<div class="encoded-text" id="resultMessage" style="display: none;"></div>';
@@ -783,9 +863,9 @@ class MuseumWebServer:
                         html += '<div class="slide-section">';
                         if (display.slide_path) {{
                             html += '<img src="/' + escapeHtml(display.slide_path) + '" alt="Slide" class="slide-image" id="slideImage" onerror="this.style.display=\\'none\\'; this.nextElementSibling.style.display=\\'flex\\';">';
-                            html += '<div class="slide-placeholder" id="slidePlaceholder" style="display: none;">Slide Image Placeholder</div>';
+                            html += '<div class="slide-placeholder" id="slidePlaceholder" style="display: none;">' + escapeHtml(getLocale('messages.slide_image_placeholder', 'Slide Image Placeholder')) + '</div>';
                         }} else {{
-                            html += '<div class="slide-placeholder" id="slidePlaceholder">Slide Image Placeholder</div>';
+                            html += '<div class="slide-placeholder" id="slidePlaceholder">' + escapeHtml(getLocale('messages.slide_image_placeholder', 'Slide Image Placeholder')) + '</div>';
                         }}
                         html += '</div>';
                         html += '</div>';
@@ -799,7 +879,7 @@ class MuseumWebServer:
                         const overlay = document.createElement('div');
                         overlay.className = 'logo-overlay';
                         overlay.id = 'logoOverlay';
-                        overlay.innerHTML = '<div class="logo-container"><img src="/enigma.png" alt="Enigma Machine" class="logo-image" id="logoImage" onerror="this.style.display=\\'none\\'; document.getElementById(\\'enigmaLogo\\').style.display=\\'block\\';"><div class="enigma-logo" id="enigmaLogo" style="display: none;">ENIGMA</div><div class="subtitle">Cipher Machine</div></div>';
+                        overlay.innerHTML = '<div class="logo-container"><img src="/enigma.png" alt="' + escapeHtml(getLocale('logo.alt_text', 'Enigma Machine')) + '" class="logo-image" id="logoImage" onerror="this.style.display=\\'none\\'; document.getElementById(\\'enigmaLogo\\').style.display=\\'block\\';"><div class="enigma-logo" id="enigmaLogo" style="display: none;">' + escapeHtml(getLocale('logo.enigma', 'ENIGMA')) + '</div><div class="subtitle">' + escapeHtml(getLocale('logo.subtitle', 'Cipher Machine')) + '</div></div>';
                         messageSection.insertBefore(overlay, messageSection.firstChild);
                     }}
                 }}
@@ -833,7 +913,7 @@ class MuseumWebServer:
                                 }}
                             }});
                         }} else {{
-                            currentMessageText.textContent = messages.current_message || 'Waiting for message...';
+                            currentMessageText.textContent = messages.current_message || getLocale('messages.waiting_for_message', 'Waiting for message...');
                         }}
                     }}
                     
@@ -927,12 +1007,12 @@ class MuseumWebServer:
                         }} else if (errorDetails.message) {{
                             detailsText = errorDetails.message;
                         }} else {{
-                            detailsText = 'Connection lost';
+                            detailsText = getLocale('errors.connection_lost', 'Connection lost');
                         }}
-                        detailsText += '. Please check the Museum Kiosk Controller. Attempting to reconnect...';
+                        detailsText += '. ' + getLocale('errors.connection_lost_message', 'Please check the Museum Kiosk Controller. Attempting to reconnect...');
                         errorDetailsEl.textContent = detailsText;
                     }} else {{
-                        errorDetailsEl.textContent = 'Connection lost. Please check the Museum Kiosk Controller. Attempting to reconnect...';
+                        errorDetailsEl.textContent = getLocale('errors.connection_lost_message', 'Connection lost. Please check the Museum Kiosk Controller. Attempting to reconnect...');
                     }}
                     offlineBanner.classList.add('show');
                     // Adjust positioning if both banners are showing
@@ -944,7 +1024,7 @@ class MuseumWebServer:
                     }}
                 }} else {{
                     offlineBanner.classList.remove('show');
-                    errorDetailsEl.textContent = 'Attempting to reconnect...';
+                    errorDetailsEl.textContent = getLocale('errors.attempting_reconnect', 'Attempting to reconnect...');
                     retryDelay = 1000; // Reset retry delay on reconnect
                     consecutiveFailures = 0; // Reset failure counter on reconnect
                     // Reset device banner position if connection banner is hidden
@@ -958,7 +1038,7 @@ class MuseumWebServer:
             function setDeviceStatus(disconnectedMessage) {{
                 const deviceErrorDetailsEl = document.getElementById('deviceErrorDetails');
                 if (disconnectedMessage) {{
-                    deviceErrorDetailsEl.textContent = 'Please reconnect the Enigma Touch device or turn it back on.';
+                    deviceErrorDetailsEl.textContent = getLocale('errors.device_disconnected_message', 'Please reconnect the Enigma Touch device or turn it back on.');
                     deviceBanner.classList.add('show');
                     // Adjust positioning if both banners are showing
                     if (offlineBanner.classList.contains('show')) {{
@@ -1029,21 +1109,21 @@ class MuseumWebServer:
                         // Only show error banner after threshold failures
                         if (consecutiveFailures >= failureThreshold) {{
                             let errorDetails = {{
-                                type: 'Connection Error',
-                                message: 'Unable to reach server'
+                                type: getLocale('errors.connection_error', 'Connection Error'),
+                                message: getLocale('errors.unable_to_reach_server', 'Unable to reach server')
                             }};
                             
                             if (error.message) {{
                                 if (error.message === 'Timeout') {{
-                                    errorDetails.type = 'Timeout';
-                                    errorDetails.message = 'Request timed out after 5 seconds';
+                                    errorDetails.type = getLocale('errors.timeout', 'Timeout');
+                                    errorDetails.message = getLocale('errors.timeout_message', 'Request timed out after 5 seconds');
                                 }} else if (error.message.startsWith('HTTP')) {{
-                                    errorDetails.type = 'Server Error';
-                                    errorDetails.message = 'Server returned an error';
+                                    errorDetails.type = getLocale('errors.server_error', 'Server Error');
+                                    errorDetails.message = getLocale('errors.server_error_message', 'Server returned an error');
                                     errorDetails.status = error.status;
                                 }} else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {{
-                                    errorDetails.type = 'Network Error';
-                                    errorDetails.message = 'Network connection failed';
+                                    errorDetails.type = getLocale('errors.network_error', 'Network Error');
+                                    errorDetails.message = getLocale('errors.network_error_message', 'Network connection failed');
                                 }} else {{
                                     errorDetails.message = error.message;
                                 }}

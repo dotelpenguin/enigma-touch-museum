@@ -1,0 +1,46 @@
+{
+  "page_title": "Enigma Museum Kiosk",
+  "labels": {
+    "model": "Modell",
+    "rotors": "Walzen",
+    "ring_settings": "Ringstellung",
+    "ring_position": "Grundstellung",
+    "plugboard": "Steckerbrett",
+    "unused": "Nicht verwendet"
+  },
+  "messages": {
+    "current_message": "Aktuelle Nachricht",
+    "encoded_message": "Verschlüsselte Nachricht",
+    "decoded_message": "Entschlüsselte Nachricht",
+    "waiting_for_message": "Warte auf Nachricht...",
+    "slide_image_placeholder": "Bildplatzhalter"
+  },
+  "interactive": {
+    "mode": "Interaktiver Modus",
+    "received": "Empfangen",
+    "encoded": "Verschlüsselt"
+  },
+  "logo": {
+    "enigma": "ENIGMA",
+    "subtitle": "Chiffriermaschine",
+    "alt_text": "Enigma Maschine"
+  },
+  "errors": {
+    "connection_lost": "Verbindung verloren",
+    "device_disconnected": "Enigma Touch Gerät getrennt",
+    "attempting_reconnect": "Versuche erneut zu verbinden...",
+    "connection_lost_message": "Verbindung verloren. Bitte überprüfen Sie den Museum Kiosk Controller. Versuche erneut zu verbinden...",
+    "device_disconnected_message": "Bitte verbinden Sie das Enigma Touch Gerät erneut oder schalten Sie es wieder ein.",
+    "connection_error": "Verbindungsfehler",
+    "timeout": "Zeitüberschreitung",
+    "timeout_message": "Anfrage nach 5 Sekunden abgelaufen",
+    "server_error": "Serverfehler",
+    "server_error_message": "Server hat einen Fehler zurückgegeben",
+    "network_error": "Netzwerkfehler",
+    "network_error_message": "Netzwerkverbindung fehlgeschlagen",
+    "unable_to_reach_server": "Server nicht erreichbar"
+  },
+  "footer": {
+    "text": "Museum Display {VERSION} - von Andrew Baker (DotelPenguin)"
+  }
+}
