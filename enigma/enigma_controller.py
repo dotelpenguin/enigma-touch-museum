@@ -5,8 +5,10 @@ Main Enigma device controller
 
 import time
 import re
-from typing import Optional, Tuple
-from .constants import DEFAULT_DEVICE, CONFIG_FILE, CHAR_TIMEOUT
+import json
+import os
+from typing import Optional, Tuple, Dict, List
+from .constants import DEFAULT_DEVICE, CONFIG_FILE, CHAR_TIMEOUT, SCRIPT_DIR
 from .config import ConfigManager
 from .serial_comm import SerialConnection
 
@@ -14,8 +16,9 @@ from .serial_comm import SerialConnection
 class EnigmaController:
     """Handles serial communication with Enigma device"""
     
-    def __init__(self, device: str = DEFAULT_DEVICE, preserve_device: bool = False):
+    def __init__(self, device: str = DEFAULT_DEVICE, preserve_device: bool = False, simulate_mode: bool = False):
         self.device = device
+        self.simulate_mode = simulate_mode
         self.serial_conn = SerialConnection(device)
         self.config_manager = ConfigManager(CONFIG_FILE)
         
@@ -95,6 +98,10 @@ class EnigmaController:
         
         # Firmware version (detected after connection)
         self.firmware_version: Optional[float] = None
+        
+        # Simulation mode data
+        self._simulation_json_data: Dict[str, List[Dict]] = {}  # Cache for loaded JSON files
+        self._current_simulation_message: Optional[Dict] = None  # Current message being simulated
     
     def save_config(self, preserve_ring_position=True, preserve_always_send_config=True, preserve_cipher_config=False):
         """Save current configuration to file
@@ -240,14 +247,19 @@ class EnigmaController:
     
     def connect(self) -> bool:
         """Connect to serial device"""
+        if self.simulate_mode:
+            return True  # Always return True in simulation mode
         return self.serial_conn.connect()
     
     def disconnect(self):
         """Close serial connection"""
-        self.serial_conn.disconnect()
+        if not self.simulate_mode:
+            self.serial_conn.disconnect()
     
     def is_connected(self) -> bool:
         """Check if serial connection is open and accessible"""
+        if self.simulate_mode:
+            return True  # Always return True in simulation mode
         return self.serial_conn.is_connected()
     
     def check_firmware_version(self, debug_callback=None) -> bool:
@@ -266,6 +278,13 @@ class EnigmaController:
             SystemExit: If firmware version is below 4.20 (minimum required)
         """
         import sys
+        
+        if self.simulate_mode:
+            # In simulation mode, set a fake firmware version
+            self.firmware_version = 4.21
+            if debug_callback:
+                debug_callback("Simulation mode: Using firmware version 4.21")
+            return True
         
         if not self.is_connected():
             if debug_callback:
@@ -1571,10 +1590,80 @@ class EnigmaController:
     
     def return_to_encode_mode(self, debug_callback=None) -> bool:
         """Return to encode mode"""
+        if self.simulate_mode:
+            return True  # Always succeed in simulation mode
         response = self.send_command(b'?MO\r\n', timeout=1.0, debug_callback=debug_callback)
         return response is not None
     
-    def send_message(self, message: str, callback=None, debug_callback=None, position_update_callback=None, config_error_callback=None, expect_lowercase_response: bool = None, mode_update_callback=None) -> bool:
+    def _load_json_file(self, language: str) -> List[Dict]:
+        """Load JSON file for simulation mode
+        
+        Args:
+            language: 'EN' or 'DE'
+            
+        Returns:
+            List of message dictionaries from JSON file
+        """
+        cache_key = language.upper()
+        if cache_key in self._simulation_json_data:
+            return self._simulation_json_data[cache_key]
+        
+        if language.upper() == 'EN':
+            json_file = os.path.join(SCRIPT_DIR, 'english-encoded.json')
+        elif language.upper() == 'DE':
+            json_file = os.path.join(SCRIPT_DIR, 'german-encoded.json')
+        else:
+            return []
+        
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                self._simulation_json_data[cache_key] = data
+                return data
+        except (IOError, json.JSONDecodeError):
+            pass
+        
+        return []
+    
+    def _lookup_message_in_json(self, message: str, language: str, is_encode: bool) -> Optional[Dict]:
+        """Look up a message in the JSON database
+        
+        Args:
+            message: The message to look up (MSG for encode, CODED for decode)
+            language: 'EN' or 'DE'
+            is_encode: True for encode mode (look up by MSG), False for decode (look up by CODED)
+            
+        Returns:
+            Message dictionary if found, None otherwise
+        """
+        messages = self._load_json_file(language)
+        if not messages:
+            return None
+        
+        # Normalize message: remove spaces, convert to uppercase
+        normalized_message = ''.join(c for c in message.upper() if c.isalpha())
+        
+        for msg_obj in messages:
+            if not isinstance(msg_obj, dict):
+                continue
+            
+            if is_encode:
+                # Encode mode: look up by MSG field
+                if 'MSG' in msg_obj:
+                    msg_text = ''.join(c for c in msg_obj['MSG'].upper() if c.isalpha())
+                    if msg_text == normalized_message:
+                        return msg_obj
+            else:
+                # Decode mode: look up by CODED field
+                if 'CODED' in msg_obj:
+                    coded_text = ''.join(c for c in msg_obj['CODED'].upper() if c.isalpha())
+                    if coded_text == normalized_message:
+                        return msg_obj
+        
+        return None
+    
+    def send_message(self, message: str, callback=None, debug_callback=None, position_update_callback=None, config_error_callback=None, expect_lowercase_response: bool = None, mode_update_callback=None, simulation_language: str = None, simulation_is_encode: bool = True) -> bool:
         """Send message character by character
         
         Args:
@@ -1586,7 +1675,15 @@ class EnigmaController:
             expect_lowercase_response: If True, expect lowercase responses (for manual messages).
                                      If None, auto-detect based on function_mode.
             mode_update_callback: Optional callback when function_mode changes
+            simulation_language: Language code ('EN' or 'DE') for simulation mode
+            simulation_is_encode: True for encode mode, False for decode mode in simulation
         """
+        # Handle simulation mode
+        if self.simulate_mode:
+            return self._simulate_send_message(message, callback, debug_callback, position_update_callback, 
+                                                expect_lowercase_response, mode_update_callback, 
+                                                simulation_language, simulation_is_encode)
+        
         if not self.ser or not self.ser.is_open:
             return False
         
@@ -2002,4 +2099,165 @@ class EnigmaController:
         if ' ' not in message:
             return self._group_encoded_text(message)
         return message
+    
+    def _simulate_send_message(self, message: str, callback=None, debug_callback=None, 
+                               position_update_callback=None, expect_lowercase_response: bool = None,
+                               mode_update_callback=None, language: str = None, is_encode: bool = True) -> bool:
+        """Simulate sending a message character by character using JSON database
+        
+        Args:
+            message: Message to send
+            callback: Optional callback function for progress updates
+            debug_callback: Optional callback for debug messages
+            position_update_callback: Optional callback when ring position updates
+            expect_lowercase_response: If True, expect lowercase responses
+            mode_update_callback: Optional callback when function_mode changes
+            language: Language code ('EN' or 'DE')
+            is_encode: True for encode mode, False for decode mode
+        """
+        if not language:
+            # Try to determine language from function_mode
+            if 'EN' in self.function_mode:
+                language = 'EN'
+            elif 'DE' in self.function_mode:
+                language = 'DE'
+            else:
+                language = 'EN'  # Default to English
+        
+        # Look up message in JSON database
+        msg_obj = self._lookup_message_in_json(message, language, is_encode)
+        if not msg_obj:
+            if debug_callback:
+                debug_callback(f"ERROR: Message not found in {language} JSON database", color_type=7)
+            return False
+        
+        # Store current simulation message
+        self._current_simulation_message = msg_obj
+        
+        # Update config from JSON if available
+        if 'MODEL' in msg_obj:
+            self.config['mode'] = msg_obj['MODEL']
+        if 'ROTOR' in msg_obj:
+            self.config['rotor_set'] = msg_obj['ROTOR']
+        if 'RINGSET' in msg_obj:
+            self.config['ring_settings'] = msg_obj['RINGSET']
+        if 'RINGPOS' in msg_obj:
+            self.config['ring_position'] = msg_obj['RINGPOS']
+            if position_update_callback:
+                position_update_callback()
+        if 'PLUG' in msg_obj:
+            self.config['pegboard'] = msg_obj['PLUG'] if msg_obj['PLUG'] else ''
+        
+        # Get source and result messages
+        if is_encode:
+            source_msg = msg_obj.get('MSG', '')
+            result_msg = msg_obj.get('CODED', '')
+        else:
+            source_msg = msg_obj.get('CODED', '')
+            result_msg = msg_obj.get('MSG', '')
+        
+        # Filter message to only A-Z characters
+        filtered_message = ''.join(c for c in message.upper() if c.isalpha() and c.isupper())
+        filtered_source = ''.join(c for c in source_msg.upper() if c.isalpha() and c.isupper())
+        filtered_result = ''.join(c for c in result_msg.upper() if c.isalpha() and c.isupper())
+        
+        if not filtered_message:
+            if debug_callback:
+                debug_callback("Warning: No valid A-Z characters in message")
+            return False
+        
+        # Verify the filtered message matches
+        if filtered_message != filtered_source:
+            if debug_callback:
+                debug_callback(f"Warning: Message mismatch. Expected: {filtered_source}, Got: {filtered_message}")
+            # Try to continue anyway
+        
+        if debug_callback:
+            debug_callback(f"Original message: {message}")
+            debug_callback(f"Filtered message (A-Z only): {filtered_message}")
+            if is_encode:
+                debug_callback(f"Simulating encode: {filtered_source} -> {filtered_result}")
+            else:
+                debug_callback(f"Simulating decode: {filtered_source} -> {filtered_result}")
+        
+        # Determine expected case based on function mode
+        is_museum_mode = (self.function_mode.startswith('Encode') or 
+                         self.function_mode.startswith('Decode'))
+        is_message_interactive_mode = (self.function_mode == 'Message Interactive')
+        expect_lowercase = is_museum_mode or is_message_interactive_mode
+        
+        encoded_chars = []
+        char_count = 0
+        
+        try:
+            # Simulate character by character
+            for i, char in enumerate(filtered_message):
+                char_count += 1
+                
+                if debug_callback:
+                    debug_callback(f">>> '{char}'")
+                
+                self.last_char_sent = char
+                
+                # Find corresponding character in result
+                if i < len(filtered_result):
+                    encoded_char = filtered_result[i]
+                else:
+                    # If result is shorter, use a placeholder or skip
+                    if debug_callback:
+                        debug_callback(f"Warning: Result message shorter than input at position {i}")
+                    encoded_char = char  # Fallback to same character
+                
+                # Store in appropriate case
+                if expect_lowercase:
+                    encoded_char_original = encoded_char.lower()
+                else:
+                    encoded_char_original = encoded_char.upper()
+                
+                self.last_char_original = char
+                self.last_char_received = encoded_char_original
+                encoded_chars.append(encoded_char.upper())
+                
+                if debug_callback:
+                    if expect_lowercase:
+                        debug_callback(f"<<< {char.lower()} {encoded_char_original}   Positions {self.config.get('ring_position', 'N/A')}")
+                    else:
+                        debug_callback(f"<<< {char} {encoded_char.upper()}   Positions {self.config.get('ring_position', 'N/A')}")
+                
+                # Call callback if provided
+                if callback:
+                    if callback(char_count, len(filtered_message), char, encoded_char.upper(), 
+                               f"{char} {encoded_char}   Positions {self.config.get('ring_position', 'N/A')}"):
+                        if debug_callback:
+                            debug_callback("Message sending stopped by callback")
+                        return False
+                
+                # Apply character delay
+                if i < len(filtered_message) - 1:
+                    if self.generating_messages:
+                        if debug_callback:
+                            debug_callback(f"Skipping delay (generating messages)")
+                        time.sleep(0.1)
+                    else:
+                        current_delay = self.character_delay_ms
+                        if current_delay > 0:
+                            if debug_callback:
+                                debug_callback(f"Character delay: {current_delay}ms")
+                            time.sleep(current_delay / 1000.0)
+                        else:
+                            if debug_callback:
+                                debug_callback(f"Character delay: 0ms")
+                            time.sleep(0.1)
+            
+            if debug_callback and encoded_chars:
+                encoded_result = ''.join(encoded_chars)
+                debug_callback(f"Simulated result (ungrouped): {encoded_result}")
+                grouped_result = self._group_encoded_text(encoded_result)
+                debug_callback(f"Simulated result (grouped): {grouped_result}")
+            
+            return True
+        except Exception as e:
+            if debug_callback:
+                debug_callback(f"Error in simulation: {e}")
+            return False
 

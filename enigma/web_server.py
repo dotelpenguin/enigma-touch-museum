@@ -174,6 +174,7 @@ class MuseumWebServer:
                 config = data.get('config', {})
                 device_connected = data.get('device_connected', True)
                 device_disconnected_message = data.get('device_disconnected_message', None)
+                simulate_mode = data.get('simulate_mode', False)
                 
                 mode = config.get('mode', 'N/A')
                 rotors = config.get('rotor_set', 'N/A')
@@ -356,6 +357,7 @@ class MuseumWebServer:
                 device_disconnected_message = data.get('device_disconnected_message', None)
                 last_char_original = data.get('last_char_original', None)
                 last_char_received = data.get('last_char_received', None)
+                simulate_mode = data.get('simulate_mode', False)
                 
                 is_interactive_mode = (function_mode == 'Interactive')
                 
@@ -499,9 +501,10 @@ class MuseumWebServer:
                         'slide_path': slide_path
                     },
                     'device': {
-                        'connected': device_connected,
-                        'disconnected_message': device_disconnected_message
+                        'connected': device_connected if not simulate_mode else True,
+                        'disconnected_message': None if simulate_mode else device_disconnected_message
                     },
+                    'simulate_mode': simulate_mode,
                     'character_highlighting': {
                         'character_delay_ms': character_delay_ms,
                         'current_char_index': current_char_index
