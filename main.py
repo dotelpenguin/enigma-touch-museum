@@ -29,6 +29,7 @@ Options:
     --museum-de-encode        Start in Encode - DE mode (German encode)
     --museum-de-decode        Start in Decode - DE mode (German decode)
     --debug                   Enable debug output panel (shows serial communication)
+    --raw-debug               Enable raw debug output (shows raw serial bytes in debug panel)
     --send-lock-config        Send kiosk/lock settings to device from saved config
                               (⚠️ use with caution - see lockout warning in README)
     --factory-reset           Factory reset the Enigma Touch device
@@ -75,8 +76,10 @@ def main():
     config_only = False
     museum_mode = None
     debug_enabled = True
+    raw_debug_enabled = False
     send_lock_config = False
     factory_reset = False
+    simulate_mode = False
     
     # Parse command line arguments
     i = 1
@@ -98,6 +101,8 @@ def main():
             museum_mode = '4'
         elif arg == '--debug':
             debug_enabled = True
+        elif arg == '--raw-debug':
+            raw_debug_enabled = True
         elif arg == '--send-lock-config':
             send_lock_config = True
         elif arg == '--factory-reset':
@@ -129,6 +134,11 @@ def main():
         preserve_device = True
     
     controller = EnigmaController(device, preserve_device=preserve_device, simulate_mode=simulate_mode)
+    
+    # Set raw debug if specified via command line
+    if raw_debug_enabled:
+        controller.raw_debug_enabled = True
+        controller.save_config(preserve_always_send_config=True)
     
     # If config-only mode, skip connection and go straight to config menu
     if config_only:

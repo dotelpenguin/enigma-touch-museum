@@ -5,6 +5,7 @@
     "rotors": "Rotors",
     "ring_settings": "Ring Settings",
     "ring_position": "Ring Position",
+    "counter": "Counter",
     "plugboard": "Plugboard",
     "unused": "Unused"
   },
@@ -43,8 +44,8 @@
   "warnings": {
     "resolution": {
       "title": "Display Resolution Warning",
-      "message": "This display has been optimized for 1024x768 resolution. Your current resolution is {{WIDTH}}x{{HEIGHT}}px, which is outside the recommended range (600-1080px height).",
-      "auto_clear": "This warning will automatically clear in {{SECONDS}} seconds."
+      "message": "This display has been optimized for 1024x768 resolution. Your current resolution is [WIDTH]x[HEIGHT]px, which is outside the recommended range (600-1080px height).",
+      "auto_clear": "This warning will automatically clear in [SECONDS] seconds."
     }
   },
   "footer": {

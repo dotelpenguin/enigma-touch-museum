@@ -5,6 +5,7 @@
     "rotors": "Walzen",
     "ring_settings": "Ringstellung",
     "ring_position": "Grundstellung",
+    "counter": "Zähler",
     "plugboard": "Steckerbrett",
     "unused": "Nicht verwendet"
   },
@@ -43,8 +44,8 @@
   "warnings": {
     "resolution": {
       "title": "Bildschirmauflösung Warnung",
-      "message": "Diese Anzeige wurde für eine Auflösung von 1024x768 optimiert. Ihre aktuelle Auflösung ist {{WIDTH}}x{{HEIGHT}}px, was außerhalb des empfohlenen Bereichs liegt (600-1080px Höhe).",
-      "auto_clear": "Diese Warnung wird automatisch in {{SECONDS}} Sekunden ausgeblendet."
+      "message": "Diese Anzeige wurde für eine Auflösung von 1024x768 optimiert. Ihre aktuelle Auflösung ist [WIDTH]x[HEIGHT]px, was außerhalb des empfohlenen Bereichs liegt (600-1080px Höhe).",
+      "auto_clear": "Diese Warnung wird automatisch in [SECONDS] Sekunden ausgeblendet."
     }
   },
   "footer": {

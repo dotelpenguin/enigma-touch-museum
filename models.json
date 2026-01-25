@@ -6,7 +6,7 @@
     "ROTOR": "B III IV I",
     "RINGSET": "21 15 16",
     "RINGPOS": "04 24 06",
-    "PLUG": "AV BS CG DL FU HZ IN KM OW RX"
+    "PLUG": "AV BS CG DL FU HZ IN KM"
   },
   {
     "name": "Enigma M3 - Navy Standard",
@@ -24,7 +24,7 @@
     "ROTOR": "B beta IV II VII",
     "RINGSET": "D X E Z",
     "RINGPOS": "A B C D",
-    "PLUG": "AB CD EF GH IJ KL MN OP QR ST UV WX YZ"
+    "PLUG": "AL BG KT"
   },
   {
     "name": "Enigma D - Early Variant",
@@ -78,7 +78,7 @@
     "ROTOR": "N II V III",
     "RINGSET": "05 10 15",
     "RINGPOS": "10 15 20",
-    "PLUG": "AB CD EF GH IJ"
+    "PLUG": "AF UJ VQ RZ"
   },
   {
     "name": "Enigma M3 - Alternative Configuration",
@@ -87,7 +87,7 @@
     "ROTOR": "C II IV VI",
     "RINGSET": "A B C",
     "RINGPOS": "Q R S",
-    "PLUG": "AC BD EG FH"
+    "PLUG": "AC HD PX KW"
   },
   {
     "name": "Enigma I - Rotor Set II V III",
@@ -96,7 +96,7 @@
     "ROTOR": "B II V III",
     "RINGSET": "05 12 18",
     "RINGPOS": "01 05 10",
-    "PLUG": "AB CD EF GH IJ KL"
+    "PLUG": "ZH CT VW"
   },
   {
     "name": "Enigma I - Rotor Set IV V I",
@@ -123,7 +123,7 @@
     "ROTOR": "A III V IV",
     "RINGSET": "03 07 11",
     "RINGPOS": "07 11 15",
-    "PLUG": "GH IJ KL MN OP QR"
+    "PLUG": "AO DE GN HI"
   },
   {
     "name": "Enigma I - Rotor Set IV I V",
@@ -132,7 +132,7 @@
     "ROTOR": "B IV I V",
     "RINGSET": "13 19 25",
     "RINGPOS": "02 08 14",
-    "PLUG": "ST UV WX YZ AB CD"
+    "PLUG": "ZJ CB EN"
   },
   {
     "name": "Enigma M3 - Rotor Set III V VI",
@@ -141,7 +141,7 @@
     "ROTOR": "B III V VI",
     "RINGSET": "E K P",
     "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH"
+    "PLUG": "JE FB MA"
   },
   {
     "name": "Enigma M3 - Rotor Set II VI VIII",
@@ -150,7 +150,7 @@
     "ROTOR": "C II VI VIII",
     "RINGSET": "M Q T",
     "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR"
+    "PLUG": "PE DM AW RZ"
   },
   {
     "name": "Enigma M3 - Rotor Set IV I III",
@@ -177,6 +177,6 @@
     "ROTOR": "C VII III I",
     "RINGSET": "O U X",
     "RINGPOS": "E I M",
-    "PLUG": "MO PR QS TU VW"
+    "PLUG": "MW UT AV"
   }
 ]

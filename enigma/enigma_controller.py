@@ -88,6 +88,9 @@ class EnigmaController:
         self.last_char_received: Optional[str] = None
         self.last_char_original: Optional[str] = None
         
+        # Counter tracking (for models that use Counter, like Model G)
+        self.counter: Optional[int] = None
+        
         # Message generation flag (skip delays during message generation)
         self.generating_messages = False
         
@@ -460,8 +463,44 @@ class EnigmaController:
         if response and 'Positions' in response:
             for line in response.split('\n'):
                 if 'Positions' in line:
-                    pos = line.replace('Positions', '').strip()
-                    return pos
+                    # Parse the line to extract positions and counter
+                    parts = line.split()
+                    # Find "Positions" in the parts
+                    try:
+                        pos_idx = [i for i, p in enumerate(parts) if p.lower() == 'positions'][0]
+                        # Get rotor count for current model
+                        rotor_count = self._get_rotor_count()
+                        # Extract positions (after "Positions" keyword)
+                        if pos_idx + 1 + rotor_count <= len(parts):
+                            pos_parts = parts[pos_idx + 1:pos_idx + 1 + rotor_count]
+                            pos = ' '.join(pos_parts)
+                            
+                            # Check for Counter field after positions
+                            counter_idx = pos_idx + 1 + rotor_count
+                            counter_value = None
+                            if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
+                                if counter_idx + 1 < len(parts):
+                                    try:
+                                        counter_value = int(parts[counter_idx + 1])
+                                        # Store counter in controller
+                                        self.counter = counter_value
+                                        if debug_callback:
+                                            debug_callback(f"Positions: {pos} Counter {counter_value} (stored)")
+                                    except ValueError:
+                                        pass
+                            
+                            if counter_value is None and debug_callback:
+                                debug_callback(f"Positions: {pos}")
+                            
+                            return pos
+                        else:
+                            # Fallback to old method if parsing fails
+                            pos = line.replace('Positions', '').strip()
+                            return pos
+                    except (IndexError, ValueError):
+                        # Fallback to old method if parsing fails
+                        pos = line.replace('Positions', '').strip()
+                        return pos
         return None
     
     def _parse_position_value(self, value: str) -> int:
@@ -495,15 +534,16 @@ class EnigmaController:
         """Get the number of rotors for a given model
         
         Args:
-            model: Model name (e.g., 'M4', 'M3', 'I'). If None, uses self.config['mode']
+            model: Model name (e.g., 'M4', 'M3', 'I', 'G'). If None, uses self.config['mode']
             
         Returns:
-            Number of rotors: 4 for M4, 3 for all other models
+            Number of rotors: 4 for M4 and G, 3 for all other models
         """
         if model is None:
             model = self.config.get('mode', 'I')
         
-        if model.upper() == 'M4':
+        model_upper = model.upper()
+        if model_upper == 'M4' or model_upper == 'G':
             return 4
         return 3
     
@@ -1005,7 +1045,13 @@ class EnigmaController:
             return False
         if response is None:
             return False
+        old_mode = self.config.get('mode')
         self.config['mode'] = mode
+        
+        # Reset counter when switching models (counter is model-specific, e.g., Model G)
+        if old_mode != mode:
+            self.counter = None
+        
         return True
     
     def set_rotor_set(self, rotor_set: str, debug_callback=None) -> bool:
@@ -1904,6 +1950,58 @@ class EnigmaController:
                                 if (len(part1) == 1 and part1.isalpha() and
                                     len(part2) == 1 and part2.isalpha() and
                                     part3.lower() == 'positions'):
+                                    
+                                    # FIRST: Check for optional Counter field after positions
+                                    # This must happen BEFORE case checks, so counter is always extracted
+                                    # Format: "Q Y   Positions O Q V A   Counter 2574"
+                                    # Note: Counter can appear even if positions parsing failed
+                                    counter_value = None
+                                    counter_idx = j + 3 + rotor_count
+                                    if debug_callback:
+                                        debug_callback(f"Checking for counter at index {counter_idx}, parts length: {len(parts)}")
+                                        if counter_idx < len(parts):
+                                            debug_callback(f"  parts[{counter_idx}] = '{parts[counter_idx]}' (lowercase: '{parts[counter_idx].lower()}')")
+                                        else:
+                                            debug_callback(f"  Counter index {counter_idx} is out of range (parts length: {len(parts)})")
+                                    if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
+                                        # Counter field found, try to parse the counter value
+                                        if debug_callback:
+                                            debug_callback(f"Counter keyword found at index {counter_idx}")
+                                        if counter_idx + 1 < len(parts):
+                                            try:
+                                                counter_value = int(parts[counter_idx + 1])
+                                                # Store counter in controller for display (always store if parsed successfully)
+                                                old_counter = self.counter
+                                                self.counter = counter_value
+                                                if debug_callback:
+                                                    debug_callback(f"Counter: {counter_value} (stored) - parts[{counter_idx}]='{parts[counter_idx]}', parts[{counter_idx+1}]='{parts[counter_idx+1]}'")
+                                                # Trigger UI refresh if counter changed and callback is available
+                                                if old_counter != counter_value and position_update_callback:
+                                                    position_update_callback()
+                                            except ValueError as e:
+                                                if debug_callback:
+                                                    debug_callback(f"Warning: Could not parse counter value '{parts[counter_idx + 1]}': {e}")
+                                        else:
+                                            if debug_callback:
+                                                debug_callback(f"Warning: Counter keyword found but no value after it (counter_idx+1={counter_idx+1} >= len(parts)={len(parts)})")
+                                    else:
+                                        # Counter not found in this response
+                                        # If we previously had a counter but this response doesn't have one,
+                                        # clear the counter to indicate it's no longer being used
+                                        if self.counter is not None:
+                                            if debug_callback:
+                                                debug_callback(f"Counter no longer present - clearing counter (was {self.counter})")
+                                            self.counter = None
+                                            # Trigger UI refresh to show counter is no longer used
+                                            if position_update_callback:
+                                                position_update_callback()
+                                        elif debug_callback:
+                                            if counter_idx < len(parts):
+                                                debug_callback(f"Counter not found: parts[{counter_idx}]='{parts[counter_idx]}' (lowercase: '{parts[counter_idx].lower()}') (expected 'counter')")
+                                            else:
+                                                debug_callback(f"Counter not found: index {counter_idx} out of range (parts length: {len(parts)})")
+                                    
+                                    # NOW: Handle case checks for character encoding
                                     if expect_lowercase:
                                         # Museum mode or Message Interactive mode: expect lowercase
                                         if part1.islower() and part2.islower():
@@ -1949,21 +2047,6 @@ class EnigmaController:
                                             debug_callback(f"Warning: Not enough parts for {rotor_count} positions. Have {len(parts)} parts, need at least {j + 3 + rotor_count}. Parts: {parts}")
                                     current_positions = self._parse_positions(parts, j + 3, rotor_count)
                                     
-                                    # Check for optional Counter field after positions
-                                    # Format: "r y   Positions I M R I   Counter 2092"
-                                    counter_value = None
-                                    counter_idx = j + 3 + rotor_count
-                                    if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
-                                        # Counter field found, try to parse the counter value
-                                        if counter_idx + 1 < len(parts):
-                                            try:
-                                                counter_value = int(parts[counter_idx + 1])
-                                                if debug_callback:
-                                                    debug_callback(f"Counter: {counter_value}")
-                                            except ValueError:
-                                                if debug_callback:
-                                                    debug_callback(f"Warning: Could not parse counter value: {parts[counter_idx + 1]}")
-                                    
                                     # Store counter_value for later comparison (even if None)
                                     current_counter = counter_value
                                     
@@ -1971,13 +2054,16 @@ class EnigmaController:
                                         if debug_callback:
                                             # Show what we tried to parse for debugging
                                             pos_parts = parts[j + 3:j + 3 + rotor_count] if j + 3 + rotor_count <= len(parts) else parts[j + 3:]
-                                            debug_callback(f"Warning: Could not parse positions from response. Parts: {pos_parts}, rotor_count: {rotor_count}, total parts: {len(parts)}")
+                                            counter_info = f" Counter {counter_value}" if counter_value is not None else ""
+                                            debug_callback(f"Warning: Could not parse positions from response. Parts: {pos_parts}, rotor_count: {rotor_count}, total parts: {len(parts)}{counter_info}")
                                     else:
                                         if debug_callback:
                                             debug_callback(f"Found: {part1} -> {encoded_char} (original case: {encoded_char_original})")
                                             # Format preserving original format (letters or numbers)
                                             pos_str = self._format_positions(parts, j + 3, rotor_count, current_positions)
                                             counter_info = f" Counter {counter_value}" if counter_value is not None else ""
+                                            if debug_callback:
+                                                debug_callback(f"About to log positions - counter_value={counter_value}, counter_info='{counter_info}'")
                                             debug_callback(f"Positions: {pos_str}{counter_info} (parsed as: {current_positions}, count: {len(current_positions)}, expected: {rotor_count})")
                                             if len(current_positions) != rotor_count:
                                                 debug_callback(f"ERROR: Position count mismatch! Got {len(current_positions)} positions but expected {rotor_count}", color_type=7)
@@ -2011,9 +2097,8 @@ class EnigmaController:
                                     update_ring_position(current_positions, parts, j + 3)
                                     if debug_callback:
                                         pos_str = self._format_positions(parts, j + 3, rotor_count, current_positions)
-                                        debug_callback(f"Recorded positions: {pos_str}")
-                                
-                                # Counter is already logged above if present
+                                        counter_info = f" Counter {counter_value}" if counter_value is not None else ""
+                                        debug_callback(f"Recorded positions: {pos_str}{counter_info}")
                                 success = True
                                 if callback:
                                     if callback(char_count, len(filtered_message), char, encoded_char, resp_text):
@@ -2136,7 +2221,11 @@ class EnigmaController:
         
         # Update config from JSON if available
         if 'MODEL' in msg_obj:
+            old_mode = self.config.get('mode')
             self.config['mode'] = msg_obj['MODEL']
+            # Reset counter when model changes (counter is model-specific, e.g., Model G)
+            if old_mode != msg_obj['MODEL']:
+                self.counter = None
         if 'ROTOR' in msg_obj:
             self.config['rotor_set'] = msg_obj['ROTOR']
         if 'RINGSET' in msg_obj:

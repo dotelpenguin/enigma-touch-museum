@@ -195,9 +195,15 @@ class UIBase:
             else:
                 last_char_info = "Last: --"
             
+            # Format counter display
+            counter_display = "N/A"
+            if self.controller.counter is not None:
+                counter_display = str(self.controller.counter)
+            
             settings_lines = [
                 f"Mode: {config.get('mode', 'N/A'):<8}  Rotors: {config.get('rotor_set', 'N/A'):<20}  Ring Settings: {config.get('ring_settings', 'N/A'):<12}",
                 f"Ring Position: {config.get('ring_position', 'N/A'):<15}  Plugboard: {config.get('pegboard', 'clear'):<20}  Function Mode: {self.controller.function_mode:<15}",
+                f"Counter: {counter_display:<15}",
             ]
             
             start_y = 1 + ((max_y - 1 - (len(settings_lines) + 1)) // 2)

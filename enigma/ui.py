@@ -2008,6 +2008,9 @@ class EnigmaMuseumUI(UIBase):
         y += 1
         self.show_message(y, 0, f"  Plugboard: {settings.get('pegboard', 'N/A') or 'clear'}")
         y += 1
+        counter_display = "N/A" if self.controller.counter is None else str(self.controller.counter)
+        self.show_message(y, 0, f"  Counter: {counter_display}")
+        y += 1
         
         # Lock Settings
         self.show_message(y, 0, "Lock Settings:", curses.A_BOLD)
@@ -2604,6 +2607,7 @@ class EnigmaMuseumUI(UIBase):
                 'device_disconnected_message': None if (device_connected or self.simulate_mode) else "Enigma Touch disconnected - museum mode paused",  # Disconnection message
                 'last_char_original': self.controller.last_char_original.upper() if self.controller.last_char_original else None,  # Last character received/input (uppercase)
                 'last_char_received': self.controller.last_char_received.upper() if self.controller.last_char_received else None,  # Last character encoded/output (uppercase)
+                'counter': self.controller.counter,  # Counter value (for models that use Counter, like Model G)
                 'simulate_mode': self.simulate_mode  # Simulation mode indicator
             }
         
@@ -2834,6 +2838,7 @@ class EnigmaMuseumUI(UIBase):
                                                 pos_info = ""
                                                 # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
                                                 # Check if we have enough parts for positions (2 + rotor_count)
+                                                positions = None
                                                 if j + 2 + rotor_count <= len(parts):
                                                     positions = self.controller._parse_positions(parts, j + 3, rotor_count)
                                                     if positions:
@@ -2841,18 +2846,26 @@ class EnigmaMuseumUI(UIBase):
                                                         pos_str = self.controller._format_positions(parts, j + 3, rotor_count, positions)
                                                         pos_info = f" Positions {pos_str}"
                                                         
-                                                        # Check for optional Counter field after positions
-                                                        counter_idx = j + 3 + rotor_count
-                                                        if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
-                                                            if counter_idx + 1 < len(parts):
-                                                                try:
-                                                                    counter_value = int(parts[counter_idx + 1])
-                                                                    pos_info += f" Counter {counter_value}"
-                                                                except ValueError:
-                                                                    pass
-                                                        
                                                         # Update ring position
                                                         self.controller.config['ring_position'] = pos_str
+                                                
+                                                # Check for optional Counter field after positions
+                                                # Counter can appear even if positions parsing failed
+                                                counter_idx = j + 3 + rotor_count
+                                                if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
+                                                    if counter_idx + 1 < len(parts):
+                                                        try:
+                                                            counter_value = int(parts[counter_idx + 1])
+                                                            pos_info += f" Counter {counter_value}"
+                                                            # Store counter in controller for display (always store if found)
+                                                            self.controller.counter = counter_value
+                                                            if debug_callback:
+                                                                debug_callback(f"Counter: {counter_value} (stored from interactive mode)")
+                                                            # Force UI refresh to show updated counter
+                                                            self.draw_settings_panel()
+                                                            self.refresh_all_panels()
+                                                        except ValueError:
+                                                            pass
                                                 debug_callback(f"<<< {original_char} {encoded_char}{pos_info}")
                                             
                                             # Update UI
