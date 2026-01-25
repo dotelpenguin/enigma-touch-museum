@@ -6,7 +6,7 @@ Constants for Enigma Museum Controller
 import os
 
 # Application Version
-VERSION = "v4.21.30"
+VERSION = "v4.21.40"
 
 # Serial Configuration
 DEFAULT_DEVICE = '/dev/ttyACM0'

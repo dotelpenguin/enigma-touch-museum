@@ -1,5 +1,7 @@
 # Enigma Museum Controller
 
+**Version 4.21.40**
+
 A Python-based control system for Enigma cipher machines, featuring a curses-based terminal interface and web server for museum displays.
 
 > **⚠️ WORK IN PROGRESS:** This project is actively under development. Features may be incomplete, documentation may be lacking, and the codebase is subject to significant changes. Use at your own risk and expect bugs and breaking changes.
@@ -60,12 +62,17 @@ The Enigma Touch connects to computers via USB serial interface, making it perfe
 ## Features
 
 - **Interactive Terminal Interface**: Full curses-based menu system for controlling Enigma devices
-- **Museum Mode**: Automated demonstration modes with configurable delays
-- **Web Server**: Real-time web interface for museum kiosk displays
-- **Message Encoding**: Send and encode messages character by character
+- **Museum Mode**: Automated demonstration modes with configurable delays (English/German, Encode/Decode)
+- **Simulation Mode**: Test museum modes without device connection using pre-encoded JSON databases
+- **Web Server**: Real-time web interface for museum kiosk displays with responsive design
+- **Message Encoding**: Send and encode messages character by character with real-time feedback
 - **Configuration Management**: Persistent settings with JSON configuration file
-- **Debug Mode**: Optional serial communication debugging
-- **Multiple Museum Modes**: Support for English and German messages, with optional pre-coded messages
+- **Debug Mode**: Optional serial communication debugging with raw byte display
+- **Counter Support**: Display and track counter values for models that support it (e.g., Model G)
+- **Multiple Enigma Models**: Support for I, II, III, M3, M4, G, K, KD, D, N, T, and more
+- **Model Configuration**: Pre-configured models via `models.json` with validation
+- **Localization**: Multi-language support (English/German) for web interface
+- **Theme Support**: Customizable web interface themes via `kiosk-theme.json`
 
 ## Screenshots
 
@@ -336,8 +343,10 @@ python3 main.py [OPTIONS] [DEVICE]
 - `--museum-de-encode`: Start directly in Encode - DE mode (German encode)
 - `--museum-de-decode`: Start directly in Decode - DE mode (German decode)
 - `--debug`: Enable debug output panel (shows serial communication). **Note:** Debug is enabled by default; this option explicitly enables it. Debug can be toggled on/off via the main menu (option 8).
+- `--raw-debug`: Enable raw debug output (shows raw serial bytes in debug panel). Can also be toggled via the main menu (option 9).
 - `--send-lock-config`: Send kiosk/lock settings to device from saved configuration (⚠️ use with caution - see lockout warning above)
 - `--factory-reset`: Factory reset the Enigma Touch device (⚠️ resets all settings to factory defaults - requires confirmation)
+- `--simulate`: Simulation mode - access museum menus only, simulate encoding/decoding using pre-encoded JSON databases (no device connection required)
 - `--help`, `-h`: Show help message and exit
 
 ### Examples
@@ -355,11 +364,17 @@ python3 main.py --museum-en-encode
 # Start with specific device and debug enabled
 python3 main.py --debug /dev/ttyACM0
 
+# Start with raw debug enabled
+python3 main.py --raw-debug /dev/ttyACM0
+
 # Start Decode - DE mode
 python3 main.py --museum-de-decode
 
 # Start Encode - DE mode with specific device
 python3 main.py --museum-de-encode /dev/ttyUSB0
+
+# Start in simulation mode (no device required)
+python3 main.py --simulate
 
 # Send kiosk/lock settings to device
 python3 main.py --send-lock-config
@@ -398,22 +413,26 @@ All modes use JSON files with pre-generated messages (`english-encoded.json` or 
 
 The web server provides real-time updates for museum displays:
 
-- **Status Page** (`/status`): Detailed status view with all information
-- **Message Page** (`/message`): Kiosk display optimized for 1024x768+ screens
-  - Shows current message being encoded
-  - Displays encoded text in real-time
-  - Highlights current character (when delay >= 2000ms)
+- **Status Page** (`/status`): Detailed status view with all device information and current settings
+- **Kiosk Page** (`/message` or `/`): Kiosk display optimized for 1024x768+ screens
+  - Shows current message being encoded/decoded
+  - Displays encoded/decoded text in real-time with character-by-character updates
+  - Highlights current character (when character delay >= 2000ms)
   - Updates ring position in real-time
-  - Auto-refreshes every 2 seconds
+  - Displays counter value (for models that support it, like Model G)
+  - Shows plugboard configuration
+  - Auto-refreshes every 1-2 seconds (faster in interactive mode)
+  - Responsive design with adaptive refresh rates
 
 ### Enabling Web Server
 
-1. Go to Configuration menu → Option 14: Web Server
-2. Enable the web server
-3. Configure the port (default: 8080)
+1. Go to Main Menu → Configuration → WebPage Options
+2. Select option 3: "Web Server: enable/disable"
+3. Configure the port (option 4, default: 8080)
 4. Access at `http://<your-ip>:<port>/message` for kiosk view
+5. Access at `http://<your-ip>:<port>/status` for detailed status view
 
-**Note:** The web server runs in the background and updates automatically. The terminal interface remains available for configuration and control.
+**Note:** The web server runs in the background and updates automatically. The terminal interface remains available for configuration and control. The web interface supports multiple language locales (English/German) and can be customized via theme configuration.
 
 ## Configuration Menu
 
@@ -422,36 +441,35 @@ Access via Main Menu → Configuration:
 The configuration menu is organized into sub-menus:
 
 ### Enigma Cipher Options
-1. Set Device (serial device path)
-2. Set Mode (I, II, III, M3, M4)
-3. Set Rotor Set (e.g., "A III IV I")
-4. Set Rings (e.g., "01 01 01")
-5. Set Ring Position (e.g., "20 6 10")
+1. Set Device (serial device path, e.g., `/dev/ttyACM0`)
+2. Set Mode (I, II, III, M3, M4, G, K, KD, D, N, T, etc.)
+3. Set Rotor Set (e.g., "A III IV I" for 3-rotor, "B beta IV II VII" for 4-rotor)
+4. Set Rings (e.g., "01 01 01" for numbers, "A B C" for letters)
+5. Set Ring Position (e.g., "20 6 10" for numbers, "A B C" for letters)
 6. Set Plugboard (e.g., "VF PQ" or leave empty for clear)
 7. Always Send Config Before Message (toggle)
 
 ### WebPage Options
-1. Set Word Group (4 or 5 characters)
-2. Set Character Delay (milliseconds between characters)
-3. Web Server Enable/Disable
-4. Set Web Server Port
-5. Enable Slides
+1. Set Word Group (4 or 5 characters per group in encoded display)
+2. Set Character Delay (milliseconds between characters during encoding)
+3. Web Server Enable/Disable (toggle web server on/off)
+4. Set Web Server Port (default: 8080)
+5. Enable Slides (toggle slide image display feature)
 
 ### Enigma Touch Device Options
-1. Set Museum Delay (seconds between messages)
-2. Lock Model (toggle)
-3. Lock Rotor/Wheel (toggle)
-4. Lock Ring (toggle)
-5. Disable Auto-PowerOff (toggle)
-6. Set Brightness (1-5)
-7. Set Volume (0-6)
-8. Set Screen Saver (0-99 minutes)
+1. Set Museum Delay (seconds between messages in museum mode)
+2. Lock Model (toggle - prevents changing model via physical buttons)
+3. Lock Rotor/Wheel (toggle - prevents changing rotors via physical buttons)
+4. Lock Ring (toggle - prevents changing ring settings via physical buttons)
+5. Disable Auto-PowerOff (toggle - prevents power-off via physical buttons)
+6. Set Brightness (1-5, controls LED display brightness)
+7. Set Volume (0-6, controls audio feedback volume)
+8. Set Screen Saver (0-99 minutes, auto-sleep timeout)
 
 ### Utilities
-1. Generate Coded Messages - EN
-2. Generate Coded Messages - DE
-3. Validate Models.json
-4. (Additional utility options)
+1. Generate Coded Messages - EN (creates `english-encoded.json` from `english.msg`)
+2. Generate Coded Messages - DE (creates `german-encoded.json` from `german.msg`)
+3. Validate Models.json (validates plugboard constraints and model configurations)
 
 ## Message Files
 
@@ -584,13 +602,13 @@ Future enhancements and improvements for the Enigma Museum Controller:
 - [ ] Full German Translation (requires German speaker)
 - [ ] Pre-built Raspberry Pi image for easier kiosk deployment
 - [ ] Advanced web interface with JavaScript/WebSockets (better than refresh)
-- [ ] Simulation Mode (when Enigma Touch is not connected)
+- [x] Simulation Mode (when Enigma Touch is not connected) - **COMPLETED**
 - [ ] Enhance web interface with additional display options
 - [ ] Add support for multiple simultaneous device connections (Interactive Encoding/Decoding)
 - [ ] Add remote control API endpoints
 - [ ] Add unit tests and integration tests
 - [ ] WebHost Display flickers due to refresh
-- [ ] Implement Counter for Models using Counters
+- [x] Implement Counter for Models using Counters - **COMPLETED** (Model G support added)
 - [ ] Remove more internal Logic. We should rely more on the Enigma Touch for the source of truth
 - [ ] Make non AI garbage slides
 
