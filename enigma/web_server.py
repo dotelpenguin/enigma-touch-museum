@@ -91,16 +91,28 @@ class MuseumWebServer:
                         html = self.generate_status_html(data)
                         self.wfile.write(html.encode('utf-8'))
                         self.wfile.flush()
-                    elif self.path == '/message.json':
+                    elif self.path.startswith('/message.json'):
+                        # Parse URL to get language parameter
+                        parsed_url = urlparse(self.path)
+                        query_params = parse_qs(parsed_url.query)
+                        language = query_params.get('lang', [None])[0]
+                        if not language:
+                            # Try to get from Accept-Language header
+                            accept_language = self.headers.get('Accept-Language', '')
+                            if 'de' in accept_language.lower():
+                                language = 'de'
+                            else:
+                                language = None
+                        
                         self.send_response(200)
                         self.send_header('Content-type', 'application/json')
                         self.send_header('Cache-Control', 'no-cache')
                         self.end_headers()
-                        json_data = self.generate_message_json(data)
+                        json_data = self.generate_message_json(data, language=language)
                         self.wfile.write(json.dumps(json_data).encode('utf-8'))
                         self.wfile.flush()
                     elif self.path.startswith('/kiosk.html'):
-                        # Parse URL to get language parameter
+                        # Parse URL to get language and debug parameters
                         parsed_url = urlparse(self.path)
                         query_params = parse_qs(parsed_url.query)
                         language = DEFAULT_LOCALE
@@ -110,11 +122,26 @@ class MuseumWebServer:
                             if requested_lang and requested_lang.isalnum() and 2 <= len(requested_lang) <= 5:
                                 language = requested_lang
                         
+                        # Parse debug parameter
+                        debug_mode = False
+                        if 'debug' in query_params and query_params['debug']:
+                            debug_value = query_params['debug'][0].strip().lower()
+                            debug_mode = debug_value in ('true', '1', 'yes', 'on')
+                        
+                        # Parse checkres parameter (default true)
+                        check_resolution = True
+                        if 'checkres' in query_params and query_params['checkres']:
+                            checkres_value = query_params['checkres'][0].strip().lower()
+                            check_resolution = checkres_value not in ('false', '0', 'no', 'off')
+                        
+                        # Get simulation mode from data (already fetched at start of do_GET)
+                        simulate_mode = data.get('simulate_mode', False)
+                        
                         self.send_response(200)
                         self.send_header('Content-type', 'text/html')
                         self.send_header('Cache-Control', 'no-cache')
                         self.end_headers()
-                        html = self.generate_kiosk_html(language=language)
+                        html = self.generate_kiosk_html(language=language, debug=debug_mode, check_resolution=check_resolution, simulate_mode=simulate_mode)
                         self.wfile.write(html.encode('utf-8'))
                         self.wfile.flush()
                     elif self.path == '/enigma.png':
@@ -174,6 +201,7 @@ class MuseumWebServer:
                 config = data.get('config', {})
                 device_connected = data.get('device_connected', True)
                 device_disconnected_message = data.get('device_disconnected_message', None)
+                simulate_mode = data.get('simulate_mode', False)
                 
                 mode = config.get('mode', 'N/A')
                 rotors = config.get('rotor_set', 'N/A')
@@ -341,12 +369,18 @@ class MuseumWebServer:
 </html>"""
                 return html
             
-            def generate_message_json(self, data):
+            def generate_message_json(self, data, language=None):
                 """Generate JSON data for museum kiosk display"""
                 config = data.get('config', {})
                 log_messages = data.get('log_messages', [])
                 function_mode = data.get('function_mode', 'N/A')
                 is_encode_mode = data.get('is_encode_mode', True)
+                
+                # Load locale for translations
+                if language:
+                    current_locale = locale_manager_ref.load_locale(language)
+                else:
+                    current_locale = locale_ref
                 enable_slides = data.get('enable_slides', False)
                 slide_path = data.get('slide_path', None)
                 character_delay_ms = data.get('character_delay_ms', 0)
@@ -356,6 +390,7 @@ class MuseumWebServer:
                 device_disconnected_message = data.get('device_disconnected_message', None)
                 last_char_original = data.get('last_char_original', None)
                 last_char_received = data.get('last_char_received', None)
+                simulate_mode = data.get('simulate_mode', False)
                 
                 is_interactive_mode = (function_mode == 'Interactive')
                 
@@ -449,6 +484,7 @@ class MuseumWebServer:
                 ring_settings = config.get('ring_settings', 'N/A')
                 ring_position = config.get('ring_position', 'N/A')
                 pegboard = config.get('pegboard', 'clear')
+                counter = data.get('counter', None)
                 
                 rotor_display = rotors
                 if ' ' in rotors:
@@ -480,14 +516,15 @@ class MuseumWebServer:
                         'rotors': rotor_display.split() if rotor_display else [],
                         'ring_settings': ring_settings.split() if ring_settings else [],
                         'ring_position': ring_position.split() if ring_position else [],
-                        'pegboard': pegboard.split() if (pegboard and pegboard.strip() and pegboard.lower() != 'clear') else []
+                        'pegboard': pegboard.split() if (pegboard and pegboard.strip() and pegboard.lower() != 'clear') else [],
+                        'counter': counter
                     },
                     'messages': {
                         'current_message': current_message,
                         'result_message': result_message,
                         'highlighted_message': highlighted_message,
                         'is_encode_mode': is_encode_mode,
-                        'result_label': ('Encoded' if is_encode_mode else 'Decoded') + ' Message'
+                        'result_label': current_locale.get('messages', {}).get('encoded_message' if is_encode_mode else 'decoded_message', ('Encoded' if is_encode_mode else 'Decoded') + ' Message')
                     },
                     'interactive': {
                         'is_interactive_mode': is_interactive_mode,
@@ -499,20 +536,24 @@ class MuseumWebServer:
                         'slide_path': slide_path
                     },
                     'device': {
-                        'connected': device_connected,
-                        'disconnected_message': device_disconnected_message
+                        'connected': device_connected if not simulate_mode else True,
+                        'disconnected_message': None if simulate_mode else device_disconnected_message
                     },
+                    'simulate_mode': simulate_mode,
                     'character_highlighting': {
                         'character_delay_ms': character_delay_ms,
                         'current_char_index': current_char_index
                     }
                 }
             
-            def generate_kiosk_html(self, language: str = None):
+            def generate_kiosk_html(self, language: str = None, debug: bool = False, check_resolution: bool = True, simulate_mode: bool = False):
                 """Generate HTML page for JavaScript-powered kiosk display
                 
                 Args:
                     language: Language code to use (e.g., 'en', 'de'). If None, uses default.
+                    debug: If True, display debug information (e.g., screen size) in footer.
+                    check_resolution: If True, check and warn about non-optimal display resolutions.
+                    simulate_mode: If True, show "Simulation Mode" in footer.
                 """
                 theme = theme_ref
                 # Load locale for the requested language
@@ -545,6 +586,10 @@ class MuseumWebServer:
                 
                 # Prepare locale strings for JavaScript (escape script tags)
                 locale_js = json.dumps(locale).replace('</script>', '<\\/script>')
+                # Prepare debug mode for JavaScript
+                debug_js = 'true' if debug else 'false'
+                # Prepare check resolution for JavaScript
+                check_resolution_js = 'true' if check_resolution else 'false'
                 
                 html = f"""<!DOCTYPE html>
 <html>
@@ -564,7 +609,9 @@ class MuseumWebServer:
         .machine-display {{ background: {get_theme('boxes.machine_display.background', 'rgba(0, 0, 0, 0.6)')}; border: 2px solid {get_theme('boxes.machine_display.border', '#ffd700')}; border-radius: {get_theme('boxes.machine_display.border_radius', '10px')}; padding: min(1vh, 10px); margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); padding-bottom: min(0.5vh, 5px); box-shadow: {get_theme('boxes.machine_display.box_shadow', '0 4px 16px rgba(0,0,0,0.5)')}; flex-shrink: 0; max-height: calc(30vh + 23px); overflow: visible; }}
         .plugboard-unused {{ opacity: {get_theme('boxes.plugboard_unused.opacity', '0.4')}; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
         .plugboard-unused .config-label {{ color: {get_theme('colors.dark_gray', '#666')} !important; }}
-        .plugboard-unused .plugboard-box {{ background: {get_theme('boxes.plugboard_unused.background', 'rgba(100, 100, 100, 0.2)')} !important; border-color: {get_theme('boxes.plugboard_unused.border', '#666')} !important; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
+        .plugboard-unused .plugboard-box {{ background: {get_theme('boxes.plugboard_unused.background', 'rgba(100, 100, 100, 0.2)')} !important; border: 2px solid {get_theme('boxes.plugboard_unused.border', '#666')} !important; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
+        .counter-box {{ background: {get_theme('boxes.counter_box.background', 'rgba(200, 150, 100, 0.3)')}; border: 2px solid {get_theme('boxes.counter_box.border', '#c89664')}; border-radius: {get_theme('boxes.counter_box.border_radius', '6px')}; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2vw, 20px); font-weight: bold; color: {get_theme('boxes.counter_box.color', '#d8b890')}; min-width: 60px; }}
+        .plugboard-unused .counter-box {{ background: {get_theme('boxes.plugboard_unused.background', 'rgba(100, 100, 100, 0.2)')} !important; border: 2px solid {get_theme('boxes.plugboard_unused.border', '#666')} !important; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
         .config-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: min(1vw, 10px); margin: min(1vh, 10px) 0; }}
         .config-item {{ background: {get_theme('boxes.config_item.background', 'rgba(255, 255, 255, 0.1)')}; padding: min(1vh, 10px); border-radius: {get_theme('boxes.config_item.border_radius', '6px')}; border: {get_theme('boxes.config_item.border', '1px solid rgba(255, 215, 0, 0.3)')}; }}
         .config-label {{ font-size: min(1.5vw, 15px); color: {get_theme('text.config_label.color', '#ffd700')}; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
@@ -600,6 +647,10 @@ class MuseumWebServer:
         .device-disconnected-banner .error-title {{ font-size: min(2.2vw, 22px); margin-bottom: min(1vh, 10px); }}
         .device-disconnected-banner .error-details {{ font-size: min(1.6vw, 16px); font-weight: normal; opacity: 0.9; margin-top: min(0.8vh, 8px); line-height: 1.4; }}
         .disconnected-banner {{ transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; }}
+        .resolution-warning-banner {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255, 193, 7, 0.95); color: #000; padding: min(2vh, 20px) min(4vw, 40px); text-align: center; font-size: min(2vw, 20px); font-weight: bold; border: 2px solid #ffc107; border-radius: 10px; box-shadow: 0 4px 20px rgba(255, 193, 7, 0.5), 0 0 20px rgba(255, 193, 7, 0.3); z-index: 9999; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out, top 0.3s ease-in-out; pointer-events: none; max-width: 80vw; min-width: min(40vw, 400px); }}
+        .resolution-warning-banner.show {{ opacity: 1; visibility: visible; }}
+        .resolution-warning-banner .warning-title {{ font-size: min(2.2vw, 22px); margin-bottom: min(1vh, 10px); }}
+        .resolution-warning-banner .warning-details {{ font-size: min(1.6vw, 16px); font-weight: normal; opacity: 0.9; margin-top: min(0.8vh, 8px); line-height: 1.4; }}
         .interactive-container {{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: min(2vh, 20px); margin: min(2vh, 20px) 0; flex-grow: 1; }}
         .interactive-mode-label {{ font-size: min(1.848vw, 18.48px); color: {get_theme('text.message_label.color', '#0ff')}; text-transform: uppercase; letter-spacing: 0.2vw; margin-bottom: min(1vh, 10px); font-weight: bold; flex-shrink: 0; }}
         .interactive-content {{ display: flex; flex-direction: row; align-items: center; justify-content: center; gap: min(3vw, 30px); }}
@@ -610,6 +661,11 @@ class MuseumWebServer:
     </style>
 </head>
 <body>
+    <div class="resolution-warning-banner" id="resolutionBanner">
+        <div class="warning-title">{html_module.escape(get_locale('warnings.resolution.title', 'Display Resolution Warning'))}</div>
+        <div class="warning-details" id="resolutionWarningDetails">{html_module.escape(get_locale('warnings.resolution.message', 'This display has been optimized for 1024x768 resolution.'))}</div>
+    </div>
+    
     <div class="device-disconnected-banner" id="deviceBanner">
         <div class="error-title">{html_module.escape(get_locale('errors.device_disconnected', 'Enigma Touch Device Disconnected'))}</div>
         <div class="error-details" id="deviceErrorDetails">{html_module.escape(get_locale('errors.device_disconnected_message', 'Please reconnect the Enigma Touch device or turn it back on.'))}</div>
@@ -634,7 +690,7 @@ class MuseumWebServer:
         </div>
         
         <div class="footer">
-            <p>{html_module.escape(get_locale('footer.text', f'Museum Display {VERSION} - by Andrew Baker (DotelPenguin)').format(VERSION=VERSION))}</p>
+            <p>{html_module.escape(get_locale('footer.text', f'Museum Display {VERSION} - by Andrew Baker (DotelPenguin)').format(VERSION=VERSION))}{' <span style="color: #f00; font-weight: bold;">Simulation Mode</span>' if simulate_mode else ''}<span id="debugInfo"></span></p>
         </div>
     </div>
     
@@ -669,14 +725,136 @@ class MuseumWebServer:
             let imageCache = {{}};
             let consecutiveFailures = 0;
             const failureThreshold = 4; // Show error after 4 consecutive failures (~2 seconds)
+            let resolutionWarningTimer = null;
+            let resolutionWarningCountdownInterval = null;
             
             // DOM elements
             const offlineBanner = document.getElementById('offlineBanner');
             const deviceBanner = document.getElementById('deviceBanner');
+            const resolutionBanner = document.getElementById('resolutionBanner');
+            const resolutionWarningDetails = document.getElementById('resolutionWarningDetails');
             const machineDisplay = document.getElementById('machineDisplay');
             const rotorDisplay = document.getElementById('rotorDisplay');
             const messageContainer = document.getElementById('messageContainer');
             const logoImage = document.getElementById('logoImage');
+            const debugInfo = document.getElementById('debugInfo');
+            
+            // Debug mode (set from Python)
+            const debugMode = {debug_js};
+            // Check resolution mode (set from Python)
+            const checkResolution = {check_resolution_js};
+            
+            // Update debug info in footer
+            function updateDebugInfo() {{
+                if (debugMode && debugInfo) {{
+                    const width = window.innerWidth;
+                    const height = window.innerHeight;
+                    debugInfo.textContent = ' | Display: ' + width + ' x ' + height + 'px';
+                }}
+            }}
+            
+            // Update debug info on load and resize
+            if (debugMode) {{
+                updateDebugInfo();
+                window.addEventListener('resize', updateDebugInfo);
+            }}
+            
+            // Update all banner positions (resolution warning at top, then device, then offline)
+            function updateBannerPositions() {{
+                const banners = [];
+                if (resolutionBanner && resolutionBanner.classList.contains('show')) {{
+                    banners.push(resolutionBanner);
+                }}
+                if (deviceBanner && deviceBanner.classList.contains('show')) {{
+                    banners.push(deviceBanner);
+                }}
+                if (offlineBanner && offlineBanner.classList.contains('show')) {{
+                    banners.push(offlineBanner);
+                }}
+                
+                // Position banners vertically centered, stacked
+                if (banners.length === 1) {{
+                    banners[0].style.top = '50%';
+                }} else if (banners.length === 2) {{
+                    banners[0].style.top = '40%';
+                    banners[1].style.top = '60%';
+                }} else if (banners.length === 3) {{
+                    banners[0].style.top = '30%';
+                    banners[1].style.top = '50%';
+                    banners[2].style.top = '70%';
+                }}
+            }}
+            
+            // Check resolution and show/hide warning
+            function checkResolutionWarning() {{
+                if (!checkResolution || !resolutionBanner || !resolutionWarningDetails) {{
+                    return;
+                }}
+                
+                // Clear any existing timeout and interval
+                if (resolutionWarningTimer) {{
+                    clearTimeout(resolutionWarningTimer);
+                    resolutionWarningTimer = null;
+                }}
+                if (resolutionWarningCountdownInterval) {{
+                    clearInterval(resolutionWarningCountdownInterval);
+                    resolutionWarningCountdownInterval = null;
+                }}
+                
+                const width = window.innerWidth;
+                const height = window.innerHeight;
+                const showWarning = height < 600 || height > 1080;
+                
+                if (showWarning) {{
+                    // Update message with current resolution
+                    let message = getLocale('warnings.resolution.message', 'This display has been optimized for 1024x768 resolution. Your current resolution is [WIDTH]x[HEIGHT]px, which is outside the recommended range (600-1080px height).');
+                    message = message.replace('[WIDTH]', '[' + width + ']').replace('[HEIGHT]', '[' + height + ']');
+                    
+                    let secondsRemaining = 10;
+                    function updateCountdown() {{
+                        if (secondsRemaining <= 0) {{
+                            clearInterval(resolutionWarningCountdownInterval);
+                            resolutionWarningCountdownInterval = null;
+                            return;
+                        }}
+                        
+                        let autoClearMsg = getLocale('warnings.resolution.auto_clear', 'This warning will automatically clear in [SECONDS] seconds.');
+                        autoClearMsg = autoClearMsg.replace('[SECONDS]', '[' + secondsRemaining + ']');
+                        resolutionWarningDetails.innerHTML = message + '<br><br>' + autoClearMsg;
+                        
+                        secondsRemaining--;
+                    }}
+                    
+                    // Initial update
+                    updateCountdown();
+                    
+                    // Update countdown every second
+                    resolutionWarningCountdownInterval = setInterval(updateCountdown, 1000);
+                    
+                    resolutionBanner.classList.add('show');
+                    updateBannerPositions();
+                    
+                    // Auto-hide after 10 seconds
+                    resolutionWarningTimer = setTimeout(function() {{
+                        resolutionBanner.classList.remove('show');
+                        updateBannerPositions();
+                        resolutionWarningTimer = null;
+                        if (resolutionWarningCountdownInterval) {{
+                            clearInterval(resolutionWarningCountdownInterval);
+                            resolutionWarningCountdownInterval = null;
+                        }}
+                    }}, 10000);
+                }} else {{
+                    resolutionBanner.classList.remove('show');
+                    updateBannerPositions();
+                }}
+            }}
+            
+            // Check resolution on load and resize
+            if (checkResolution) {{
+                checkResolutionWarning();
+                window.addEventListener('resize', checkResolutionWarning);
+            }}
             
             // Fetch with timeout
             function fetchWithTimeout(url, timeout = 5000) {{
@@ -747,6 +925,34 @@ class MuseumWebServer:
             }}
             
             // Update machine display
+            // Center counter and plugboard sections after values are rendered
+            function centerCounterAndPlugboard() {{
+                // Find the container that holds counter and plugboard
+                const container = document.querySelector('.counter-plugboard-container');
+                if (!container) return;
+                
+                // Find counter and plugboard content divs
+                const counterContent = container.querySelector('.counter-content');
+                const plugboardContent = container.querySelector('.plugboard-content');
+                
+                // Ensure proper centering
+                if (counterContent) {{
+                    counterContent.style.justifyContent = 'center';
+                    counterContent.style.alignItems = 'center';
+                    counterContent.style.textAlign = 'center';
+                }}
+                
+                if (plugboardContent) {{
+                    plugboardContent.style.justifyContent = 'center';
+                    plugboardContent.style.alignItems = 'center';
+                    plugboardContent.style.textAlign = 'center';
+                }}
+                
+                // Ensure container is centered
+                container.style.justifyContent = 'center';
+                container.style.alignItems = 'flex-start';
+            }}
+            
             function updateMachineDisplay(config) {{
                 let html = '<div class="rotor-display">';
                 
@@ -783,18 +989,55 @@ class MuseumWebServer:
                 }});
                 html += '</div></div>';
                 
-                // Plugboard - always show, grey out if unused
-                html += '<div class="config-section' + (config.pegboard && config.pegboard.length > 0 ? '' : ' plugboard-unused') + '" style="display: flex; flex-direction: column; align-items: center; margin-top: min(1vh, 10px); margin-bottom: min(1.5vh, 15px); width: 100%;">';
+                // Counter and Plugboard - on same line, separate sections
+                html += '<div class="counter-plugboard-container" style="display: flex; gap: min(2vw, 20px); justify-content: center; align-items: flex-start; margin-top: min(1vh, 10px); margin-bottom: min(1.5vh, 15px); width: 100%; flex-wrap: wrap;">';
+                
+                // Counter - separate section, grey out if unused
+                // Counter is always a number when present
+                var hasCounter = false;
+                var counterValue = null;
+                
+                // Check if counter exists and is a valid number (including 0)
+                if (config.counter !== null && config.counter !== undefined) {{
+                    if (typeof config.counter === 'number') {{
+                        // Counter is a number (0 is valid)
+                        hasCounter = true;
+                        counterValue = config.counter;
+                    }} else if (typeof config.counter === 'string') {{
+                        // Try to parse as number
+                        var parsed = parseInt(config.counter, 10);
+                        if (!isNaN(parsed)) {{
+                            hasCounter = true;
+                            counterValue = parsed;
+                        }}
+                    }}
+                }}
+                
+                html += '<div class="config-section counter-section' + (hasCounter ? '' : ' plugboard-unused') + '" style="display: flex; flex-direction: column; align-items: center; flex: 0 1 auto; min-width: 200px; max-width: 50%;">';
+                html += '<div class="config-label">' + escapeHtml(getLocale('labels.counter', 'Counter')) + '</div>';
+                html += '<div class="counter-content" style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center; align-items: center; width: 100%;">';
+                if (hasCounter) {{
+                    html += '<div class="counter-box">' + escapeHtml(String(counterValue)) + '</div>';
+                }} else {{
+                    html += '<div class="counter-box" style="font-style: italic;">' + escapeHtml(getLocale('labels.unused', 'UNUSED')) + '</div>';
+                }}
+                html += '</div></div>';
+                
+                // Plugboard - separate section, grey out if unused
+                var hasPlugboard = config.pegboard && config.pegboard.length > 0;
+                html += '<div class="config-section plugboard-section' + (hasPlugboard ? '' : ' plugboard-unused') + '" style="display: flex; flex-direction: column; align-items: center; flex: 0 1 auto; min-width: 200px; max-width: 50%;">';
                 html += '<div class="config-label">' + escapeHtml(getLocale('labels.plugboard', 'Plugboard')) + '</div>';
-                html += '<div style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center;">';
-                if (config.pegboard && config.pegboard.length > 0) {{
+                html += '<div class="plugboard-content" style="display: flex; gap: min(1vw, 10px); flex-wrap: wrap; justify-content: center; align-items: center; width: 100%;">';
+                if (hasPlugboard) {{
                     config.pegboard.forEach(function(plug) {{
                         html += '<div class="plugboard-box">' + escapeHtml(plug) + '</div>';
                     }});
                 }} else {{
-                    html += '<div class="plugboard-box" style="font-style: italic;">' + escapeHtml(getLocale('labels.unused', 'Unused')) + '</div>';
+                    html += '<div class="plugboard-box" style="font-style: italic;">' + escapeHtml(getLocale('labels.unused', 'UNUSED')) + '</div>';
                 }}
                 html += '</div></div>';
+                
+                html += '</div>';
                 
                 html += '</div>';
                 
@@ -1015,22 +1258,13 @@ class MuseumWebServer:
                         errorDetailsEl.textContent = getLocale('errors.connection_lost_message', 'Connection lost. Please check the Museum Kiosk Controller. Attempting to reconnect...');
                     }}
                     offlineBanner.classList.add('show');
-                    // Adjust positioning if both banners are showing
-                    if (deviceBanner.classList.contains('show')) {{
-                        deviceBanner.style.top = '40%';
-                        offlineBanner.style.top = '60%';
-                    }} else {{
-                        offlineBanner.style.top = '50%';
-                    }}
+                    updateBannerPositions();
                 }} else {{
                     offlineBanner.classList.remove('show');
                     errorDetailsEl.textContent = getLocale('errors.attempting_reconnect', 'Attempting to reconnect...');
                     retryDelay = 1000; // Reset retry delay on reconnect
                     consecutiveFailures = 0; // Reset failure counter on reconnect
-                    // Reset device banner position if connection banner is hidden
-                    if (deviceBanner.classList.contains('show')) {{
-                        deviceBanner.style.top = '50%';
-                    }}
+                    updateBannerPositions();
                 }}
             }}
             
@@ -1040,19 +1274,10 @@ class MuseumWebServer:
                 if (disconnectedMessage) {{
                     deviceErrorDetailsEl.textContent = getLocale('errors.device_disconnected_message', 'Please reconnect the Enigma Touch device or turn it back on.');
                     deviceBanner.classList.add('show');
-                    // Adjust positioning if both banners are showing
-                    if (offlineBanner.classList.contains('show')) {{
-                        deviceBanner.style.top = '40%';
-                        offlineBanner.style.top = '60%';
-                    }} else {{
-                        deviceBanner.style.top = '50%';
-                    }}
+                    updateBannerPositions();
                 }} else {{
                     deviceBanner.classList.remove('show');
-                    // Reset connection banner position if device banner is hidden
-                    if (offlineBanner.classList.contains('show')) {{
-                        offlineBanner.style.top = '50%';
-                    }}
+                    updateBannerPositions();
                 }}
             }}
             
@@ -1068,7 +1293,12 @@ class MuseumWebServer:
                     retryTimer = null;
                 }}
                 
-                fetchWithTimeout('/message.json')
+                // Get current language from URL or default to 'en'
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentLang = urlParams.get('lang') || 'en';
+                const messageJsonUrl = '/message.json' + (currentLang ? '?lang=' + encodeURIComponent(currentLang) : '');
+                
+                fetchWithTimeout(messageJsonUrl)
                     .then(function(response) {{
                         if (!response.ok) {{
                             const error = new Error('HTTP ' + response.status);
@@ -1086,6 +1316,11 @@ class MuseumWebServer:
                         if (dataChanged(data)) {{
                             // Update machine display
                             updateMachineDisplay(data.config);
+                            
+                            // Center counter and plugboard after values are rendered
+                            setTimeout(function() {{
+                                centerCounterAndPlugboard();
+                            }}, 0);
                             
                             // Update message display
                             updateMessageDisplay(data);

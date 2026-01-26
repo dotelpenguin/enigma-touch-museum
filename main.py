@@ -29,10 +29,13 @@ Options:
     --museum-de-encode        Start in Encode - DE mode (German encode)
     --museum-de-decode        Start in Decode - DE mode (German decode)
     --debug                   Enable debug output panel (shows serial communication)
+    --raw-debug               Enable raw debug output (shows raw serial bytes in debug panel)
     --send-lock-config        Send kiosk/lock settings to device from saved config
                               (⚠️ use with caution - see lockout warning in README)
     --factory-reset           Factory reset the Enigma Touch device
                               (⚠️ resets all settings to factory defaults - requires confirmation)
+    --simulate                Simulation mode - access museum menus only, simulate encoding/decoding
+                              using pre-encoded JSON databases (no device connection required)
     --help, -h                Show this help message and exit
 
 Arguments:
@@ -50,6 +53,7 @@ Examples:
     {script_name} --museum-de-decode   # Start Decode - DE mode
     {script_name} --send-lock-config   # Send kiosk/lock settings to device
     {script_name} --factory-reset      # Factory reset device (requires confirmation)
+    {script_name} --simulate           # Run in simulation mode (museum menus only, no device)
 
 Description:
     This tool provides a curses-based menu interface for controlling an Enigma
@@ -72,8 +76,10 @@ def main():
     config_only = False
     museum_mode = None
     debug_enabled = True
+    raw_debug_enabled = False
     send_lock_config = False
     factory_reset = False
+    simulate_mode = False
     
     # Parse command line arguments
     i = 1
@@ -95,10 +101,14 @@ def main():
             museum_mode = '4'
         elif arg == '--debug':
             debug_enabled = True
+        elif arg == '--raw-debug':
+            raw_debug_enabled = True
         elif arg == '--send-lock-config':
             send_lock_config = True
         elif arg == '--factory-reset':
             factory_reset = True
+        elif arg == '--simulate':
+            simulate_mode = True
         elif arg.startswith('-'):
             print(f"Unknown option: {arg}")
             print("Use --help or -h for usage information.")
@@ -123,7 +133,12 @@ def main():
     else:
         preserve_device = True
     
-    controller = EnigmaController(device, preserve_device=preserve_device)
+    controller = EnigmaController(device, preserve_device=preserve_device, simulate_mode=simulate_mode)
+    
+    # Set raw debug if specified via command line
+    if raw_debug_enabled:
+        controller.raw_debug_enabled = True
+        controller.save_config(preserve_always_send_config=True)
     
     # If config-only mode, skip connection and go straight to config menu
     if config_only:
@@ -136,26 +151,31 @@ def main():
             print("\nGoodbye!")
         return
     
-    # Normal mode - try to connect
-    print(f"Connecting to {controller.device}...")
-    if not controller.connect():
-        print(f"ERROR: Could not connect to {controller.device}")
-        print("Make sure the device is connected and you have permission to access it.")
-        print(f"\nTo change the device, run: {sys.argv[0]} --config")
-        sys.exit(1)
-    
-    # Check firmware version
-    print("Checking firmware version...")
-    if not controller.check_firmware_version():
-        print("ERROR: Could not determine firmware version")
-        controller.disconnect()
-        sys.exit(1)
-    
-    # Report firmware version
-    if controller.firmware_version is not None:
-        print(f"Firmware version: {controller.firmware_version:.2f}")
+    # Simulation mode - skip connection
+    if simulate_mode:
+        print("Simulation mode enabled - no device connection required")
+        print("Accessing museum menus only...")
     else:
-        print("Firmware version: Unknown")
+        # Normal mode - try to connect
+        print(f"Connecting to {controller.device}...")
+        if not controller.connect():
+            print(f"ERROR: Could not connect to {controller.device}")
+            print("Make sure the device is connected and you have permission to access it.")
+            print(f"\nTo change the device, run: {sys.argv[0]} --config")
+            sys.exit(1)
+        
+        # Check firmware version
+        print("Checking firmware version...")
+        if not controller.check_firmware_version():
+            print("ERROR: Could not determine firmware version")
+            controller.disconnect()
+            sys.exit(1)
+        
+        # Report firmware version
+        if controller.firmware_version is not None:
+            print(f"Firmware version: {controller.firmware_version:.2f}")
+        else:
+            print("Firmware version: Unknown")
     
     # Handle --send-lock-config switch
     if send_lock_config:
@@ -177,8 +197,11 @@ def main():
         print("\nDisconnected. Goodbye!")
         return
     
-    # Handle --factory-reset switch
+    # Handle --factory-reset switch (not available in simulation mode)
     if factory_reset:
+        if simulate_mode:
+            print("ERROR: --factory-reset is not available in simulation mode")
+            sys.exit(1)
         print("\n⚠️  WARNING: This will factory reset the Enigma Touch device!")
         print("All settings will be reset to factory defaults.")
         print("\nMake sure your Enigma Touch device is connected and ready.")
@@ -220,17 +243,23 @@ def main():
         print("\nDisconnected. Goodbye!")
         return
     
-    print("Connected! Starting UI...")
-    time.sleep(1)
+    if not simulate_mode:
+        print("Connected! Starting UI...")
+        time.sleep(1)
+    else:
+        print("Starting UI in simulation mode...")
     
     try:
-        ui = EnigmaMuseumUI(controller)
-        ui.run(museum_mode=museum_mode, debug_enabled=debug_enabled)
+        ui = EnigmaMuseumUI(controller, simulate_mode=simulate_mode)
+        ui.run(museum_mode=museum_mode, debug_enabled=debug_enabled, simulate_mode=simulate_mode)
     except KeyboardInterrupt:
         pass
     finally:
-        controller.disconnect()
-        print("\nDisconnected. Goodbye!")
+        if not simulate_mode:
+            controller.disconnect()
+            print("\nDisconnected. Goodbye!")
+        else:
+            print("\nGoodbye!")
 
 
 if __name__ == '__main__':

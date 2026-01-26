@@ -5,8 +5,9 @@
     "rotors": "Rotors",
     "ring_settings": "Ring Settings",
     "ring_position": "Ring Position",
+    "counter": "Counter",
     "plugboard": "Plugboard",
-    "unused": "Unused"
+    "unused": "UNUSED"
   },
   "messages": {
     "current_message": "Current Message",
@@ -39,6 +40,13 @@
     "network_error": "Network Error",
     "network_error_message": "Network connection failed",
     "unable_to_reach_server": "Unable to reach server"
+  },
+  "warnings": {
+    "resolution": {
+      "title": "Display Resolution Warning",
+      "message": "This display has been optimized for 1024x768 resolution. Your current resolution is [WIDTH]x[HEIGHT]px, which is outside the recommended range (600-1080px height).",
+      "auto_clear": "This warning will automatically clear in [SECONDS] seconds."
+    }
   },
   "footer": {
     "text": "Museum Display {VERSION} - by Andrew Baker (DotelPenguin)"

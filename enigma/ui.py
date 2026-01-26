@@ -26,11 +26,12 @@ from enigma.base import UIBase
 class EnigmaMuseumUI(UIBase):
     """Curses-based UI for Enigma Museum Controller"""
     
-    def __init__(self, controller: EnigmaController):
+    def __init__(self, controller: EnigmaController, simulate_mode: bool = False):
         # Initialize UIBase - stdscr will be set in run() method
         UIBase.__init__(self, controller, None)
         self.controller = controller
         self.stdscr = None  # Will be initialized in run() method
+        self.simulate_mode = simulate_mode
         # Note: Most base methods are inherited from UIBase
 
 
@@ -247,25 +248,39 @@ class EnigmaMuseumUI(UIBase):
     
     def main_menu(self) -> str:
         """Display main menu"""
-        options = [
-            ("1", "Send Message"),
-            ("2", "Configuration"),
-            ("3", "Query All Settings"),
-            ("4", "Museum Mode"),
-            ("5", "Send Enigma Config"),
-            ("6", "Send Enigma Lock Config"),
-            ("7", "Factory Reset Enigma"),
-            ("8", f"Debug: {'true' if self.debug_enabled else 'false'}"),
-            ("9", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}"),
-            ("Q", "Quit")
-        ]
+        if self.simulate_mode:
+            # In simulation mode, only show Museum Mode option
+            options = [
+                ("4", "Museum Mode"),
+                ("8", f"Debug: {'true' if self.debug_enabled else 'false'}"),
+                ("Q", "Quit")
+            ]
+        else:
+            options = [
+                ("1", "Send Message"),
+                ("2", "Configuration"),
+                ("3", "Query All Settings"),
+                ("4", "Museum Mode"),
+                ("5", "Send Enigma Config"),
+                ("6", "Send Enigma Lock Config"),
+                ("7", "Factory Reset Enigma"),
+                ("8", f"Debug: {'true' if self.debug_enabled else 'false'}"),
+                ("9", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}"),
+                ("Q", "Quit")
+            ]
         
         selected = 0
         while True:
             # Update debug status in options
-            options[7] = ("8", f"Debug: {'true' if self.debug_enabled else 'false'}")
-            options[8] = ("9", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}")
-            self.show_menu("Enigma Museum Controller", options, selected)
+            if self.simulate_mode:
+                # In simulation mode, only update debug option (index 1)
+                options[1] = ("8", f"Debug: {'true' if self.debug_enabled else 'false'}")
+            else:
+                # In normal mode, update both debug options
+                options[7] = ("8", f"Debug: {'true' if self.debug_enabled else 'false'}")
+                options[8] = ("9", f"Raw Debug: {'ON' if self.controller.raw_debug_enabled else 'OFF'}")
+            menu_title = "Enigma Museum Controller" + (" [SIMULATION MODE]" if self.simulate_mode else "")
+            self.show_menu(menu_title, options, selected)
             key = self.stdscr.getch()
             
             if key == ord('q') or key == ord('Q'):
@@ -278,8 +293,8 @@ class EnigmaMuseumUI(UIBase):
                 self.create_subwindows()  # Recreate subwindows
                 self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
                 continue
-            elif key == ord('9'):
-                # Toggle raw debug
+            elif key == ord('9') and not self.simulate_mode:
+                # Toggle raw debug (only in normal mode)
                 self.controller.raw_debug_enabled = not self.controller.raw_debug_enabled
                 self.controller.save_config()
                 self.add_debug_output(f"Raw Debug {'enabled' if self.controller.raw_debug_enabled else 'disabled'}")
@@ -299,8 +314,8 @@ class EnigmaMuseumUI(UIBase):
                     self.create_subwindows()  # Recreate subwindows
                     self.add_debug_output(f"Debug {'enabled' if self.debug_enabled else 'disabled'}")
                     continue
-                elif options[selected][0] == '9':
-                    # Toggle raw debug
+                elif options[selected][0] == '9' and not self.simulate_mode:
+                    # Toggle raw debug (only in normal mode)
                     self.controller.raw_debug_enabled = not self.controller.raw_debug_enabled
                     self.controller.save_config()
                     self.add_debug_output(f"Raw Debug {'enabled' if self.controller.raw_debug_enabled else 'disabled'}")
@@ -1993,6 +2008,9 @@ class EnigmaMuseumUI(UIBase):
         y += 1
         self.show_message(y, 0, f"  Plugboard: {settings.get('pegboard', 'N/A') or 'clear'}")
         y += 1
+        counter_display = "N/A" if self.controller.counter is None else str(self.controller.counter)
+        self.show_message(y, 0, f"  Counter: {counter_display}")
+        y += 1
         
         # Lock Settings
         self.show_message(y, 0, "Lock Settings:", curses.A_BOLD)
@@ -2402,7 +2420,7 @@ class EnigmaMuseumUI(UIBase):
         # Function mode should already be set, but ensure it's current
         self.controller.function_mode = mode_name
         header_lines = [
-            f"Museum Mode: {self.controller.function_mode}",
+            f"Museum Mode: {self.controller.function_mode}" + (" [SIMULATION]" if self.simulate_mode else ""),
             f"Delay: {self.controller.museum_delay} seconds",
             "Press Q to stop"
         ]
@@ -2585,10 +2603,12 @@ class EnigmaMuseumUI(UIBase):
                 'current_encoded_text': current_encoded_text[0],  # Encoded/decoded text being built in real-time
                 'enable_slides': self.controller.enable_slides,  # Enable slides feature
                 'slide_path': slide_path,  # Path to current slide image
-                'device_connected': device_connected,  # USB connection status
-                'device_disconnected_message': "Enigma Touch disconnected - museum mode paused" if not device_connected else None,  # Disconnection message
+                'device_connected': device_connected if not self.simulate_mode else True,  # USB connection status (always True in simulation)
+                'device_disconnected_message': None if (device_connected or self.simulate_mode) else "Enigma Touch disconnected - museum mode paused",  # Disconnection message
                 'last_char_original': self.controller.last_char_original.upper() if self.controller.last_char_original else None,  # Last character received/input (uppercase)
-                'last_char_received': self.controller.last_char_received.upper() if self.controller.last_char_received else None  # Last character encoded/output (uppercase)
+                'last_char_received': self.controller.last_char_received.upper() if self.controller.last_char_received else None,  # Last character encoded/output (uppercase)
+                'counter': self.controller.counter,  # Counter value (for models that use Counter, like Model G)
+                'simulate_mode': self.simulate_mode  # Simulation mode indicator
             }
         
         # Start web server if enabled
@@ -2818,6 +2838,7 @@ class EnigmaMuseumUI(UIBase):
                                                 pos_info = ""
                                                 # Parse positions using helper function (handles letters and numbers, 3 or 4 rotors)
                                                 # Check if we have enough parts for positions (2 + rotor_count)
+                                                positions = None
                                                 if j + 2 + rotor_count <= len(parts):
                                                     positions = self.controller._parse_positions(parts, j + 3, rotor_count)
                                                     if positions:
@@ -2825,18 +2846,26 @@ class EnigmaMuseumUI(UIBase):
                                                         pos_str = self.controller._format_positions(parts, j + 3, rotor_count, positions)
                                                         pos_info = f" Positions {pos_str}"
                                                         
-                                                        # Check for optional Counter field after positions
-                                                        counter_idx = j + 3 + rotor_count
-                                                        if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
-                                                            if counter_idx + 1 < len(parts):
-                                                                try:
-                                                                    counter_value = int(parts[counter_idx + 1])
-                                                                    pos_info += f" Counter {counter_value}"
-                                                                except ValueError:
-                                                                    pass
-                                                        
                                                         # Update ring position
                                                         self.controller.config['ring_position'] = pos_str
+                                                
+                                                # Check for optional Counter field after positions
+                                                # Counter can appear even if positions parsing failed
+                                                counter_idx = j + 3 + rotor_count
+                                                if counter_idx < len(parts) and parts[counter_idx].lower() == 'counter':
+                                                    if counter_idx + 1 < len(parts):
+                                                        try:
+                                                            counter_value = int(parts[counter_idx + 1])
+                                                            pos_info += f" Counter {counter_value}"
+                                                            # Store counter in controller for display (always store if found)
+                                                            self.controller.counter = counter_value
+                                                            if debug_callback:
+                                                                debug_callback(f"Counter: {counter_value} (stored from interactive mode)")
+                                                            # Force UI refresh to show updated counter
+                                                            self.draw_settings_panel()
+                                                            self.refresh_all_panels()
+                                                        except ValueError:
+                                                            pass
                                                 debug_callback(f"<<< {original_char} {encoded_char}{pos_info}")
                                             
                                             # Update UI
@@ -3015,36 +3044,52 @@ class EnigmaMuseumUI(UIBase):
                     debug_callback(f"Applying configuration from message...")
                 
                 try:
-                    self.controller.set_mode(msg_obj.get('MODEL', 'I'), debug_callback=debug_callback)
-                    time.sleep(0.2)
-                    self.controller.set_rotor_set(msg_obj.get('ROTOR', 'A III IV I'), debug_callback=debug_callback)
-                    time.sleep(0.2)
-                    self.controller.set_ring_settings(msg_obj.get('RINGSET', '01 01 01'), debug_callback=debug_callback)
-                    time.sleep(0.2)
-                    self.controller.set_ring_position(msg_obj.get('RINGPOS', '20 6 10'), debug_callback=debug_callback)
-                    time.sleep(0.2)
-                    self.controller.set_pegboard(msg_obj.get('PLUG', ''), debug_callback=debug_callback)
-                    time.sleep(0.2)
-                    # Set word group size from JSON
-                    self.controller.word_group_size = msg_obj.get('GROUP', 5)
-                    # Only return to encode mode if we're in encode mode
-                    # In decode mode, the device should already be in the correct mode
-                    if is_encode:
-                        self.controller.return_to_encode_mode(debug_callback=debug_callback)
-                        time.sleep(0.5)
+                    if self.simulate_mode:
+                        # In simulation mode, just update config directly (no serial communication)
+                        self.controller.config['mode'] = msg_obj.get('MODEL', 'I')
+                        self.controller.config['rotor_set'] = msg_obj.get('ROTOR', 'A III IV I')
+                        self.controller.config['ring_settings'] = msg_obj.get('RINGSET', '01 01 01')
+                        self.controller.config['ring_position'] = msg_obj.get('RINGPOS', '20 6 10')
+                        self.controller.config['pegboard'] = msg_obj.get('PLUG', '') if msg_obj.get('PLUG') else ''
+                        self.controller.word_group_size = msg_obj.get('GROUP', 5)
+                        if debug_callback:
+                            debug_callback("Configuration updated for simulation")
                     else:
-                        # For decode mode, ensure we're ready to decode
-                        # The device should be in decode mode (set by user or device state)
-                        time.sleep(0.5)
+                        self.controller.set_mode(msg_obj.get('MODEL', 'I'), debug_callback=debug_callback)
+                        time.sleep(0.2)
+                        self.controller.set_rotor_set(msg_obj.get('ROTOR', 'A III IV I'), debug_callback=debug_callback)
+                        time.sleep(0.2)
+                        self.controller.set_ring_settings(msg_obj.get('RINGSET', '01 01 01'), debug_callback=debug_callback)
+                        time.sleep(0.2)
+                        self.controller.set_ring_position(msg_obj.get('RINGPOS', '20 6 10'), debug_callback=debug_callback)
+                        time.sleep(0.2)
+                        self.controller.set_pegboard(msg_obj.get('PLUG', ''), debug_callback=debug_callback)
+                        time.sleep(0.2)
+                        # Set word group size from JSON
+                        self.controller.word_group_size = msg_obj.get('GROUP', 5)
+                        # Only return to encode mode if we're in encode mode
+                        # In decode mode, the device should already be in the correct mode
+                        if is_encode:
+                            self.controller.return_to_encode_mode(debug_callback=debug_callback)
+                            time.sleep(0.5)
+                        else:
+                            # For decode mode, ensure we're ready to decode
+                            # The device should be in decode mode (set by user or device state)
+                            time.sleep(0.5)
                 except (serial.SerialException, OSError, AttributeError) as e:
-                    # Serial operation failed - likely disconnection
-                    device_disconnected[0] = True
-                    museum_paused[0] = True
-                    add_log_message("Enigma Touch disconnected during configuration - museum mode paused")
-                    if debug_callback:
-                        debug_callback(f"Serial error during configuration: {e} - pausing museum mode", color_type=self.COLOR_MISMATCH)
-                    draw_screen()
-                    continue  # Skip to next loop iteration to enter reconnection polling
+                    if not self.simulate_mode:
+                        # Serial operation failed - likely disconnection
+                        device_disconnected[0] = True
+                        museum_paused[0] = True
+                        add_log_message("Enigma Touch disconnected during configuration - museum mode paused")
+                        if debug_callback:
+                            debug_callback(f"Serial error during configuration: {e} - pausing museum mode", color_type=self.COLOR_MISMATCH)
+                        draw_screen()
+                        continue  # Skip to next loop iteration to enter reconnection polling
+                    else:
+                        # In simulation mode, just log the error
+                        if debug_callback:
+                            debug_callback(f"Error in simulation configuration: {e}", color_type=self.COLOR_MISMATCH)
                 
                 # Determine message to send and expected result
                 if is_encode:
@@ -3210,8 +3255,33 @@ class EnigmaMuseumUI(UIBase):
                         debug_callback(error_msg, color_type=self.COLOR_MISMATCH)
                 
                 try:
-                    message_sent = self.controller.send_message(message_to_send, progress_callback, debug_callback, position_update_callback, config_error_callback)
+                    # Determine language for simulation
+                    simulation_language = 'EN' if mode in ('1', '2') else 'DE'
+                    if self.simulate_mode:
+                        message_sent = self.controller.send_message(
+                            message_to_send, progress_callback, debug_callback, position_update_callback, 
+                            config_error_callback, simulation_language=simulation_language, 
+                            simulation_is_encode=is_encode
+                        )
+                    else:
+                        message_sent = self.controller.send_message(
+                            message_to_send, progress_callback, debug_callback, position_update_callback, config_error_callback
+                        )
                 except (serial.SerialException, OSError, AttributeError) as e:
+                    if not self.simulate_mode:
+                        # Serial operation failed during message sending - likely disconnection
+                        device_disconnected[0] = True
+                        museum_paused[0] = True
+                        add_log_message("Enigma Touch disconnected during message sending - museum mode paused")
+                        if debug_callback:
+                            debug_callback(f"Serial error during message sending: {e} - pausing museum mode", color_type=self.COLOR_MISMATCH)
+                        draw_screen()
+                        continue  # Skip to next loop iteration to enter reconnection polling
+                    else:
+                        # In simulation mode, just log the error
+                        if debug_callback:
+                            debug_callback(f"Error in simulation: {e}", color_type=self.COLOR_MISMATCH)
+                        message_sent = False
                     # Serial operation failed during message sending - likely disconnection
                     device_disconnected[0] = True
                     museum_paused[0] = True
@@ -3308,14 +3378,18 @@ class EnigmaMuseumUI(UIBase):
         self.draw_debug_panel()
         self.refresh_all_panels()
     
-    def run(self, config_only: bool = False, museum_mode: Optional[str] = None, debug_enabled: bool = True):
+    def run(self, config_only: bool = False, museum_mode: Optional[str] = None, debug_enabled: bool = True, simulate_mode: bool = False):
         """Main UI loop
         
         Args:
             config_only: If True, show only config menu and exit after
             museum_mode: If set, start directly in specified museum mode ('1', '2', '3', or '4')
             debug_enabled: If True, enable debug output panel at startup
+            simulate_mode: If True, run in simulation mode (museum menus only)
         """
+        # Update simulate_mode if provided
+        if simulate_mode:
+            self.simulate_mode = True
         # Set debug enabled if requested via command line (before initializing curses)
         if debug_enabled:
             self.debug_enabled = True

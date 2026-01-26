@@ -1,43 +1,43 @@
 [
   {
     "MSG": "UNITS RETREAT AFTER FAILURE",
-    "MODEL": "G",
-    "ROTOR": "K I II III",
-    "RINGSET": "A B C V",
-    "RINGPOS": "K L M F",
-    "PLUG": "",
+    "MODEL": "N",
+    "ROTOR": "N II V III",
+    "RINGSET": "05 10 15",
+    "RINGPOS": "10 15 20",
+    "PLUG": "AF UJ VQ RZ",
     "GROUP": 5,
-    "CODED": "SAMXJHXYEFIWRWIAFMCNSZEM"
+    "CODED": "CFXADNRNTLKGKQRLVNKHPZIV"
   },
   {
     "MSG": "ATTACK BEGINS TOMORROW MORNING",
+    "MODEL": "M3",
+    "ROTOR": "C II IV VI",
+    "RINGSET": "A B C",
+    "RINGPOS": "Q R S",
+    "PLUG": "AC HD PX KW",
+    "GROUP": 5,
+    "CODED": "IQDFGSFNWZTKJTKEWMBUNDHPTWE"
+  },
+  {
+    "MSG": "ADVANCE ON EASTERN FRONT",
+    "MODEL": "M3",
+    "ROTOR": "C VII III I",
+    "RINGSET": "O U X",
+    "RINGPOS": "E I M",
+    "PLUG": "MW UT AV",
+    "GROUP": 5,
+    "CODED": "BZULWFRIEZTWDRCUVBULL"
+  },
+  {
+    "MSG": "ENEMY OBSERVED STRONG",
     "MODEL": "M3",
     "ROTOR": "B IV I III",
     "RINGSET": "H L R",
     "RINGPOS": "C G K",
     "PLUG": "ST UV WX YZ AC",
     "GROUP": 5,
-    "CODED": "BQGJQGTWSZLVSEINJOMZERTZJXO"
-  },
-  {
-    "MSG": "ADVANCE ON EASTERN FRONT",
-    "MODEL": "D",
-    "ROTOR": "K II I III",
-    "RINGSET": "D A B B",
-    "RINGPOS": "K G T K",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "BEEHCUBYTDQQFNHIXIVYH"
-  },
-  {
-    "MSG": "ENEMY OBSERVED STRONG",
-    "MODEL": "I",
-    "ROTOR": "C IV V I",
-    "RINGSET": "10 20 15",
-    "RINGPOS": "15 20 25",
-    "PLUG": "MN OP QR ST UV",
-    "GROUP": 5,
-    "CODED": "WQBXFJZWSHWPYIQVEMD"
+    "CODED": "JURWXITCVCKPINGIIBU"
   },
   {
     "MSG": "COMMUNICATIONS INTERRUPTED NOW",
@@ -52,52 +52,52 @@
   {
     "MSG": "ARMORED DIVISION SOUTH",
     "MODEL": "I",
-    "ROTOR": "C IV V I",
-    "RINGSET": "10 20 15",
-    "RINGPOS": "15 20 25",
-    "PLUG": "MN OP QR ST UV",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "AO DE GN HI",
     "GROUP": 5,
-    "CODED": "MMUZBLINDFYKWMAAEDAA"
+    "CODED": "ZOPHCGTMRBSDWDXDJTZR"
   },
   {
     "MSG": "AIR FORCE REPORT LOCATION",
-    "MODEL": "M3",
-    "ROTOR": "C II IV VI",
-    "RINGSET": "A B C",
-    "RINGPOS": "Q R S",
-    "PLUG": "AC BD EG FH",
-    "GROUP": 5,
-    "CODED": "IXXMRBLWFQQKOOHGJKRQWM"
-  },
-  {
-    "MSG": "FIRE ON ENEMY",
     "MODEL": "T",
     "ROTOR": "T V VII VIII",
     "RINGSET": "E F G V",
     "RINGPOS": "N O P W",
     "PLUG": "",
     "GROUP": 5,
-    "CODED": "QBZKQGFUUHG"
+    "CODED": "EBZWQLTPZLQBNHKNQIBKNX"
+  },
+  {
+    "MSG": "FIRE ON ENEMY",
+    "MODEL": "KD",
+    "ROTOR": "D I III II",
+    "RINGSET": "A B C",
+    "RINGPOS": "H I J",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "YUGHHOQDGUC"
   },
   {
     "MSG": "ARTILLERY HOLD READY",
-    "MODEL": "G",
-    "ROTOR": "K I II III",
-    "RINGSET": "A B C V",
-    "RINGPOS": "K L M F",
-    "PLUG": "",
+    "MODEL": "I",
+    "ROTOR": "B III IV I",
+    "RINGSET": "21 15 16",
+    "RINGPOS": "04 24 06",
+    "PLUG": "AV BS CG DL FU HZ IN KM",
     "GROUP": 5,
-    "CODED": "IMAKBPXHNBXFZBQEQW"
+    "CODED": "VIKYESADSWSEFHRJYU"
   },
   {
     "MSG": "SUPPLIES EXPECTED",
-    "MODEL": "N",
-    "ROTOR": "N II V III",
-    "RINGSET": "05 10 15",
-    "RINGPOS": "10 15 20",
-    "PLUG": "AB CD EF GH IJ",
+    "MODEL": "I",
+    "ROTOR": "B IV I V",
+    "RINGSET": "13 19 25",
+    "RINGPOS": "02 08 14",
+    "PLUG": "ZJ CB EN",
     "GROUP": 5,
-    "CODED": "QJTATQTYIOSYXFUC"
+    "CODED": "UCOIQCYYBRWOWNWR"
   },
   {
     "MSG": "RADIO SILENCE UNTIL ORDER",
@@ -111,333 +111,333 @@
   },
   {
     "MSG": "FLANKS ARE ENDANGERED",
-    "MODEL": "M3",
-    "ROTOR": "B III V VI",
-    "RINGSET": "E K P",
-    "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
+    "MODEL": "M4",
+    "ROTOR": "B beta IV II VII",
+    "RINGSET": "D X E Z",
+    "RINGPOS": "A B C D",
+    "PLUG": "AL BG KT",
     "GROUP": 5,
-    "CODED": "ERHXUNMAOWEIPUYHQMU"
+    "CODED": "UEHBNKBUAXYTIQOWLXV"
   },
   {
     "MSG": "BRIDGE DESTROYED IMMEDIATELY",
     "MODEL": "I",
-    "ROTOR": "B II V III",
-    "RINGSET": "05 12 18",
-    "RINGPOS": "01 05 10",
-    "PLUG": "AB CD EF GH IJ KL",
+    "ROTOR": "B IV I V",
+    "RINGSET": "13 19 25",
+    "RINGPOS": "02 08 14",
+    "PLUG": "ZJ CB EN",
     "GROUP": 5,
-    "CODED": "WQPBUBNCMHWTPGIYFZFATJGJHW"
+    "CODED": "AKYBWDMWAKJEXKHLERGVMENRKP"
   },
   {
     "MSG": "ORDERS RECEIVED FROM BERLIN",
+    "MODEL": "M3",
+    "ROTOR": "B I V II",
+    "RINGSET": "D G F",
+    "RINGPOS": "V G H",
+    "PLUG": "FV PQ",
+    "GROUP": 5,
+    "CODED": "VHEYTRPBMOGGKOLNLSHHAGRJ"
+  },
+  {
+    "MSG": "MARCH READY SOVIET TERRITORY",
     "MODEL": "M3",
     "ROTOR": "B V II IV",
     "RINGSET": "N S W",
     "RINGPOS": "D H L",
     "PLUG": "BD EG FH IK JL",
     "GROUP": 5,
-    "CODED": "TQWIJGQFWLZCCBZBKEHBNGNZ"
-  },
-  {
-    "MSG": "MARCH READY SOVIET TERRITORY",
-    "MODEL": "M3",
-    "ROTOR": "B IV I III",
-    "RINGSET": "H L R",
-    "RINGPOS": "C G K",
-    "PLUG": "ST UV WX YZ AC",
-    "GROUP": 5,
-    "CODED": "DWEBZBGONTTXJTOMGPIXGSATL"
+    "CODED": "VFCHDQOTNGOZPFODEMLDWJKQT"
   },
   {
     "MSG": "PATROL AHEAD SANDY AREA",
     "MODEL": "I",
-    "ROTOR": "C IV V I",
-    "RINGSET": "10 20 15",
-    "RINGPOS": "15 20 25",
-    "PLUG": "MN OP QR ST UV",
+    "ROTOR": "B III IV I",
+    "RINGSET": "21 15 16",
+    "RINGPOS": "04 24 06",
+    "PLUG": "AV BS CG DL FU HZ IN KM",
     "GROUP": 5,
-    "CODED": "VISYCEJCSPKKTAZNKGMH"
+    "CODED": "EXKBCSEWGZKYJEHUMFLQ"
   },
   {
     "MSG": "REMAIN ALERT DAY AND NIGHT",
-    "MODEL": "T",
-    "ROTOR": "T V VII VIII",
-    "RINGSET": "E F G V",
-    "RINGPOS": "N O P W",
-    "PLUG": "",
+    "MODEL": "I",
+    "ROTOR": "B V IV II",
+    "RINGSET": "08 14 22",
+    "RINGPOS": "12 18 24",
+    "PLUG": "WX YZ AC BD EF",
     "GROUP": 5,
-    "CODED": "VYCOPGDKUQRTPXTOUQKOJZ"
+    "CODED": "GJGQHQOCCCJGWXVKAONWTM"
   },
   {
     "MSG": "HOLD POSITION AT ALL COSTS",
-    "MODEL": "T",
-    "ROTOR": "T V VII VIII",
-    "RINGSET": "E F G V",
-    "RINGPOS": "N O P W",
+    "MODEL": "K",
+    "ROTOR": "K III II I",
+    "RINGSET": "F G R T",
+    "RINGPOS": "L A S T",
     "PLUG": "",
     "GROUP": 5,
-    "CODED": "KMGHIIQVPYBRPHTTFXNMQQ"
+    "CODED": "IHRIAUWHOSFCRGPWPZTHBT"
   },
   {
     "MSG": "AIR RAID ALARM IN REGION",
+    "MODEL": "M3",
+    "ROTOR": "B I V II",
+    "RINGSET": "D G F",
+    "RINGPOS": "V G H",
+    "PLUG": "FV PQ",
+    "GROUP": 5,
+    "CODED": "JWLTMWLRNFVZAXIDUJKJ"
+  },
+  {
+    "MSG": "NAVAL FORCES ADVANCING",
+    "MODEL": "I",
+    "ROTOR": "B III IV I",
+    "RINGSET": "21 15 16",
+    "RINGPOS": "04 24 06",
+    "PLUG": "AV BS CG DL FU HZ IN KM",
+    "GROUP": 5,
+    "CODED": "WXEHEZDDDUOZFIGWTOKF"
+  },
+  {
+    "MSG": "CREW REPORTS NONE",
+    "MODEL": "M3",
+    "ROTOR": "B III V VI",
+    "RINGSET": "E K P",
+    "RINGPOS": "A E I",
+    "PLUG": "JE FB MA",
+    "GROUP": 5,
+    "CODED": "GLCUMABZPUIDAUO"
+  },
+  {
+    "MSG": "DIVISION RETREAT ORDER",
+    "MODEL": "I",
+    "ROTOR": "B II V III",
+    "RINGSET": "05 12 18",
+    "RINGPOS": "01 05 10",
+    "PLUG": "ZH CT VW",
+    "GROUP": 5,
+    "CODED": "YGCKCQBSNQGSZMJVZPFY"
+  },
+  {
+    "MSG": "REPORT ABOUT RIVER BRIDGE",
+    "MODEL": "I",
+    "ROTOR": "B V IV II",
+    "RINGSET": "08 14 22",
+    "RINGPOS": "12 18 24",
+    "PLUG": "WX YZ AC BD EF",
+    "GROUP": 5,
+    "CODED": "GJXJCVOPGTJUUSNXYVNRYD"
+  },
+  {
+    "MSG": "INFANTRY ON SECURITY DUTY",
+    "MODEL": "M3",
+    "ROTOR": "C II VI VIII",
+    "RINGSET": "M Q T",
+    "RINGPOS": "B F J",
+    "PLUG": "PE DM AW RZ",
+    "GROUP": 5,
+    "CODED": "YHSJKMZAGVEWVFHRDQJBLD"
+  },
+  {
+    "MSG": "COMMAND ASSEMBLY POINT SOUTH",
     "MODEL": "G",
     "ROTOR": "K I II III",
     "RINGSET": "A B C V",
     "RINGPOS": "K L M F",
     "PLUG": "",
     "GROUP": 5,
-    "CODED": "ICHWIOUPUGPQCYSALABI"
+    "CODED": "MYILIJUPDJTQUUVCSAFGLNGGI"
   },
   {
-    "MSG": "NAVAL FORCES ADVANCING",
+    "MSG": "ENEMY APPROACHING FROM WEST",
+    "MODEL": "M3",
+    "ROTOR": "B I V II",
+    "RINGSET": "D G F",
+    "RINGPOS": "V G H",
+    "PLUG": "FV PQ",
+    "GROUP": 5,
+    "CODED": "SVDNKJRDAENWGGZLHGKBUVVU"
+  },
+  {
+    "MSG": "OBSERVATION POST LOST",
+    "MODEL": "M3",
+    "ROTOR": "B I V II",
+    "RINGSET": "D G F",
+    "RINGPOS": "V G H",
+    "PLUG": "FV PQ",
+    "GROUP": 5,
+    "CODED": "VATYTXNNUEABCLPGLMF"
+  },
+  {
+    "MSG": "TANKS LOADED IN FOREST",
+    "MODEL": "N",
+    "ROTOR": "N II V III",
+    "RINGSET": "05 10 15",
+    "RINGPOS": "10 15 20",
+    "PLUG": "AF UJ VQ RZ",
+    "GROUP": 5,
+    "CODED": "DDWYDBHLZLVBBQITZMI"
+  },
+  {
+    "MSG": "PLATOON LEADER REPORT REQUIRED",
+    "MODEL": "M3",
+    "ROTOR": "B I V II",
+    "RINGSET": "D G F",
+    "RINGPOS": "V G H",
+    "PLUG": "FV PQ",
+    "GROUP": 5,
+    "CODED": "HJNRIFAOGFYKZJMHLGFZSWDXISH"
+  },
+  {
+    "MSG": "DAY MARCH ATTACK",
+    "MODEL": "I",
+    "ROTOR": "B V IV II",
+    "RINGSET": "08 14 22",
+    "RINGPOS": "12 18 24",
+    "PLUG": "WX YZ AC BD EF",
+    "GROUP": 5,
+    "CODED": "WGJPXZGKKUJOTI"
+  },
+  {
+    "MSG": "COMMUNICATIONS BLOCKADE LIFTED",
+    "MODEL": "M4",
+    "ROTOR": "B beta IV II VII",
+    "RINGSET": "D X E Z",
+    "RINGPOS": "A B C D",
+    "PLUG": "AL BG KT",
+    "GROUP": 5,
+    "CODED": "JZJWOLXYEGMXLDWAJZUYRCREARSL"
+  },
+  {
+    "MSG": "CONTINGENT TO BE INSPECTED IMMEDIATELY",
     "MODEL": "M3",
     "ROTOR": "C II IV VI",
     "RINGSET": "A B C",
     "RINGPOS": "Q R S",
-    "PLUG": "AC BD EG FH",
+    "PLUG": "AC HD PX KW",
     "GROUP": 5,
-    "CODED": "UEOHKQJLPQYHIQSUJEHY"
+    "CODED": "WEKVDWMNFYNWIRZUKNYPWTSCEZGRUXHLXG"
   },
   {
-    "MSG": "CREW REPORTS NONE",
-    "MODEL": "I",
-    "ROTOR": "C IV V I",
-    "RINGSET": "10 20 15",
-    "RINGPOS": "15 20 25",
-    "PLUG": "MN OP QR ST UV",
-    "GROUP": 5,
-    "CODED": "HMBGBLQTYGAZGAU"
-  },
-  {
-    "MSG": "DIVISION RETREAT ORDER",
-    "MODEL": "I",
-    "ROTOR": "A III V IV",
-    "RINGSET": "03 07 11",
-    "RINGPOS": "07 11 15",
-    "PLUG": "GH IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "XSLNMYZEANWOOEPQYBBU"
-  },
-  {
-    "MSG": "REPORT ABOUT RIVER BRIDGE",
+    "MSG": "ROADBLOCK ABANDONED",
     "MODEL": "D",
     "ROTOR": "K II I III",
     "RINGSET": "D A B B",
     "RINGPOS": "K G T K",
     "PLUG": "",
     "GROUP": 5,
-    "CODED": "GDBWFSVWSPZBBKSCUIPCFV"
+    "CODED": "GRUNIODUHXMTXYIISN"
   },
   {
-    "MSG": "INFANTRY ON SECURITY DUTY",
-    "MODEL": "M3",
-    "ROTOR": "B III V VI",
-    "RINGSET": "E K P",
-    "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
-    "GROUP": 5,
-    "CODED": "WVTMTYNFEFIPHNQXYWUYON"
-  },
-  {
-    "MSG": "COMMAND ASSEMBLY POINT SOUTH",
-    "MODEL": "M3",
-    "ROTOR": "C II VI VIII",
-    "RINGSET": "M Q T",
-    "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "XGKQPPTKBQKVYIDMXJIJXXQIG"
-  },
-  {
-    "MSG": "ENEMY APPROACHING FROM WEST",
-    "MODEL": "M3",
-    "ROTOR": "C II VI VIII",
-    "RINGSET": "M Q T",
-    "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "ZZRQDGWFOLLDZLUAVYEFJSVI"
-  },
-  {
-    "MSG": "OBSERVATION POST LOST",
-    "MODEL": "M4",
-    "ROTOR": "B beta IV II VII",
-    "RINGSET": "D X E Z",
-    "RINGPOS": "A B C D",
-    "PLUG": "AB CD EF GH IJ KL MN OP QR ST UV WX YZ",
-    "GROUP": 5,
-    "CODED": "NFMOYASAUZJWWUDVDLZ"
-  },
-  {
-    "MSG": "TANKS LOADED IN FOREST",
+    "MSG": "AIR SUPPORT REQUESTED",
     "MODEL": "I",
     "ROTOR": "A III V IV",
     "RINGSET": "03 07 11",
     "RINGPOS": "07 11 15",
-    "PLUG": "GH IJ KL MN OP QR",
+    "PLUG": "AO DE GN HI",
     "GROUP": 5,
-    "CODED": "FQOWMSZLZNOFVOMPMXZ"
-  },
-  {
-    "MSG": "PLATOON LEADER REPORT REQUIRED",
-    "MODEL": "M3",
-    "ROTOR": "B V II IV",
-    "RINGSET": "N S W",
-    "RINGPOS": "D H L",
-    "PLUG": "BD EG FH IK JL",
-    "GROUP": 5,
-    "CODED": "YZHWVYSYYOKYQUONKFFDAZHBDZP"
-  },
-  {
-    "MSG": "DAY MARCH ATTACK",
-    "MODEL": "M3",
-    "ROTOR": "C II VI VIII",
-    "RINGSET": "M Q T",
-    "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "IEAQPMSUJNZOVX"
-  },
-  {
-    "MSG": "COMMUNICATIONS BLOCKADE LIFTED",
-    "MODEL": "M3",
-    "ROTOR": "B I V II",
-    "RINGSET": "D G F",
-    "RINGPOS": "V G H",
-    "PLUG": "FV PQ",
-    "GROUP": 5,
-    "CODED": "RTUNSYBKRNGAYLSGLNOSJVAXECRW"
-  },
-  {
-    "MSG": "CONTINGENT TO BE INSPECTED IMMEDIATELY",
-    "MODEL": "M3",
-    "ROTOR": "B I V II",
-    "RINGSET": "D G F",
-    "RINGPOS": "V G H",
-    "PLUG": "FV PQ",
-    "GROUP": 5,
-    "CODED": "RTAROYHBLNWAJPRRQAQICVUXWDRWOFYIEI"
-  },
-  {
-    "MSG": "ROADBLOCK ABANDONED",
-    "MODEL": "M3",
-    "ROTOR": "C II VI VIII",
-    "RINGSET": "M Q T",
-    "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "GGYEHHIIVEFOQHRLUM"
-  },
-  {
-    "MSG": "AIR SUPPORT REQUESTED",
-    "MODEL": "M3",
-    "ROTOR": "B III V VI",
-    "RINGSET": "E K P",
-    "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
-    "GROUP": 5,
-    "CODED": "MTNZKLEZPUBPWNFUYMU"
+    "CODED": "ZEBQQVZKIFZGEYDDNBB"
   },
   {
     "MSG": "HIGH COMMAND SEND RECALL",
-    "MODEL": "KD",
-    "ROTOR": "D I III II",
+    "MODEL": "M3",
+    "ROTOR": "C II IV VI",
     "RINGSET": "A B C",
-    "RINGPOS": "H I J",
-    "PLUG": "",
+    "RINGPOS": "Q R S",
+    "PLUG": "AC HD PX KW",
     "GROUP": 5,
-    "CODED": "TUREKNTTYVACBJKUPTVZW"
+    "CODED": "ZPBRGYGTJFJKHAQFGFJTE"
   },
   {
     "MSG": "RADAR STATIONS OPERATIONAL",
-    "MODEL": "K",
-    "ROTOR": "K III II I",
-    "RINGSET": "F G R T",
-    "RINGPOS": "L A S T",
-    "PLUG": "",
+    "MODEL": "M3",
+    "ROTOR": "C II IV VI",
+    "RINGSET": "A B C",
+    "RINGPOS": "Q R S",
+    "PLUG": "AC HD PX KW",
     "GROUP": 5,
-    "CODED": "NNWKSFAMOSFCDHAUJGOZUHLB"
+    "CODED": "LGTFOKHQSZRDPTEOWWRQKMIT"
   },
   {
     "MSG": "SEPARATED UNITS REGROUP",
-    "MODEL": "M4",
-    "ROTOR": "B beta IV II VII",
-    "RINGSET": "D X E Z",
-    "RINGPOS": "A B C D",
-    "PLUG": "AB CD EF GH IJ KL MN OP QR ST UV WX YZ",
-    "GROUP": 5,
-    "CODED": "CHWRYVXWSHJXLULSUBDGZ"
-  },
-  {
-    "MSG": "AMMUNITION DEPOT REACHED SAFELY",
     "MODEL": "M3",
     "ROTOR": "B I V II",
     "RINGSET": "D G F",
     "RINGPOS": "V G H",
     "PLUG": "FV PQ",
     "GROUP": 5,
-    "CODED": "JXUFZWVFTTYKXDPNXPWESXVFESTX"
+    "CODED": "EGJLTJVBSJANDLIDUGKWX"
+  },
+  {
+    "MSG": "AMMUNITION DEPOT REACHED SAFELY",
+    "MODEL": "I",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "AO DE GN HI",
+    "GROUP": 5,
+    "CODED": "ZNPIKWDYQHLGDDAPWZRRKHTPMGCJ"
   },
   {
     "MSG": "NEW ORDERS COMING SOON",
-    "MODEL": "K",
-    "ROTOR": "K III II I",
-    "RINGSET": "F G R T",
-    "RINGPOS": "L A S T",
-    "PLUG": "",
+    "MODEL": "M3",
+    "ROTOR": "B IV I III",
+    "RINGSET": "H L R",
+    "RINGPOS": "C G K",
+    "PLUG": "ST UV WX YZ AC",
     "GROUP": 5,
-    "CODED": "RIDVSJDKQEFTFCHGQBZ"
+    "CODED": "SDFFAHGXGRJDDSTZIRJ"
   },
   {
     "MSG": "ENEMY AIRCRAFT SEEN AT BATTLE ALTITUDE",
     "MODEL": "M3",
-    "ROTOR": "B III V VI",
-    "RINGSET": "E K P",
-    "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
+    "ROTOR": "B IV I III",
+    "RINGSET": "H L R",
+    "RINGPOS": "C G K",
+    "PLUG": "ST UV WX YZ AC",
     "GROUP": 5,
-    "CODED": "FVXAJCUAHDDTYYFHSLYHXGBXGXTMQAIPV"
+    "CODED": "JURWXSAXOCRTSNOFMVWEVSRCFLZUDYQMF"
   },
   {
     "MSG": "CAVALRY MOVING EAST",
-    "MODEL": "M3",
-    "ROTOR": "B V II IV",
-    "RINGSET": "N S W",
-    "RINGPOS": "D H L",
-    "PLUG": "BD EG FH IK JL",
+    "MODEL": "I",
+    "ROTOR": "B V IV II",
+    "RINGSET": "08 14 22",
+    "RINGPOS": "12 18 24",
+    "PLUG": "WX YZ AC BD EF",
     "GROUP": 5,
-    "CODED": "RFTJKQBNHJZDNCDXE"
+    "CODED": "NGZQTZWSGGPWMMVDU"
   },
   {
     "MSG": "PRISONERS ARE TO BE TREATED",
     "MODEL": "I",
-    "ROTOR": "B II V III",
-    "RINGSET": "05 12 18",
-    "RINGPOS": "01 05 10",
-    "PLUG": "AB CD EF GH IJ KL",
-    "GROUP": 5,
-    "CODED": "UQPYKCBKMLWVOYGMVTFDITB"
-  },
-  {
-    "MSG": "MOUNTAIN ASSAULT NEXT NIGHT",
-    "MODEL": "KD",
-    "ROTOR": "D I III II",
-    "RINGSET": "A B C",
-    "RINGPOS": "H I J",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "XQPCGQBDYPKNWUHYPGRQBAPH"
-  },
-  {
-    "MSG": "CLEARING BOTH FLANKS",
-    "MODEL": "I",
     "ROTOR": "A III V IV",
     "RINGSET": "03 07 11",
     "RINGPOS": "07 11 15",
-    "PLUG": "GH IJ KL MN OP QR",
+    "PLUG": "AO DE GN HI",
     "GROUP": 5,
-    "CODED": "VUFJUYSYOIWVIBGVQX"
+    "CODED": "YOQQDZKFDGZGXDSZNKNPALH"
+  },
+  {
+    "MSG": "MOUNTAIN ASSAULT NEXT NIGHT",
+    "MODEL": "T",
+    "ROTOR": "T V VII VIII",
+    "RINGSET": "E F G V",
+    "RINGPOS": "N O P W",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "ZMPZEBLUQPCJXGAOPCBAROLF"
+  },
+  {
+    "MSG": "CLEARING BOTH FLANKS",
+    "MODEL": "M3",
+    "ROTOR": "B III V VI",
+    "RINGSET": "E K P",
+    "RINGPOS": "A E I",
+    "PLUG": "JE FB MA",
+    "GROUP": 5,
+    "CODED": "GRCFMWRQOEGYPQVVJQ"
   },
   {
     "MSG": "BATTLE PLAN TRANSMITTED",
@@ -445,269 +445,269 @@
     "ROTOR": "N II V III",
     "RINGSET": "05 10 15",
     "RINGPOS": "10 15 20",
-    "PLUG": "AB CD EF GH IJ",
+    "PLUG": "AF UJ VQ RZ",
     "GROUP": 5,
-    "CODED": "JYPETTQEUCAZNJIHKJJBS"
+    "CODED": "YDPATMVAUDBZKIUGAIIQA"
   },
   {
     "MSG": "TASK FORCE TO BE REASSIGNED",
-    "MODEL": "M3",
-    "ROTOR": "C II VI VIII",
-    "RINGSET": "M Q T",
-    "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
+    "MODEL": "M4",
+    "ROTOR": "B beta IV II VII",
+    "RINGSET": "D X E Z",
+    "RINGPOS": "A B C D",
+    "PLUG": "AL BG KT",
     "GROUP": 5,
-    "CODED": "SEFTOIEIINSXOVQGAANHVSB"
+    "CODED": "ZTRSGDZYAGQEFUULWMOUBCB"
   },
   {
     "MSG": "REPORT ON COMPLIANCE",
+    "MODEL": "I",
+    "ROTOR": "B V IV II",
+    "RINGSET": "08 14 22",
+    "RINGPOS": "12 18 24",
+    "PLUG": "WX YZ AC BD EF",
+    "GROUP": 5,
+    "CODED": "GJXJCVAQEHUYHKVKXK"
+  },
+  {
+    "MSG": "STRATEGY RECONSIDER IMMEDIATELY",
+    "MODEL": "M3",
+    "ROTOR": "B III V VI",
+    "RINGSET": "E K P",
+    "RINGPOS": "A E I",
+    "PLUG": "JE FB MA",
+    "GROUP": 5,
+    "CODED": "PINFNACJPOFMMYCKIIEGYZWJQPCRV"
+  },
+  {
+    "MSG": "RADIO FAILURES HAVE BEGUN",
+    "MODEL": "D",
+    "ROTOR": "K II I III",
+    "RINGSET": "D A B B",
+    "RINGPOS": "K G T K",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "GUTGWEVQFPWXGSZFSPNEMB"
+  },
+  {
+    "MSG": "NEW TARGETS CONFIRMED",
+    "MODEL": "I",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "AO DE GN HI",
+    "GROUP": 5,
+    "CODED": "KIAYVQXBMCVLSPOPUBB"
+  },
+  {
+    "MSG": "SECURE SECRET FILES",
     "MODEL": "M3",
     "ROTOR": "C II VI VIII",
     "RINGSET": "M Q T",
     "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
+    "PLUG": "PE DM AW RZ",
     "GROUP": 5,
-    "CODED": "GAVHKDIRQLYQWLGLKK"
-  },
-  {
-    "MSG": "STRATEGY RECONSIDER IMMEDIATELY",
-    "MODEL": "G",
-    "ROTOR": "K I II III",
-    "RINGSET": "A B C V",
-    "RINGPOS": "K L M F",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "UPHHDAATEFJISPTSXXPLAGAZKNYGH"
-  },
-  {
-    "MSG": "RADIO FAILURES HAVE BEGUN",
-    "MODEL": "I",
-    "ROTOR": "B V IV II",
-    "RINGSET": "08 14 22",
-    "RINGPOS": "12 18 24",
-    "PLUG": "WX YZ AC BD EF",
-    "GROUP": 5,
-    "CODED": "GGWGKIOFXTOXVZVYVLLWJG"
-  },
-  {
-    "MSG": "NEW TARGETS CONFIRMED",
-    "MODEL": "G",
-    "ROTOR": "K I II III",
-    "RINGSET": "A B C V",
-    "RINGPOS": "K L M F",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "QQFXIHAUFJJISWTUNDE"
-  },
-  {
-    "MSG": "SECURE SECRET FILES",
-    "MODEL": "I",
-    "ROTOR": "B V IV II",
-    "RINGSET": "08 14 22",
-    "RINGPOS": "12 18 24",
-    "PLUG": "WX YZ AC BD EF",
-    "GROUP": 5,
-    "CODED": "AJNVCWZOECCMBKRMO"
+    "CODED": "TGRWPJCZZOSKUANHW"
   },
   {
     "MSG": "ORDERS MUST BE OBEYED",
+    "MODEL": "N",
+    "ROTOR": "N II V III",
+    "RINGSET": "05 10 15",
+    "RINGPOS": "10 15 20",
+    "PLUG": "AF UJ VQ RZ",
+    "GROUP": 5,
+    "CODED": "LVVXQZSZHCTFMVHZZB"
+  },
+  {
+    "MSG": "ENCODING NOT TO BE REMOVED",
+    "MODEL": "M3",
+    "ROTOR": "B I V II",
+    "RINGSET": "D G F",
+    "RINGPOS": "V G H",
+    "PLUG": "FV PQ",
+    "GROUP": 5,
+    "CODED": "SVXGPWAYLEWFCCMNXSKTSX"
+  },
+  {
+    "MSG": "SECURITY REVIEW",
+    "MODEL": "N",
+    "ROTOR": "N II V III",
+    "RINGSET": "05 10 15",
+    "RINGPOS": "10 15 20",
+    "PLUG": "AF UJ VQ RZ",
+    "GROUP": 5,
+    "CODED": "VSUJQOASTLDBRH"
+  },
+  {
+    "MSG": "STAFF SEPARATING FROM UNIT",
+    "MODEL": "M3",
+    "ROTOR": "C II IV VI",
+    "RINGSET": "A B C",
+    "RINGPOS": "Q R S",
+    "PLUG": "AC HD PX KW",
+    "GROUP": 5,
+    "CODED": "FQLAZKKZJDVJBAYRWZWWMQJ"
+  },
+  {
+    "MSG": "ESCAPE ROUTE FROM BATTLEFIELD IDENTIFIED",
+    "MODEL": "I",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "AO DE GN HI",
+    "GROUP": 5,
+    "CODED": "XJOBBGBKVFPJGDFWPUZWKANXKISMWLSRSXGO"
+  },
+  {
+    "MSG": "DIVISION ADVANCE REROUTED",
+    "MODEL": "M3",
+    "ROTOR": "C II IV VI",
+    "RINGSET": "A B C",
+    "RINGPOS": "Q R S",
+    "PLUG": "AC HD PX KW",
+    "GROUP": 5,
+    "CODED": "QPOYXTJEJRAFXKPFGMBWWTS"
+  },
+  {
+    "MSG": "SUPPORT HAS ARRIVED",
     "MODEL": "M3",
     "ROTOR": "B V II IV",
     "RINGSET": "N S W",
     "RINGPOS": "D H L",
     "PLUG": "BD EG FH IK JL",
     "GROUP": 5,
-    "CODED": "TQWIJGGKGKPYMDOHTK"
+    "CODED": "JMSUVQDCJQMGQFIZF"
   },
   {
-    "MSG": "ENCODING NOT TO BE REMOVED",
+    "MSG": "ENEMY HAS DISPERSED",
+    "MODEL": "KD",
+    "ROTOR": "D I III II",
+    "RINGSET": "A B C",
+    "RINGPOS": "H I J",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "JVIJVJHJLEKQBPZTH"
+  },
+  {
+    "MSG": "OBSERVE NIGHT SKY NEARBY",
+    "MODEL": "T",
+    "ROTOR": "T V VII VIII",
+    "RINGSET": "E F G V",
+    "RINGPOS": "N O P W",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "CIIKGMFUKOVDHCVOPIWJV"
+  },
+  {
+    "MSG": "STORM OFFENSIVE BEGINS TODAY",
     "MODEL": "I",
-    "ROTOR": "B IV I V",
-    "RINGSET": "13 19 25",
-    "RINGPOS": "02 08 14",
-    "PLUG": "ST UV WX YZ AB CD",
+    "ROTOR": "B III IV I",
+    "RINGSET": "21 15 16",
+    "RINGPOS": "04 24 06",
+    "PLUG": "AV BS CG DL FU HZ IN KM",
     "GROUP": 5,
-    "CODED": "WYGAZAZWDYBXMZQCLRKPQQ"
+    "CODED": "LEFBSHXBGMORGNZZLOKLPCOWO"
   },
   {
-    "MSG": "SECURITY REVIEW",
-    "MODEL": "M3",
-    "ROTOR": "B IV I III",
-    "RINGSET": "H L R",
-    "RINGPOS": "C G K",
-    "PLUG": "ST UV WX YZ AC",
+    "MSG": "NIGHT PATROL REPORT MISSING",
+    "MODEL": "I",
+    "ROTOR": "B II V III",
+    "RINGSET": "05 12 18",
+    "RINGPOS": "01 05 10",
+    "PLUG": "ZH CT VW",
     "GROUP": 5,
-    "CODED": "NDSPAOBITHKARX"
+    "CODED": "MGKCBSFKNFJSZLXGLHMQGBVC"
   },
   {
-    "MSG": "STAFF SEPARATING FROM UNIT",
+    "MSG": "RADAR INTERFERENCE ACTIVE",
+    "MODEL": "M4",
+    "ROTOR": "B beta IV II VII",
+    "RINGSET": "D X E Z",
+    "RINGPOS": "A B C D",
+    "PLUG": "AL BG KT",
+    "GROUP": 5,
+    "CODED": "BTQCXPFNANXBWWIQYIPLVAJ"
+  },
+  {
+    "MSG": "TRAINING SUPPLIES AVAILABLE",
     "MODEL": "D",
     "ROTOR": "K II I III",
     "RINGSET": "D A B B",
     "RINGPOS": "K G T K",
     "PLUG": "",
     "GROUP": 5,
-    "CODED": "ZMUBRTBJVOQABEBVOMKMPYB"
-  },
-  {
-    "MSG": "ESCAPE ROUTE FROM BATTLEFIELD IDENTIFIED",
-    "MODEL": "M3",
-    "ROTOR": "B III V VI",
-    "RINGSET": "E K P",
-    "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
-    "GROUP": 5,
-    "CODED": "FQWMZGNZDUNTDDVPBZYNUSMJFYZOLQZYXWUG"
-  },
-  {
-    "MSG": "DIVISION ADVANCE REROUTED",
-    "MODEL": "M3",
-    "ROTOR": "B I V II",
-    "RINGSET": "D G F",
-    "RINGPOS": "V G H",
-    "PLUG": "FV PQ",
-    "GROUP": 5,
-    "CODED": "IWZHUWQTRLROYBMNXGKWCVU"
-  },
-  {
-    "MSG": "SUPPORT HAS ARRIVED",
-    "MODEL": "I",
-    "ROTOR": "B III IV I",
-    "RINGSET": "21 15 16",
-    "RINGPOS": "04 24 06",
-    "PLUG": "AV BS CG DL FU HZ IN KM OW RX",
-    "GROUP": 5,
-    "CODED": "LMJNYBBOOFLQKVFZY"
-  },
-  {
-    "MSG": "ENEMY HAS DISPERSED",
-    "MODEL": "N",
-    "ROTOR": "N II V III",
-    "RINGSET": "05 10 15",
-    "RINGPOS": "10 15 20",
-    "PLUG": "AB CD EF GH IJ",
-    "GROUP": 5,
-    "CODED": "UBFNBPIYJQPGKKIXN"
-  },
-  {
-    "MSG": "OBSERVE NIGHT SKY NEARBY",
-    "MODEL": "I",
-    "ROTOR": "B V IV II",
-    "RINGSET": "08 14 22",
-    "RINGPOS": "12 18 24",
-    "PLUG": "WX YZ AC BD EF",
-    "GROUP": 5,
-    "CODED": "EYEYCTTQPVAMVIHKVJGEG"
-  },
-  {
-    "MSG": "STORM OFFENSIVE BEGINS TODAY",
-    "MODEL": "M3",
-    "ROTOR": "B I V II",
-    "RINGSET": "D G F",
-    "RINGPOS": "V G H",
-    "PLUG": "FV PQ",
-    "GROUP": 5,
-    "CODED": "EOQTAFJIGTMNLPSDUJJACFUFN"
-  },
-  {
-    "MSG": "NIGHT PATROL REPORT MISSING",
-    "MODEL": "M3",
-    "ROTOR": "C II IV VI",
-    "RINGSET": "A B C",
-    "RINGPOS": "Q R S",
-    "PLUG": "AC BD EG FH",
-    "GROUP": 5,
-    "CODED": "UXIANEFMFJKIKUVHARWMIQXO"
-  },
-  {
-    "MSG": "RADAR INTERFERENCE ACTIVE",
-    "MODEL": "M3",
-    "ROTOR": "B III V VI",
-    "RINGSET": "E K P",
-    "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
-    "GROUP": 5,
-    "CODED": "YOJMBWRXODZPDRSKVLQVKXF"
-  },
-  {
-    "MSG": "TRAINING SUPPLIES AVAILABLE",
-    "MODEL": "I",
-    "ROTOR": "B III IV I",
-    "RINGSET": "21 15 16",
-    "RINGPOS": "04 24 06",
-    "PLUG": "AV BS CG DL FU HZ IN KM OW RX",
-    "GROUP": 5,
-    "CODED": "GADYIPXSYENTMVXMMGTMOYRXC"
+    "CODED": "OOUGCWPAOPKFEBSTMQXXBRTMU"
   },
   {
     "MSG": "MAIL CONTAINERS REMAIN EMPTY",
+    "MODEL": "M3",
+    "ROTOR": "B III V VI",
+    "RINGSET": "E K P",
+    "RINGPOS": "A E I",
+    "PLUG": "JE FB MA",
+    "GROUP": 5,
+    "CODED": "DPQPICRXQZBUCYQHFBELNRCAX"
+  },
+  {
+    "MSG": "ORDERS ISSUED BY RADIO",
+    "MODEL": "G",
+    "ROTOR": "K I II III",
+    "RINGSET": "A B C V",
+    "RINGPOS": "K L M F",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "HMUSFKFXDYTJUNSEQAB"
+  },
+  {
+    "MSG": "RESTRICTED AREA ACTIVE",
+    "MODEL": "I",
+    "ROTOR": "B II V III",
+    "RINGSET": "05 12 18",
+    "RINGPOS": "01 05 10",
+    "PLUG": "ZH CT VW",
+    "GROUP": 5,
+    "CODED": "QNUAVQWKXUYSZMZBLKOJ"
+  },
+  {
+    "MSG": "UNIT TURN BACK IN FOREST",
     "MODEL": "I",
     "ROTOR": "C IV V I",
     "RINGSET": "10 20 15",
     "RINGPOS": "15 20 25",
     "PLUG": "MN OP QR ST UV",
     "GROUP": 5,
-    "CODED": "AIQPOJVOUNRPCIIOULLOMUWMF"
-  },
-  {
-    "MSG": "ORDERS ISSUED BY RADIO",
-    "MODEL": "D",
-    "ROTOR": "K II I III",
-    "RINGSET": "D A B B",
-    "RINGPOS": "K G T K",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "TOTJFTXKOPIKIDHLNRV"
-  },
-  {
-    "MSG": "RESTRICTED AREA ACTIVE",
-    "MODEL": "M3",
-    "ROTOR": "B IV I III",
-    "RINGSET": "H L R",
-    "RINGPOS": "C G K",
-    "PLUG": "ST UV WX YZ AC",
-    "GROUP": 5,
-    "CODED": "PDCDAOMFVMRYRHNYGXQB"
-  },
-  {
-    "MSG": "UNIT TURN BACK IN FOREST",
-    "MODEL": "M4",
-    "ROTOR": "B beta IV II VII",
-    "RINGSET": "D X E Z",
-    "RINGPOS": "A B C D",
-    "PLUG": "AB CD EF GH IJ KL MN OP QR ST UV WX YZ",
-    "GROUP": 5,
-    "CODED": "PCNSNGZSMLVUAOVCVGVY"
+    "CODED": "GQQESRODHPZSWAOEWSXE"
   },
   {
     "MSG": "FIRE ONLY ON ORDER",
-    "MODEL": "N",
-    "ROTOR": "N II V III",
-    "RINGSET": "05 10 15",
-    "RINGPOS": "10 15 20",
-    "PLUG": "AB CD EF GH IJ",
-    "GROUP": 5,
-    "CODED": "PRSTEZJSYCZZGSY"
-  },
-  {
-    "MSG": "UNIT AWAITS DECISION",
     "MODEL": "M3",
     "ROTOR": "B I V II",
     "RINGSET": "D G F",
     "RINGPOS": "V G H",
     "PLUG": "FV PQ",
     "GROUP": 5,
-    "CODED": "QVWRMINFOGYKOGBXLC"
+    "CODED": "ZWLYIYDGTTJSTPI"
+  },
+  {
+    "MSG": "UNIT AWAITS DECISION",
+    "MODEL": "N",
+    "ROTOR": "N II V III",
+    "RINGSET": "05 10 15",
+    "RINGPOS": "10 15 20",
+    "PLUG": "AF UJ VQ RZ",
+    "GROUP": 5,
+    "CODED": "CFXAOCTDRGVFHNUFDF"
   },
   {
     "MSG": "AIRLIFT ESTABLISHED",
-    "MODEL": "I",
-    "ROTOR": "B IV I V",
-    "RINGSET": "13 19 25",
-    "RINGPOS": "02 08 14",
-    "PLUG": "ST UV WX YZ AB CD",
+    "MODEL": "M3",
+    "ROTOR": "C II VI VIII",
+    "RINGSET": "M Q T",
+    "RINGPOS": "B F J",
+    "PLUG": "PE DM AW RZ",
     "GROUP": 5,
-    "CODED": "NWWBMWBFVZNIQHDDLJ"
+    "CODED": "NXCTTCMZBDDXIAAEXB"
   },
   {
     "MSG": "BORDER POSTS INSPECTED",
@@ -715,348 +715,348 @@
     "ROTOR": "B III V VI",
     "RINGSET": "E K P",
     "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
+    "PLUG": "JE FB MA",
     "GROUP": 5,
-    "CODED": "CANRAXEZAUIDBYHHMZWG"
+    "CODED": "JFNBYXBZFUICMYGHLZIW"
   },
   {
     "MSG": "SEND REPORT WHEN POSSIBLE",
-    "MODEL": "I",
-    "ROTOR": "B II V III",
-    "RINGSET": "05 12 18",
-    "RINGPOS": "01 05 10",
-    "PLUG": "AB CD EF GH IJ KL",
+    "MODEL": "K",
+    "ROTOR": "K III II I",
+    "RINGSET": "F G R T",
+    "RINGPOS": "L A S T",
+    "PLUG": "",
     "GROUP": 5,
-    "CODED": "LCCBWBHWNHRGLQVWAAQJUT"
+    "CODED": "PISISRUQDRLRTCANGXGOEW"
   },
   {
     "MSG": "SECURITY ZONE EXPAND NOW",
-    "MODEL": "I",
-    "ROTOR": "B III IV I",
-    "RINGSET": "21 15 16",
-    "RINGPOS": "04 24 06",
-    "PLUG": "AV BS CG DL FU HZ IN KM OW RX",
+    "MODEL": "M3",
+    "ROTOR": "B III V VI",
+    "RINGSET": "E K P",
+    "RINGPOS": "A E I",
+    "PLUG": "JE FB MA",
     "GROUP": 5,
-    "CODED": "LTLFTPBMIHPLBHCJICKXV"
+    "CODED": "PUEWMWZJNEBUZIGRSVXJQ"
   },
   {
     "MSG": "ARMORED UNITS HOLD LINE",
-    "MODEL": "I",
-    "ROTOR": "A III V IV",
-    "RINGSET": "03 07 11",
-    "RINGPOS": "07 11 15",
-    "PLUG": "GH IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "KEIDUTLRTOWESFRZJAWX"
-  },
-  {
-    "MSG": "TASK GROUP FOR SECURITY",
-    "MODEL": "M3",
-    "ROTOR": "C II VI VIII",
-    "RINGSET": "M Q T",
-    "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "SEFTUMIHGISNRTPDGJXX"
-  },
-  {
-    "MSG": "GUIDED PATROL IS EMPTY",
-    "MODEL": "M3",
-    "ROTOR": "B III V VI",
-    "RINGSET": "E K P",
-    "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
-    "GROUP": 5,
-    "CODED": "TJQRAOERBDVSFYFRZZT"
-  },
-  {
-    "MSG": "OBSERVATION POINT HELD",
-    "MODEL": "M3",
-    "ROTOR": "B V II IV",
-    "RINGSET": "N S W",
-    "RINGPOS": "D H L",
-    "PLUG": "BD EG FH IK JL",
-    "GROUP": 5,
-    "CODED": "TJPIJXPAQAEMMFGDWMRR"
-  },
-  {
-    "MSG": "RADIO AREA CLEAR",
-    "MODEL": "M3",
-    "ROTOR": "B IV I III",
-    "RINGSET": "H L R",
-    "RINGPOS": "C G K",
-    "PLUG": "ST UV WX YZ AC",
-    "GROUP": 5,
-    "CODED": "PWUQMSNWQRNPBQ"
-  },
-  {
-    "MSG": "URGENT REPORT REQUESTED",
-    "MODEL": "I",
-    "ROTOR": "B V IV II",
-    "RINGSET": "08 14 22",
-    "RINGPOS": "12 18 24",
-    "PLUG": "WX YZ AC BD EF",
-    "GROUP": 5,
-    "CODED": "JHMYQVXOIHOMKMPLVHUBA"
-  },
-  {
-    "MSG": "ALARM DUTY ACTIVATED",
-    "MODEL": "G",
-    "ROTOR": "K I II III",
-    "RINGSET": "A B C V",
-    "RINGPOS": "K L M F",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "IUTWGBDYNGJWCJHIXE"
-  },
-  {
-    "MSG": "WATER SUPPLY SECURED",
-    "MODEL": "M3",
-    "ROTOR": "C II VI VIII",
-    "RINGSET": "M Q T",
-    "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "MELDKWHFGOMKOGNWUM"
-  },
-  {
-    "MSG": "NEXT MESSAGE ARRIVES TOMORROW",
-    "MODEL": "D",
-    "ROTOR": "K II I III",
-    "RINGSET": "D A B B",
-    "RINGPOS": "K G T K",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "PDJSXFUKVSITATOFSFDVUGDWXC"
-  },
-  {
-    "MSG": "AIR RAID PROTECTION MAINTAINED",
-    "MODEL": "K",
-    "ROTOR": "K III II I",
-    "RINGSET": "F G R T",
-    "RINGPOS": "L A S T",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "MELLPPELDPSGZGSNKWHZHSLFDPJ"
-  },
-  {
-    "MSG": "OPERATION PROCEED ON SCHEDULE",
-    "MODEL": "K",
-    "ROTOR": "K III II I",
-    "RINGSET": "F G R T",
-    "RINGPOS": "L A S T",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "WKBLPCMQZOCPZZTIQFFJNWHSWP"
-  },
-  {
-    "MSG": "ORDERS GIVEN QUICKLY",
-    "MODEL": "I",
-    "ROTOR": "A III V IV",
-    "RINGSET": "03 07 11",
-    "RINGPOS": "07 11 15",
-    "PLUG": "GH IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "YEUQULHMUNPWCHQAJF"
-  },
-  {
-    "MSG": "CODE SOPHISTICATION ENSURED",
-    "MODEL": "M3",
-    "ROTOR": "B I V II",
-    "RINGSET": "D G F",
-    "RINGPOS": "V G H",
-    "PLUG": "FV PQ",
-    "GROUP": 5,
-    "CODED": "RTEYUFRVUGWNOTPXLCQJEKIHS"
-  },
-  {
-    "MSG": "DEPARTMENT READY AND IN POSITION",
-    "MODEL": "I",
-    "ROTOR": "A III V IV",
-    "RINGSET": "03 07 11",
-    "RINGPOS": "07 11 15",
-    "PLUG": "GH IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "XRWJUEXNTFUSZZWKUBGZTVTZEAXE"
-  },
-  {
-    "MSG": "OBSERVATION OF ENEMY MOVEMENT",
-    "MODEL": "M3",
-    "ROTOR": "B III V VI",
-    "RINGSET": "E K P",
-    "RINGPOS": "A E I",
-    "PLUG": "AB CD EF GH",
-    "GROUP": 5,
-    "CODED": "LFPCBBMXLJEBIRSHCWAFGWIJJP"
-  },
-  {
-    "MSG": "COLUMN ARRIVED EAST",
-    "MODEL": "I",
-    "ROTOR": "B V IV II",
-    "RINGSET": "08 14 22",
-    "RINGPOS": "12 18 24",
-    "PLUG": "WX YZ AC BD EF",
-    "GROUP": 5,
-    "CODED": "NWRVDQODJAWXNMVDU"
-  },
-  {
-    "MSG": "ORIGIN OF MESSAGE IS SECRET",
-    "MODEL": "K",
-    "ROTOR": "K III II I",
-    "RINGSET": "F G R T",
-    "RINGPOS": "L A S T",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "WYYUQZCVBCTARTTDGXJJMWR"
-  },
-  {
-    "MSG": "RADIO TRAFFIC STRENGTHENED",
-    "MODEL": "M4",
-    "ROTOR": "B beta IV II VII",
-    "RINGSET": "D X E Z",
-    "RINGPOS": "A B C D",
-    "PLUG": "AB CD EF GH IJ KL MN OP QR ST UV WX YZ",
-    "GROUP": 5,
-    "CODED": "AMAVLSZTKWYLUCLSEEZQFXLB"
-  },
-  {
-    "MSG": "ENEMY PUSHED BACK",
-    "MODEL": "M3",
-    "ROTOR": "C VII III I",
-    "RINGSET": "O U X",
-    "RINGPOS": "E I M",
-    "PLUG": "MO PR QS TU VW",
-    "GROUP": 5,
-    "CODED": "TJVNMWZZSZRJWVN"
-  },
-  {
-    "MSG": "TASK TEAMS PREPARED",
-    "MODEL": "N",
-    "ROTOR": "N II V III",
-    "RINGSET": "05 10 15",
-    "RINGPOS": "10 15 20",
-    "PLUG": "AB CD EF GH IJ",
-    "GROUP": 5,
-    "CODED": "CYRYLTIOGGXYIQYXN"
-  },
-  {
-    "MSG": "OFFICE REPORTS NO CHANGE",
-    "MODEL": "G",
-    "ROTOR": "K I II III",
-    "RINGSET": "A B C V",
-    "RINGPOS": "K L M F",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "HVWKEAMUHCPWNYZPUIFTK"
-  },
-  {
-    "MSG": "TRANSMISSION COMPLETED",
-    "MODEL": "M3",
-    "ROTOR": "C II IV VI",
-    "RINGSET": "A B C",
-    "RINGPOS": "Q R S",
-    "PLUG": "AC BD EG FH",
-    "GROUP": 5,
-    "CODED": "XBLLPVUYTZRFWTWBFIRNF"
-  },
-  {
-    "MSG": "RADIO SILENCE PERIOD OBSERVED",
-    "MODEL": "I",
-    "ROTOR": "B IV I V",
-    "RINGSET": "13 19 25",
-    "RINGPOS": "02 08 14",
-    "PLUG": "ST UV WX YZ AB CD",
-    "GROUP": 5,
-    "CODED": "QVMPVKOAGQQPBSPLIJKJFRFIAJ"
-  },
-  {
-    "MSG": "STRATEGIC POSITION SECURE",
-    "MODEL": "I",
-    "ROTOR": "B IV I V",
-    "RINGSET": "13 19 25",
-    "RINGPOS": "02 08 14",
-    "PLUG": "ST UV WX YZ AB CD",
-    "GROUP": 5,
-    "CODED": "YFWOADKMYJKZSVVSMEDUXES"
-  },
-  {
-    "MSG": "LINE ARMOR REINFORCED",
-    "MODEL": "M3",
-    "ROTOR": "B IV I III",
-    "RINGSET": "H L R",
-    "RINGPOS": "C G K",
-    "PLUG": "ST UV WX YZ AC",
-    "GROUP": 5,
-    "CODED": "TMHXRBCATCPAZPEIXPC"
-  },
-  {
-    "MSG": "BATTLE REPORT EXPECTED",
-    "MODEL": "M3",
-    "ROTOR": "C VII III I",
-    "RINGSET": "O U X",
-    "RINGPOS": "E I M",
-    "PLUG": "MO PR QS TU VW",
-    "GROUP": 5,
-    "CODED": "WPRXJODTUTDEQUCDBDVY"
-  },
-  {
-    "MSG": "SEND HELP REGIMENT EATEN BY GRUE",
-    "MODEL": "K",
-    "ROTOR": "K III II I",
-    "RINGSET": "F G R T",
-    "RINGPOS": "L A S T",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "PISIFRRLDCXYXZVVHGOAHFJMUCI"
-  },
-  {
-    "MSG": "WE ARE GONNA NEED A BIGGER BOAT",
-    "MODEL": "M3",
-    "ROTOR": "C II VI VIII",
-    "RINGSET": "M Q T",
-    "RINGPOS": "B F J",
-    "PLUG": "IJ KL MN OP QR",
-    "GROUP": 5,
-    "CODED": "MAYJZAIRTEWHOHGELLCKMILBU"
-  },
-  {
-    "MSG": "LIFE IS LIKE A BOX OF CHOCOLATES",
-    "MODEL": "I",
-    "ROTOR": "B V IV II",
-    "RINGSET": "08 14 22",
-    "RINGPOS": "12 18 24",
-    "PLUG": "WX YZ AC BD EF",
-    "GROUP": 5,
-    "CODED": "PFTYHDJFALHQQYFIXSQUCWJEND"
-  },
-  {
-    "MSG": "THE CAKE IS A LIE",
-    "MODEL": "D",
-    "ROTOR": "K II I III",
-    "RINGSET": "D A B B",
-    "RINGPOS": "K G T K",
-    "PLUG": "",
-    "GROUP": 5,
-    "CODED": "OYVVVDBQOXUGL"
-  },
-  {
-    "MSG": "SWORDFISH",
     "MODEL": "T",
     "ROTOR": "T V VII VIII",
     "RINGSET": "E F G V",
     "RINGPOS": "N O P W",
     "PLUG": "",
     "GROUP": 5,
-    "CODED": "PAASCYLJX"
+    "CODED": "EVCAGHANWYRVSVKIFAOL"
   },
   {
-    "MSG": "BE SURE TO DRINK YOUR OVALTINE",
+    "MSG": "TASK GROUP FOR SECURITY",
+    "MODEL": "I",
+    "ROTOR": "B III IV I",
+    "RINGSET": "21 15 16",
+    "RINGPOS": "04 24 06",
+    "PLUG": "AV BS CG DL FU HZ IN KM",
+    "GROUP": 5,
+    "CODED": "GXWOQJDEKSSITNPYSOAP"
+  },
+  {
+    "MSG": "GUIDED PATROL IS EMPTY",
+    "MODEL": "M3",
+    "ROTOR": "B IV I III",
+    "RINGSET": "H L R",
+    "RINGPOS": "C G K",
+    "PLUG": "ST UV WX YZ AC",
+    "GROUP": 5,
+    "CODED": "VNBTIHDORCJHDNOTAWZ"
+  },
+  {
+    "MSG": "OBSERVATION POINT HELD",
+    "MODEL": "I",
+    "ROTOR": "B V IV II",
+    "RINGSET": "08 14 22",
+    "RINGPOS": "12 18 24",
+    "PLUG": "WX YZ AC BD EF",
+    "GROUP": 5,
+    "CODED": "EYEYCTOJPHKYQKEPKKER"
+  },
+  {
+    "MSG": "RADIO AREA CLEAR",
+    "MODEL": "I",
+    "ROTOR": "B II V III",
+    "RINGSET": "05 12 18",
+    "RINGPOS": "01 05 10",
+    "PLUG": "ZH CT VW",
+    "GROUP": 5,
+    "CODED": "QMNKLFJXGGJQGX"
+  },
+  {
+    "MSG": "URGENT REPORT REQUESTED",
+    "MODEL": "M4",
+    "ROTOR": "B beta IV II VII",
+    "RINGSET": "D X E Z",
+    "RINGPOS": "A B C D",
+    "PLUG": "AL BG KT",
+    "GROUP": 5,
+    "CODED": "FWCLKCZPOFCDWWTTYMFOR"
+  },
+  {
+    "MSG": "ALARM DUTY ACTIVATED",
+    "MODEL": "I",
+    "ROTOR": "B IV I V",
+    "RINGSET": "13 19 25",
+    "RINGPOS": "02 08 14",
+    "PLUG": "ZJ CB EN",
+    "GROUP": 5,
+    "CODED": "BVWXIELJRNEYTMXOMY"
+  },
+  {
+    "MSG": "WATER SUPPLY SECURED",
+    "MODEL": "I",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "AO DE GN HI",
+    "GROUP": 5,
+    "CODED": "DGZPCKCSBRKDQHLPWG"
+  },
+  {
+    "MSG": "NEXT MESSAGE ARRIVES TOMORROW",
+    "MODEL": "M3",
+    "ROTOR": "C II VI VIII",
+    "RINGSET": "M Q T",
+    "RINGPOS": "B F J",
+    "PLUG": "PE DM AW RZ",
+    "GROUP": 5,
+    "CODED": "AGJLYJCBMISFHNJFXWXRWMWMED"
+  },
+  {
+    "MSG": "AIR RAID PROTECTION MAINTAINED",
+    "MODEL": "KD",
+    "ROTOR": "D I III II",
+    "RINGSET": "A B C",
+    "RINGPOS": "H I J",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "VUGTFGUUVLGHZOPBIQVJDUTKBXI"
+  },
+  {
+    "MSG": "OPERATION PROCEED ON SCHEDULE",
+    "MODEL": "I",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "AO DE GN HI",
+    "GROUP": 5,
+    "CODED": "LFUDVDNKLJZLUZDSJPVBILHQKG"
+  },
+  {
+    "MSG": "ORDERS GIVEN QUICKLY",
+    "MODEL": "M3",
+    "ROTOR": "C II VI VIII",
+    "RINGSET": "M Q T",
+    "RINGPOS": "B F J",
+    "PLUG": "PE DM AW RZ",
+    "GROUP": 5,
+    "CODED": "UDUHPAIGLKYDFAODCQ"
+  },
+  {
+    "MSG": "CODE SOPHISTICATION ENSURED",
+    "MODEL": "G",
+    "ROTOR": "K I II III",
+    "RINGSET": "A B C V",
+    "RINGPOS": "K L M F",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "MYUSJICROJEOIHITSBDILZEMV"
+  },
+  {
+    "MSG": "DEPARTMENT READY AND IN POSITION",
     "MODEL": "K",
     "ROTOR": "K III II I",
     "RINGSET": "F G R T",
     "RINGPOS": "L A S T",
     "PLUG": "",
     "GROUP": 5,
-    "CODED": "DINGSRAQRTJCQUKEJBMEESUQG"
+    "CODED": "BIUKSCICZRCGRPXMKLGFGMFFPNCE"
+  },
+  {
+    "MSG": "OBSERVATION OF ENEMY MOVEMENT",
+    "MODEL": "D",
+    "ROTOR": "K II I III",
+    "RINGSET": "D A B B",
+    "RINGPOS": "K G T K",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "TFKJFQVMBRSJTNLXAUKVQVKCWU"
+  },
+  {
+    "MSG": "COLUMN ARRIVED EAST",
+    "MODEL": "I",
+    "ROTOR": "B III IV I",
+    "RINGSET": "21 15 16",
+    "RINGPOS": "04 24 06",
+    "PLUG": "AV BS CG DL FU HZ IN KM",
+    "GROUP": 5,
+    "CODED": "UWCFSYEDJOXLFNGMC"
+  },
+  {
+    "MSG": "ORIGIN OF MESSAGE IS SECRET",
+    "MODEL": "I",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "AO DE GN HI",
+    "GROUP": 5,
+    "CODED": "LOQFXZFRTIIDYRDFVXNBDLS"
+  },
+  {
+    "MSG": "RADIO TRAFFIC STRENGTHENED",
+    "MODEL": "I",
+    "ROTOR": "B II V III",
+    "RINGSET": "05 12 18",
+    "RINGPOS": "01 05 10",
+    "PLUG": "ZH CT VW",
+    "GROUP": 5,
+    "CODED": "QMNKLOJBOOSOVUBQGANFXXFV"
+  },
+  {
+    "MSG": "ENEMY PUSHED BACK",
+    "MODEL": "M3",
+    "ROTOR": "C II IV VI",
+    "RINGSET": "A B C",
+    "RINGPOS": "Q R S",
+    "PLUG": "AC HD PX KW",
+    "GROUP": 5,
+    "CODED": "KWIDBLIYZBJHFKM"
+  },
+  {
+    "MSG": "TASK TEAMS PREPARED",
+    "MODEL": "KD",
+    "ROTOR": "D I III II",
+    "RINGSET": "A B C",
+    "RINGPOS": "H I J",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "HPHDGDHTJSWHMDQTH"
+  },
+  {
+    "MSG": "OFFICE REPORTS NO CHANGE",
+    "MODEL": "T",
+    "ROTOR": "T V VII VIII",
+    "RINGSET": "E F G V",
+    "RINGPOS": "N O P W",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "CSXMDHYPTGTDHRGKVIOOF"
+  },
+  {
+    "MSG": "TRANSMISSION COMPLETED",
+    "MODEL": "M3",
+    "ROTOR": "B V II IV",
+    "RINGSET": "N S W",
+    "RINGPOS": "D H L",
+    "PLUG": "BD EG FH IK JL",
+    "GROUP": 5,
+    "CODED": "OQHSWJHZGWSDEMJNGMFBM"
+  },
+  {
+    "MSG": "RADIO SILENCE PERIOD OBSERVED",
+    "MODEL": "KD",
+    "ROTOR": "D I III II",
+    "RINGSET": "A B C",
+    "RINGPOS": "H I J",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "ZPCXHVBCGVYHMCQXJFNPTFIDFW"
+  },
+  {
+    "MSG": "STRATEGIC POSITION SECURE",
+    "MODEL": "I",
+    "ROTOR": "A III V IV",
+    "RINGSET": "03 07 11",
+    "RINGPOS": "07 11 15",
+    "PLUG": "AO DE GN HI",
+    "GROUP": 5,
+    "CODED": "QLBBWGXYXJNDWWOLTXNBPNB"
+  },
+  {
+    "MSG": "LINE ARMOR REINFORCED",
+    "MODEL": "I",
+    "ROTOR": "B III IV I",
+    "RINGSET": "21 15 16",
+    "RINGPOS": "04 24 06",
+    "PLUG": "AV BS CG DL FU HZ IN KM",
+    "GROUP": 5,
+    "CODED": "SRMZRJKZJJMRYYNXTKG"
+  },
+  {
+    "MSG": "BATTLE REPORT EXPECTED",
+    "MODEL": "T",
+    "ROTOR": "T V VII VIII",
+    "RINGSET": "E F G V",
+    "RINGPOS": "N O P W",
+    "PLUG": "",
+    "GROUP": 5,
+    "CODED": "NWEXBHYPTGTDJYWZQRUX"
+  },
+  {
+    "MSG": "SEND HELP REGIMENT EATEN BY GRUE",
+    "MODEL": "M3",
+    "ROTOR": "C II VI VIII",
+    "RINGSET": "M Q T",
+    "RINGPOS": "B F J",
+    "PLUG": "PE DM AW RZ",
+    "GROUP": 5,
+    "CODED": "TGLOBJFRNKCJGOLCXXXKQJLAXJU"
+  },
+  {
+    "MSG": "WE ARE GONNA NEED A BIGGER BOAT",
+    "MODEL": "I",
+    "ROTOR": "C IV V I",
+    "RINGSET": "10 20 15",
+    "RINGPOS": "15 20 25",
+    "PLUG": "MN OP QR ST UV",
+    "GROUP": 5,
+    "CODED": "EZRYMARDVPRPXTNQNRDTLGKRG"
+  },
+  {
+    "MSG": "LIFE IS LIKE A BOX OF CHOCOLATES",
+    "MODEL": "M3",
+    "ROTOR": "B IV I III",
+    "RINGSET": "H L R",
+    "RINGPOS": "C G K",
+    "PLUG": "ST UV WX YZ AC",
+    "GROUP": 5,
+    "CODED": "TMWXEAJYLHRQFWEEXSMVFDORFO"
+  },
+  {
+    "MSG": "THE CAKE IS A LIE",
+    "MODEL": "M3",
+    "ROTOR": "C II VI VIII",
+    "RINGSET": "M Q T",
+    "RINGPOS": "B F J",
+    "PLUG": "PE DM AW RZ",
+    "GROUP": 5,
+    "CODED": "SNIXXHJGBXPJP"
+  },
+  {
+    "MSG": "SWORDFISH",
+    "MODEL": "M3",
+    "ROTOR": "B IV I III",
+    "RINGSET": "H L R",
+    "RINGPOS": "C G K",
+    "PLUG": "ST UV WX YZ AC",
+    "GROUP": 5,
+    "CODED": "NAPVJCACB"
+  },
+  {
+    "MSG": "BE SURE TO DRINK YOUR OVALTINE",
+    "MODEL": "I",
+    "ROTOR": "B II V III",
+    "RINGSET": "05 12 18",
+    "RINGPOS": "01 05 10",
+    "PLUG": "ZH CT VW",
+    "GROUP": 5,
+    "CODED": "TNUPVGNVZPSJFOXSZJOIWSUYP"
   }
 ]
