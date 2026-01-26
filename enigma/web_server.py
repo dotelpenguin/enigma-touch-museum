@@ -91,12 +91,24 @@ class MuseumWebServer:
                         html = self.generate_status_html(data)
                         self.wfile.write(html.encode('utf-8'))
                         self.wfile.flush()
-                    elif self.path == '/message.json':
+                    elif self.path.startswith('/message.json'):
+                        # Parse URL to get language parameter
+                        parsed_url = urlparse(self.path)
+                        query_params = parse_qs(parsed_url.query)
+                        language = query_params.get('lang', [None])[0]
+                        if not language:
+                            # Try to get from Accept-Language header
+                            accept_language = self.headers.get('Accept-Language', '')
+                            if 'de' in accept_language.lower():
+                                language = 'de'
+                            else:
+                                language = None
+                        
                         self.send_response(200)
                         self.send_header('Content-type', 'application/json')
                         self.send_header('Cache-Control', 'no-cache')
                         self.end_headers()
-                        json_data = self.generate_message_json(data)
+                        json_data = self.generate_message_json(data, language=language)
                         self.wfile.write(json.dumps(json_data).encode('utf-8'))
                         self.wfile.flush()
                     elif self.path.startswith('/kiosk.html'):
@@ -357,12 +369,18 @@ class MuseumWebServer:
 </html>"""
                 return html
             
-            def generate_message_json(self, data):
+            def generate_message_json(self, data, language=None):
                 """Generate JSON data for museum kiosk display"""
                 config = data.get('config', {})
                 log_messages = data.get('log_messages', [])
                 function_mode = data.get('function_mode', 'N/A')
                 is_encode_mode = data.get('is_encode_mode', True)
+                
+                # Load locale for translations
+                if language:
+                    current_locale = locale_manager_ref.load_locale(language)
+                else:
+                    current_locale = locale_ref
                 enable_slides = data.get('enable_slides', False)
                 slide_path = data.get('slide_path', None)
                 character_delay_ms = data.get('character_delay_ms', 0)
@@ -506,7 +524,7 @@ class MuseumWebServer:
                         'result_message': result_message,
                         'highlighted_message': highlighted_message,
                         'is_encode_mode': is_encode_mode,
-                        'result_label': ('Encoded' if is_encode_mode else 'Decoded') + ' Message'
+                        'result_label': current_locale.get('messages', {}).get('encoded_message' if is_encode_mode else 'decoded_message', ('Encoded' if is_encode_mode else 'Decoded') + ' Message')
                     },
                     'interactive': {
                         'is_interactive_mode': is_interactive_mode,
@@ -591,9 +609,9 @@ class MuseumWebServer:
         .machine-display {{ background: {get_theme('boxes.machine_display.background', 'rgba(0, 0, 0, 0.6)')}; border: 2px solid {get_theme('boxes.machine_display.border', '#ffd700')}; border-radius: {get_theme('boxes.machine_display.border_radius', '10px')}; padding: min(1vh, 10px); margin: min(1vh, 10px) min(1vw, 10px) 0 min(1vw, 10px); padding-bottom: min(0.5vh, 5px); box-shadow: {get_theme('boxes.machine_display.box_shadow', '0 4px 16px rgba(0,0,0,0.5)')}; flex-shrink: 0; max-height: calc(30vh + 23px); overflow: visible; }}
         .plugboard-unused {{ opacity: {get_theme('boxes.plugboard_unused.opacity', '0.4')}; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
         .plugboard-unused .config-label {{ color: {get_theme('colors.dark_gray', '#666')} !important; }}
-        .plugboard-unused .plugboard-box {{ background: {get_theme('boxes.plugboard_unused.background', 'rgba(100, 100, 100, 0.2)')} !important; border-color: {get_theme('boxes.plugboard_unused.border', '#666')} !important; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
-        .counter-box {{ background: {get_theme('boxes.counter_box.background', 'rgba(200, 150, 100, 0.3)')}; border: 2px solid {get_theme('boxes.counter_box.border', '#c89664')}; border-radius: {get_theme('boxes.counter_box.border_radius', '6px')}; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2.2vw, 22px); font-weight: bold; color: {get_theme('boxes.counter_box.color', '#d8b890')}; min-width: 60px; }}
-        .plugboard-unused .counter-box {{ background: {get_theme('boxes.plugboard_unused.background', 'rgba(100, 100, 100, 0.2)')} !important; border-color: {get_theme('boxes.plugboard_unused.border', '#666')} !important; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
+        .plugboard-unused .plugboard-box {{ background: {get_theme('boxes.plugboard_unused.background', 'rgba(100, 100, 100, 0.2)')} !important; border: 2px solid {get_theme('boxes.plugboard_unused.border', '#666')} !important; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
+        .counter-box {{ background: {get_theme('boxes.counter_box.background', 'rgba(200, 150, 100, 0.3)')}; border: 2px solid {get_theme('boxes.counter_box.border', '#c89664')}; border-radius: {get_theme('boxes.counter_box.border_radius', '6px')}; padding: min(0.8vh, 8px) min(1.5vw, 15px); font-size: min(2vw, 20px); font-weight: bold; color: {get_theme('boxes.counter_box.color', '#d8b890')}; min-width: 60px; }}
+        .plugboard-unused .counter-box {{ background: {get_theme('boxes.plugboard_unused.background', 'rgba(100, 100, 100, 0.2)')} !important; border: 2px solid {get_theme('boxes.plugboard_unused.border', '#666')} !important; color: {get_theme('boxes.plugboard_unused.color', '#888')} !important; }}
         .config-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: min(1vw, 10px); margin: min(1vh, 10px) 0; }}
         .config-item {{ background: {get_theme('boxes.config_item.background', 'rgba(255, 255, 255, 0.1)')}; padding: min(1vh, 10px); border-radius: {get_theme('boxes.config_item.border_radius', '6px')}; border: {get_theme('boxes.config_item.border', '1px solid rgba(255, 215, 0, 0.3)')}; }}
         .config-label {{ font-size: min(1.5vw, 15px); color: {get_theme('text.config_label.color', '#ffd700')}; text-transform: uppercase; letter-spacing: 0.1vw; margin-bottom: min(1vh, 10px); font-weight: bold; }}
@@ -1001,7 +1019,7 @@ class MuseumWebServer:
                 if (hasCounter) {{
                     html += '<div class="counter-box">' + escapeHtml(String(counterValue)) + '</div>';
                 }} else {{
-                    html += '<div class="counter-box" style="font-style: italic;">' + escapeHtml(getLocale('labels.unused', 'Unused')) + '</div>';
+                    html += '<div class="counter-box" style="font-style: italic;">' + escapeHtml(getLocale('labels.unused', 'UNUSED')) + '</div>';
                 }}
                 html += '</div></div>';
                 
@@ -1015,7 +1033,7 @@ class MuseumWebServer:
                         html += '<div class="plugboard-box">' + escapeHtml(plug) + '</div>';
                     }});
                 }} else {{
-                    html += '<div class="plugboard-box" style="font-style: italic;">' + escapeHtml(getLocale('labels.unused', 'Unused')) + '</div>';
+                    html += '<div class="plugboard-box" style="font-style: italic;">' + escapeHtml(getLocale('labels.unused', 'UNUSED')) + '</div>';
                 }}
                 html += '</div></div>';
                 
@@ -1275,7 +1293,12 @@ class MuseumWebServer:
                     retryTimer = null;
                 }}
                 
-                fetchWithTimeout('/message.json')
+                // Get current language from URL or default to 'en'
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentLang = urlParams.get('lang') || 'en';
+                const messageJsonUrl = '/message.json' + (currentLang ? '?lang=' + encodeURIComponent(currentLang) : '');
+                
+                fetchWithTimeout(messageJsonUrl)
                     .then(function(response) {{
                         if (!response.ok) {{
                             const error = new Error('HTTP ' + response.status);
